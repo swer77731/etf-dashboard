@@ -7,10 +7,12 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from datetime import date, datetime, timedelta
+
 from fastapi import HTTPException
 
 from app.config import PROJECT_ROOT, settings
-from app.services import etf_metrics, ranking
+from app.services import etf_metrics, performance, ranking
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +108,53 @@ async def index(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request, "index.html",
         {**_common_ctx(), "sections": sections, "market": market},
+    )
+
+
+def _parse_date(s: str | None, default: date) -> date:
+    if not s:
+        return default
+    try:
+        return datetime.strptime(s, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return default
+
+
+@router.get("/compare", response_class=HTMLResponse)
+async def compare(
+    request: Request,
+    codes: str = "0050,0056,00878",
+    start: str | None = None,
+    end: str | None = None,
+) -> HTMLResponse:
+    """績效比較頁 — 自選 ETF + 自選日期區間 + 統計表 + 累積報酬走勢圖。"""
+    today = date.today()
+    end_date = _parse_date(end, today)
+    start_date = _parse_date(start, today - timedelta(days=365))
+    if start_date > end_date:
+        start_date, end_date = end_date, start_date
+
+    # 上限 6 支(避免圖表太擠)
+    code_list = [c.strip().upper() for c in codes.split(",") if c.strip()][:6]
+
+    from dataclasses import asdict
+    result = performance.compare_etfs(code_list, start_date, end_date)
+    # 把 dataclass(slots=True 沒 __dict__)轉成 plain dict 給 template 與 ECharts JSON 用
+    stats_dicts = [asdict(s) for s in result["stats"]]
+    return templates.TemplateResponse(
+        request, "compare.html",
+        {
+            **_common_ctx(),
+            "result": {
+                **result,
+                "stats": stats_dicts,
+            },
+            "form": {
+                "codes": ",".join(code_list),
+                "start": start_date.isoformat(),
+                "end": end_date.isoformat(),
+            },
+        },
     )
 
 

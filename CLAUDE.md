@@ -960,7 +960,16 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
   - [x] 排行榜代號 → 點擊跳詳情頁
   - [ ] Phase 2:經理人 / 選股理念(需人工 + AI)
   - [ ] Phase 3:十大持股 / 產業分布(FinMind 無資料,需爬蟲)
-- [ ] Step 3:績效比較圖表
+- [x] Step 3:績效比較圖表 ✅ 2026-04-26
+  - [x] `/compare?codes=...&start=...&end=...` 自選 ETF + 自訂期間(上限 6 支)
+  - [x] 統計指標:總報酬 / 年化 / 年化波動 / 夏普 / Sortino / 最大回撤 / 最佳年 / 最差年
+  - [x] 累積報酬折線圖(ECharts 暗色,期初 = 100 標準化)
+  - [x] 槓桿型粗線、反向型虛線(Default-Safe / Optional-Powerful 開放原則)
+  - [x] Jargon-tooltip:夏普 / Sortino / 年化波動 / 最大回撤 hover 出白話一句解釋
+  - [x] 6 色 palette 避開紅綠(避免與漲跌語意衝突)
+  - [x] 快速期間連結:當日 / YTD / 1Y / 3Y / 5Y
+  - [x] 找不到代號 / 資料不足提示
+  - [x] sidebar 主導航啟用「績效比較」
 - [ ] Step 4:新聞牆
 - [ ] Step 5:Telegram 推播
 - [ ] Step 6:會員系統

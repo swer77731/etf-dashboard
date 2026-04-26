@@ -376,28 +376,26 @@
 
       <nav class="flex-1 overflow-y-auto">
         <div class="text-[0.65rem] uppercase tracking-widest text-muted mb-2 px-3">主導航</div>
-        <a href="/" class="nav-item active mb-1">
+        <a href="/" class="nav-item mb-1 {% if request.url.path == '/' %}active{% endif %}">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
           排行榜
         </a>
-
-        <div class="text-[0.65rem] uppercase tracking-widest text-muted mb-2 mt-6 px-3">即將推出</div>
-        <a href="#" class="nav-item disabled mb-1">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-          ETF 詳情
-          <span class="nav-badge">Step 2.5</span>
-        </a>
-        <a href="#" class="nav-item disabled mb-1">
+        <a href="/compare" class="nav-item mb-1 {% if request.url.path == '/compare' %}active{% endif %}">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
           績效比較
-          <span class="nav-badge">Step 3</span>
         </a>
+
+        <div class="text-[0.65rem] uppercase tracking-widest text-muted mb-2 mt-6 px-3">即將推出</div>
         <a href="#" class="nav-item disabled">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg>
           新聞
           <span class="nav-badge">Step 4</span>
         </a>
       </nav>
+
+      <p class="text-[0.7rem] text-muted/70 px-3 mt-4 leading-relaxed">
+        想看單一 ETF 詳情?從排行榜點代號即可。
+      </p>
 
       <div class="space-y-3 pt-4 border-t border-border">
         {# 整列點擊 toggle,內部按鈕也能精準選 (stop.propagation 防雙觸發) #}

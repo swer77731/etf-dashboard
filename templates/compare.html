@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+
+{% block title %}績效比較 — {{ brand_full }}{% endblock %}
+
+{% macro fmt_pct(v, signed=True, dp=2) -%}
+  {%- if v is none -%}—
+  {%- else -%}
+    {%- if signed and v > 0 -%}+{%- endif -%}{{ ("%."~dp~"f")|format(v) }}%
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro fmt_num(v, dp=2) -%}
+  {%- if v is none -%}—{%- else -%}{{ ("%."~dp~"f")|format(v) }}{%- endif -%}
+{%- endmacro %}
+
+{% macro pct_color(v) -%}
+  {%- if v is none -%}text-muted
+  {%- elif v > 0 -%}text-up
+  {%- elif v < 0 -%}text-down
+  {%- else -%}text-fg
+  {%- endif -%}
+{%- endmacro %}
+
+{# Tooltip helper — dotted underline + hover 出現一句白話 #}
+{% macro tip(text, hint) -%}
+  <span class="border-b border-dotted border-muted/50 cursor-help" title="{{ hint }}">{{ text }}</span>
+{%- endmacro %}
+
+{% block content %}
+
+<section class="mb-8">
+  <h1 class="text-2xl sm:text-3xl font-semibold mb-2">
+    <span class="hero-text">績效比較</span>
+  </h1>
+  <p class="text-base text-muted">
+    自選最多 6 支 ETF + 自訂期間,看誰真的賺最多、波動多大。
+  </p>
+</section>
+
+{# === 表單 === #}
+<section class="relative section-card rounded-xl p-5 sm:p-7 mb-7">
+  <form method="get" action="/compare" class="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end">
+    <div class="sm:col-span-6">
+      <label class="block text-sm text-muted mb-2">ETF 代號(最多 6 支,用逗號分隔)</label>
+      <input type="text" name="codes" value="{{ form.codes }}"
+             placeholder="0050,0056,00878"
+             class="w-full bg-bg-soft border border-border rounded-md px-3 py-2.5 text-base font-mono text-fg focus:outline-none focus:border-accent transition" />
+    </div>
+    <div class="sm:col-span-3">
+      <label class="block text-sm text-muted mb-2">起始日</label>
+      <input type="date" name="start" value="{{ form.start }}"
+             class="w-full bg-bg-soft border border-border rounded-md px-3 py-2.5 text-base text-fg focus:outline-none focus:border-accent transition" />
+    </div>
+    <div class="sm:col-span-3">
+      <label class="block text-sm text-muted mb-2">結束日</label>
+      <input type="date" name="end" value="{{ form.end }}"
+             class="w-full bg-bg-soft border border-border rounded-md px-3 py-2.5 text-base text-fg focus:outline-none focus:border-accent transition" />
+    </div>
+    <div class="sm:col-span-12 flex items-center gap-3 flex-wrap">
+      <button type="submit" class="bg-accent text-white px-5 py-2.5 rounded-md font-semibold hover:opacity-90 transition shadow-[0_0_18px_var(--c-accent-glow)]">
+        比較
+      </button>
+      <span class="text-xs text-muted">快速:</span>
+      <a href="/compare?codes={{ form.codes }}&start={{ result.end }}&end={{ result.end }}" class="text-xs text-accent hover:underline">當日</a>
+      <span class="text-muted text-xs">·</span>
+      {% set today = result.end %}
+      <a class="text-xs text-accent hover:underline" href="/compare?codes={{ form.codes }}&start=2025-01-01&end={{ today }}">YTD</a>
+      <span class="text-muted text-xs">·</span>
+      <a class="text-xs text-accent hover:underline" href="/compare?codes={{ form.codes }}&start=2025-04-26&end={{ today }}">近 1 年</a>
+      <span class="text-muted text-xs">·</span>
+      <a class="text-xs text-accent hover:underline" href="/compare?codes={{ form.codes }}&start=2023-04-26&end={{ today }}">近 3 年</a>
+      <span class="text-muted text-xs">·</span>
+      <a class="text-xs text-accent hover:underline" href="/compare?codes={{ form.codes }}&start=2021-01-01&end={{ today }}">5 年</a>
+    </div>
+  </form>
+</section>
+
+{# === 警示訊息 === #}
+{% if result.not_found or result.insufficient %}
+<section class="mb-7 px-4 py-3 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-200/90 text-sm sm:text-base">
+  {% if result.not_found %}
+    找不到這些代號:<span class="font-mono">{{ result.not_found|join(", ") }}</span>。
+  {% endif %}
+  {% if result.insufficient %}
+    這些代號在指定區間資料不足:<span class="font-mono">{{ result.insufficient|join(", ") }}</span>。
+  {% endif %}
+</section>
+{% endif %}
+
+{% if result.stats %}
+
+{# === 累積報酬走勢圖 === #}
+<section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7">
+  <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
+
+  <div class="card-content">
+    <header class="mb-5 flex items-baseline justify-between gap-4 flex-wrap">
+      <div class="flex items-center gap-3">
+        <div class="w-1 h-7 bg-accent rounded-full" style="box-shadow: 0 0 8px var(--c-accent-glow);"></div>
+        <div>
+          <h2 class="text-xl sm:text-2xl font-semibold">累積報酬走勢</h2>
+          <div class="text-sm text-muted mt-1">期初 = 100,後續為當日累積報酬指數</div>
+        </div>
+      </div>
+      <div class="text-xs sm:text-sm text-muted num">{{ result.start }} ~ {{ result.end }}</div>
+    </header>
+
+    <div id="cmp-chart" class="w-full h-80 sm:h-[28rem] relative z-10"></div>
+
+    <div class="mt-4 text-xs text-muted">
+      線型說明:一般 ETF 實線 / 槓桿型加粗實線 / 反向型虛線
+    </div>
+  </div>
+
+  <div class="card-watermark">ETF Watch</div>
+</section>
+
+{# === 統計表 === #}
+<section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7 pb-12">
+  <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
+
+  <div class="card-content">
+    <header class="mb-5 flex items-baseline gap-3 flex-wrap">
+      <div class="w-1 h-7 bg-accent rounded-full" style="box-shadow: 0 0 8px var(--c-accent-glow);"></div>
+      <div>
+        <h2 class="text-xl sm:text-2xl font-semibold">績效統計表</h2>
+        <div class="text-sm text-muted mt-1">含 hover 提示的指標,把游標移上去看白話解釋</div>
+      </div>
+    </header>
+
+    <div class="overflow-x-auto -mx-4 sm:mx-0">
+      <table class="w-full text-base num min-w-[760px]">
+        <thead>
+          <tr class="text-left text-muted border-b border-border">
+            <th class="py-3 px-3 font-medium text-base">代號 / 名稱</th>
+            <th class="py-3 px-3 font-medium text-base text-right">總報酬</th>
+            <th class="py-3 px-3 font-medium text-base text-right">{{ tip("年化報酬", "把總報酬攤成「平均一年賺多少 %」") }}</th>
+            <th class="py-3 px-3 font-medium text-base text-right">{{ tip("年化波動", "這支 ETF 每年大約上下擺多大,越小越穩") }}</th>
+            <th class="py-3 px-3 font-medium text-base text-right">{{ tip("夏普值", "每承擔 1 分風險可換到的報酬,越高越好") }}</th>
+            <th class="py-3 px-3 font-medium text-base text-right">{{ tip("Sortino", "跟夏普值類似,但只算「往下跌」的風險") }}</th>
+            <th class="py-3 px-3 font-medium text-base text-right">{{ tip("最大回撤", "從歷史高點曾經跌到多深,負數越大越慘") }}</th>
+            <th class="py-3 px-3 font-medium text-base text-right">最佳年</th>
+            <th class="py-3 px-3 font-medium text-base text-right">最差年</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in result.stats %}
+          <tr class="border-b border-border/40 hover:bg-bg/40">
+            <td class="py-3 px-3">
+              <a href="/etf/{{ s.code }}" class="font-mono text-accent hover:underline">{{ s.code }}</a>
+              <span class="ml-2">{{ s.name }}</span>
+              {% if s.leverage_subtype == "positive" %}
+                <span class="ml-2 px-1.5 py-0.5 text-[0.65rem] font-semibold bg-amber-500/20 text-amber-300 rounded">{{ s.leverage_multiplier }} 倍</span>
+              {% elif s.leverage_subtype == "inverse" %}
+                <span class="ml-2 px-1.5 py-0.5 text-[0.65rem] font-semibold bg-amber-500/20 text-amber-300 rounded">{{ s.leverage_multiplier }} 倍</span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-3 text-right font-semibold {{ pct_color(s.total_return_pct) }}">{{ fmt_pct(s.total_return_pct) }}</td>
+            <td class="py-3 px-3 text-right {{ pct_color(s.annualized_return_pct) }}">{{ fmt_pct(s.annualized_return_pct) }}</td>
+            <td class="py-3 px-3 text-right">{{ fmt_pct(s.volatility_pct, signed=False) }}</td>
+            <td class="py-3 px-3 text-right">{{ fmt_num(s.sharpe) }}</td>
+            <td class="py-3 px-3 text-right">{{ fmt_num(s.sortino) }}</td>
+            <td class="py-3 px-3 text-right text-down">{{ fmt_pct(s.max_drawdown_pct) }}</td>
+            <td class="py-3 px-3 text-right">
+              {% if s.best_year %}<span class="text-xs text-muted">{{ s.best_year }} </span>{% endif %}
+              <span class="{{ pct_color(s.best_year_pct) }}">{{ fmt_pct(s.best_year_pct) }}</span>
+            </td>
+            <td class="py-3 px-3 text-right">
+              {% if s.worst_year %}<span class="text-xs text-muted">{{ s.worst_year }} </span>{% endif %}
+              <span class="{{ pct_color(s.worst_year_pct) }}">{{ fmt_pct(s.worst_year_pct) }}</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card-watermark">ETF Watch</div>
+</section>
+
+{% else %}
+
+<section class="text-center py-16 text-muted">
+  輸入 ETF 代號開始比較。
+</section>
+
+{% endif %}
+
+<div class="text-xs text-muted text-center mt-12 mb-6 max-w-2xl mx-auto leading-relaxed px-4">
+  資料來源:台灣證券交易所 · 報酬以還原股價計算,如與券商略有差異以您券商為準
+</div>
+
+{% if result.stats %}
+<script src="/static/js/chart-watermark.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    if (typeof echarts === 'undefined') return;
+    var el = document.getElementById('cmp-chart');
+    if (!el) return;
+
+    function cssVar(n) {
+      var v = getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+      return v ? 'rgb(' + v + ')' : '#3b82f6';
+    }
+    var muted = cssVar('--c-muted');
+    var fg = cssVar('--c-fg');
+    var border = cssVar('--c-border');
+    var bgSoft = cssVar('--c-bg-soft');
+
+    // 6 條獨立色(避開紅綠 = 漲跌語意)
+    var palette = ['#3b82f6', '#a78bfa', '#f59e0b', '#06b6d4', '#ec4899', '#14b8a6'];
+
+    var statsData = {{ result.stats | tojson }};
+
+    var seriesArr = statsData.map(function (s, i) {
+      var color = palette[i % palette.length];
+      var lineStyle = { width: 2, color: color };
+      // 槓桿型粗線、反向型虛線
+      if (s.leverage_subtype === 'positive') {
+        lineStyle.width = 3;
+      } else if (s.leverage_subtype === 'inverse') {
+        lineStyle.type = 'dashed';
+      }
+      var data = (s.series || []).map(function (p) { return [p.date, p.value]; });
+      var label = s.code + ' ' + s.name;
+      if (s.leverage_subtype === 'positive') label += ' (' + s.leverage_multiplier + ' 倍)';
+      else if (s.leverage_subtype === 'inverse') label += ' (' + s.leverage_multiplier + ' 倍)';
+      return {
+        name: label,
+        type: 'line',
+        showSymbol: false,
+        smooth: false,
+        lineStyle: lineStyle,
+        itemStyle: { color: color },
+        data: data,
+      };
+    });
+
+    var chart = echarts.init(el, null, { renderer: 'canvas' });
+    chart.setOption({
+      backgroundColor: 'transparent',
+      grid: { left: 60, right: 24, top: 56, bottom: 44 },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: bgSoft,
+        borderColor: border,
+        textStyle: { color: fg, fontSize: 13 },
+      },
+      legend: {
+        textStyle: { color: muted, fontSize: 12 },
+        top: 8,
+        type: 'scroll',
+      },
+      xAxis: {
+        type: 'time',
+        axisLine: { lineStyle: { color: border } },
+        axisLabel: { color: muted, fontSize: 11 },
+        splitLine: { show: false },
+      },
+      yAxis: {
+        type: 'value',
+        scale: true,
+        axisLine: { show: false },
+        axisLabel: { color: muted, fontSize: 11, formatter: function (v) { return v.toFixed(0); } },
+        splitLine: { lineStyle: { color: border, type: 'dashed', opacity: 0.5 } },
+      },
+      series: seriesArr,
+    });
+
+    if (typeof applyDefaultWatermark === 'function') {
+      applyDefaultWatermark(chart, { opacity: 0.06, fontSize: 56, color: fg, logoSize: 64 });
+    }
+
+    window.addEventListener('resize', function () { chart.resize(); });
+  });
+</script>
+{% endif %}
+{% endblock %}
