@@ -99,6 +99,37 @@ def get_period_base_close(
     return (row[0], row[1]) if row else None
 
 
+def apply_d_formula(
+    session, etf_id: int, period_start: date,
+) -> tuple[date, date, float] | None:
+    """D 公式 — 用 adj_close 計算,自動處理股票分割 + 除權息。
+
+    給長期(≥ 1y)報酬計算用,因為 B 公式遇 reverse split (如 0050 2025-06-18 1:4)
+    會出現假跌(raw close 跨越分割點計算錯誤)。
+
+    短期(1m/3m/ytd)請繼續用 apply_b_formula(對 YP-Finance 比較貼)。
+    """
+    base = session.execute(
+        select(DailyKBar.date, DailyKBar.adj_close)
+        .where(DailyKBar.etf_id == etf_id)
+        .where(DailyKBar.date < period_start)
+        .where(DailyKBar.adj_close.is_not(None))
+        .order_by(DailyKBar.date.desc())
+        .limit(1)
+    ).first()
+    last = session.execute(
+        select(DailyKBar.date, DailyKBar.adj_close)
+        .where(DailyKBar.etf_id == etf_id)
+        .where(DailyKBar.adj_close.is_not(None))
+        .order_by(DailyKBar.date.desc())
+        .limit(1)
+    ).first()
+    if not base or not last or base[1] == 0:
+        return None
+    ret = (last[1] / base[1] - 1) * 100
+    return (base[0], last[0], ret)
+
+
 def get_period_base_close_raw(
     session, etf_id: int, period_start: date,
 ) -> tuple[date, float] | None:

@@ -7,8 +7,10 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from fastapi import HTTPException
+
 from app.config import PROJECT_ROOT, settings
-from app.services import ranking
+from app.services import etf_metrics, ranking
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +106,18 @@ async def index(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request, "index.html",
         {**_common_ctx(), "sections": sections, "market": market},
+    )
+
+
+@router.get("/etf/{code}", response_class=HTMLResponse)
+async def etf_detail(request: Request, code: str) -> HTMLResponse:
+    """ETF 詳情頁 — 100% 讀本地 DB,不打外部 API。"""
+    detail = etf_metrics.get_etf_detail(code)
+    if not detail:
+        raise HTTPException(status_code=404, detail=f"找不到 ETF: {code}")
+    return templates.TemplateResponse(
+        request, "etf_detail.html",
+        {**_common_ctx(), "etf": detail},
     )
 
 

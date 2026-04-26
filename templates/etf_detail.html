@@ -1,0 +1,337 @@
+{% extends "base.html" %}
+
+{% block title %}{{ etf.code }} {{ etf.name }} — {{ brand_full }}{% endblock %}
+
+{% macro fmt_pct(v, signed=True) -%}
+  {%- if v is none -%}—
+  {%- else -%}
+    {%- if signed and v > 0 -%}+{%- endif -%}{{ "%.2f"|format(v) }}%
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro pct_color(v) -%}
+  {%- if v is none -%}text-muted
+  {%- elif v > 0 -%}text-up
+  {%- elif v < 0 -%}text-down
+  {%- else -%}text-fg
+  {%- endif -%}
+{%- endmacro %}
+
+{% block content %}
+
+{# === 麵包屑 === #}
+<nav class="mb-6 text-sm text-muted">
+  <a href="/" class="hover:text-fg transition">排行榜</a>
+  <span class="mx-2">/</span>
+  <span class="text-fg">{{ etf.category_label }}</span>
+  <span class="mx-2">/</span>
+  <span class="text-fg num">{{ etf.code }}</span>
+</nav>
+
+{# === 1. 基本資訊 + 即時報價(Hero 區) === #}
+<section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7">
+  <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
+
+  <div class="card-content">
+    <div class="flex items-start justify-between gap-4 flex-wrap">
+      <div class="min-w-0">
+        <div class="flex items-center gap-3 flex-wrap mb-2">
+          <span class="inline-block px-2.5 py-0.5 text-xs font-medium bg-accent/10 text-accent border border-accent/30 rounded-full">{{ etf.category_label }}</span>
+          {% if etf.first_data_date %}
+            <span class="text-xs text-muted">資料起算 {{ etf.first_data_date }}</span>
+          {% endif %}
+        </div>
+        <h1 class="text-2xl sm:text-3xl font-semibold tracking-tight">
+          <span class="font-mono text-accent">{{ etf.code }}</span>
+          <span class="ml-2">{{ etf.name }}</span>
+        </h1>
+      </div>
+
+      {% if etf.last_kbar and etf.last_kbar.close %}
+      <div class="text-right">
+        <div class="text-xs text-muted mb-1">最新收盤 · {{ etf.last_kbar.date }}</div>
+        <div class="flex items-baseline gap-3 flex-wrap justify-end">
+          <span class="text-3xl sm:text-4xl font-bold num">{{ "%.2f"|format(etf.last_kbar.close) }}</span>
+          {% if etf.today_change_pct is not none %}
+            <span class="num text-base sm:text-lg font-semibold {{ pct_color(etf.today_change_pct) }}">{{ fmt_pct(etf.today_change_pct) }}</span>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    {# 當日 OHLC 簡表 #}
+    {% if etf.last_kbar and etf.last_kbar.close %}
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
+      <div class="bg-bg-soft border border-border rounded-md p-3">
+        <div class="text-[0.7rem] text-muted mb-0.5">開盤</div>
+        <div class="num font-semibold">{{ "%.2f"|format(etf.last_kbar.open) }}</div>
+      </div>
+      <div class="bg-bg-soft border border-border rounded-md p-3">
+        <div class="text-[0.7rem] text-muted mb-0.5">最高</div>
+        <div class="num font-semibold text-up">{{ "%.2f"|format(etf.last_kbar.high) }}</div>
+      </div>
+      <div class="bg-bg-soft border border-border rounded-md p-3">
+        <div class="text-[0.7rem] text-muted mb-0.5">最低</div>
+        <div class="num font-semibold text-down">{{ "%.2f"|format(etf.last_kbar.low) }}</div>
+      </div>
+      <div class="bg-bg-soft border border-border rounded-md p-3">
+        <div class="text-[0.7rem] text-muted mb-0.5">成交量(張)</div>
+        <div class="num font-semibold">{{ "{:,}".format((etf.last_kbar.volume / 1000)|int) }}</div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card-watermark">ETF Watch</div>
+</section>
+
+{# === 2. 多期間報酬卡片 === #}
+<section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7">
+  <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
+
+  <div class="card-content">
+    <header class="mb-5 flex items-baseline justify-between gap-4 flex-wrap">
+      <div class="flex items-center gap-3">
+        <div class="w-1 h-7 bg-accent rounded-full" style="box-shadow: 0 0 8px var(--c-accent-glow);"></div>
+        <div>
+          <h2 class="text-xl sm:text-2xl font-semibold">期間報酬</h2>
+          <div class="text-sm text-muted mt-1">含配息再投入 · 對照大盤(TAIEX)</div>
+        </div>
+      </div>
+    </header>
+
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+      {% for p in etf.periods %}
+      <div class="bg-bg-soft border border-border rounded-lg p-4 transition hover:border-accent/40">
+        <div class="text-xs sm:text-sm text-muted mb-1.5">{{ p.label }}</div>
+        <div class="text-xl sm:text-2xl font-bold num mb-1 {{ pct_color(p.return_pct) }}">{{ fmt_pct(p.return_pct) }}</div>
+        {% if p.vs_index_pct is not none %}
+          <div class="text-xs text-muted">
+            vs 大盤
+            <span class="num ml-1 {{ pct_color(p.vs_index_pct) }}">{{ fmt_pct(p.vs_index_pct) }}</span>
+          </div>
+        {% else %}
+          <div class="text-xs text-muted">vs 大盤 —</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card-watermark">ETF Watch</div>
+</section>
+
+{# === 3. 近 1 年走勢圖 === #}
+<section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7">
+  <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
+
+  <div class="card-content">
+    <header class="mb-5 flex items-baseline justify-between gap-4 flex-wrap">
+      <div class="flex items-center gap-3">
+        <div class="w-1 h-7 bg-accent rounded-full" style="box-shadow: 0 0 8px var(--c-accent-glow);"></div>
+        <div>
+          <h2 class="text-xl sm:text-2xl font-semibold">近 1 年走勢</h2>
+          <div class="text-sm text-muted mt-1">還原股價 vs 大盤(TAIEX),以期初 = 100 標準化</div>
+        </div>
+      </div>
+    </header>
+
+    <div id="trend-chart" class="w-full h-72 sm:h-96 relative z-10"></div>
+  </div>
+
+  <div class="card-watermark">ETF Watch</div>
+</section>
+
+{# === 4. 配息歷史 === #}
+<section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7 pb-12">
+  <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
+
+  <div class="card-content">
+    <header class="mb-5 flex items-baseline justify-between gap-4 flex-wrap">
+      <div class="flex items-center gap-3">
+        <div class="w-1 h-7 bg-accent rounded-full" style="box-shadow: 0 0 8px var(--c-accent-glow);"></div>
+        <div>
+          <h2 class="text-xl sm:text-2xl font-semibold">配息歷史</h2>
+          <div class="text-sm text-muted mt-1">
+            近 1 年共配息 <span class="text-fg font-semibold num">{{ etf.dividend_count_1y }}</span> 次
+            ,合計每股 <span class="text-fg font-semibold num">{{ "%.4f"|format(etf.dividend_sum_1y) }}</span> 元
+          </div>
+        </div>
+      </div>
+    </header>
+
+    {% if etf.dividends %}
+    <div class="overflow-x-auto -mx-4 sm:mx-0">
+      <table class="w-full text-base num min-w-[480px]">
+        <thead>
+          <tr class="text-left text-muted border-b border-border">
+            <th class="py-3 px-3 font-medium">除息日</th>
+            <th class="py-3 px-3 font-medium text-right">每股配息</th>
+            <th class="py-3 px-3 font-medium hidden sm:table-cell">發放日</th>
+            <th class="py-3 px-3 font-medium hidden sm:table-cell">會計年度</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in etf.dividends %}
+          <tr class="border-b border-border/40 hover:bg-bg/40">
+            <td class="py-3 px-3">{{ d.ex_date }}</td>
+            <td class="py-3 px-3 text-right font-semibold text-up">{{ "%.4f"|format(d.cash) }}</td>
+            <td class="py-3 px-3 hidden sm:table-cell text-muted">{{ d.payment_date or "—" }}</td>
+            <td class="py-3 px-3 hidden sm:table-cell text-muted">{{ d.fiscal_year or "—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-base text-muted py-8 text-center">本 ETF 尚無配息紀錄。</div>
+    {% endif %}
+  </div>
+
+  <div class="card-watermark">ETF Watch</div>
+</section>
+
+{# === 5. 即將推出 === #}
+<section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7 pb-12 opacity-70">
+  <div class="card-content">
+    <header class="mb-3 flex items-center gap-3">
+      <div class="w-1 h-7 bg-muted rounded-full"></div>
+      <div>
+        <h2 class="text-xl sm:text-2xl font-semibold">即將推出</h2>
+        <div class="text-sm text-muted mt-1">需要更多資料源,陸續補上</div>
+      </div>
+    </header>
+    <ul class="text-sm sm:text-base text-muted space-y-2 ml-4 list-disc">
+      <li>十大持股 + 產業分布(圓餅圖)</li>
+      <li>經理人介紹 + 選股理念</li>
+      <li>管理費 / 規模 / 追蹤指數</li>
+      <li>績效統計表(年化、最佳年、最差年、夏普值)</li>
+    </ul>
+  </div>
+  <div class="card-watermark">ETF Watch</div>
+</section>
+
+<div class="text-xs text-muted text-center mt-12 mb-6 max-w-2xl mx-auto leading-relaxed px-4">
+  資料來源:台灣證券交易所 · 報酬以還原股價計算,如與券商略有差異以您券商為準
+</div>
+
+{# === ECharts 走勢圖渲染 === #}
+<script src="/static/js/chart-watermark.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    if (typeof echarts === 'undefined') return;
+    var el = document.getElementById('trend-chart');
+    if (!el) return;
+
+    var etfData = {{ etf.trend_etf | tojson }};
+    var taiexData = {{ etf.trend_taiex | tojson }};
+
+    if (!etfData.length) {
+      el.innerHTML = '<div class="text-muted text-center py-12">資料不足,無法繪製走勢圖</div>';
+      return;
+    }
+
+    // 標準化:各自第一個值 = 100,後續 = (value / first) * 100
+    function normalize(series) {
+      if (!series.length) return [];
+      var base = series[0].value;
+      if (!base) return [];
+      return series.map(function (p) {
+        return [p.date, +(p.value / base * 100).toFixed(3)];
+      });
+    }
+    var etfNorm = normalize(etfData);
+    var taiexNorm = normalize(taiexData);
+
+    // 顏色由 CSS variable 取
+    function cssVar(name) {
+      var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      return v ? 'rgb(' + v + ')' : '#3b82f6';
+    }
+    var accent = cssVar('--c-accent');
+    var muted = cssVar('--c-muted');
+    var fg = cssVar('--c-fg');
+    var border = cssVar('--c-border');
+    var bgSoft = cssVar('--c-bg-soft');
+
+    var chart = echarts.init(el, null, { renderer: 'canvas' });
+
+    chart.setOption({
+      backgroundColor: 'transparent',
+      grid: { left: 50, right: 20, top: 50, bottom: 40 },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: bgSoft,
+        borderColor: border,
+        textStyle: { color: fg, fontSize: 13 },
+        axisPointer: { lineStyle: { color: muted } },
+      },
+      legend: {
+        data: [{{ etf.code | tojson }} + ' ' + {{ etf.name | tojson }}, '大盤(TAIEX)'],
+        textStyle: { color: muted, fontSize: 12 },
+        top: 8,
+      },
+      xAxis: {
+        type: 'time',
+        axisLine: { lineStyle: { color: border } },
+        axisLabel: { color: muted, fontSize: 11 },
+        splitLine: { show: false },
+      },
+      yAxis: {
+        type: 'value',
+        scale: true,
+        axisLine: { show: false },
+        axisLabel: {
+          color: muted, fontSize: 11,
+          formatter: function (v) { return v.toFixed(0); },
+        },
+        splitLine: { lineStyle: { color: border, type: 'dashed', opacity: 0.5 } },
+      },
+      series: [
+        {
+          name: {{ etf.code | tojson }} + ' ' + {{ etf.name | tojson }},
+          type: 'line',
+          showSymbol: false,
+          smooth: false,
+          lineStyle: { width: 2.5, color: accent },
+          areaStyle: {
+            color: {
+              type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+              colorStops: [
+                { offset: 0, color: accent + '33' },
+                { offset: 1, color: accent + '00' },
+              ],
+            },
+          },
+          itemStyle: { color: accent },
+          data: etfNorm,
+          z: 3,
+        },
+        {
+          name: '大盤(TAIEX)',
+          type: 'line',
+          showSymbol: false,
+          smooth: false,
+          lineStyle: { width: 1.5, color: muted, type: 'dashed' },
+          itemStyle: { color: muted },
+          data: taiexNorm,
+          z: 2,
+        },
+      ],
+    });
+
+    // 加 LOGO + 文字浮水印 (chart-watermark.js)
+    if (typeof applyDefaultWatermark === 'function') {
+      applyDefaultWatermark(chart, {
+        opacity: 0.06,
+        fontSize: 56,
+        color: fg,
+        logoSize: 64,
+      });
+    }
+
+    window.addEventListener('resize', function () { chart.resize(); });
+  });
+</script>
+{% endblock %}
