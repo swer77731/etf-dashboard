@@ -752,8 +752,10 @@ etf_dashboard/
 
 > 推 GitHub(任何 remote)前**必審 git log**,確認以下都乾淨:
 
-- [ ] 所有 commit author 都是 placeholder(`dev@etfwatch.local`),**沒有 user 私人信箱**
-  - 檢查:`git log --pretty=format:"%h %an <%ae>" | grep -iE "a35615666|c8c886|allenac|gmail.com"` 應無輸出
+- [ ] 所有 commit author 都是專案專屬信箱 `swer77731@gmail.com` / name `ETF Watch Dev`
+  - **最高優先檢查**:`git log --format='%ae' --all | sort -u`
+    應該**只有** `swer77731@gmail.com` **一個** email,其他通通要清掉再 push
+  - 若有殘留 → 先 `git filter-branch --env-filter '...'` 改寫所有 commit author 再 push
 - [ ] 沒有 `.env` / `.env.local` 等含 token 檔案被 commit
   - 檢查:`git log --all --full-history -- .env` 應無輸出
 - [ ] 沒有 FinMind token / API key 寫死在程式碼或文件
@@ -832,18 +834,17 @@ etf_dashboard/
 - `_common_ctx()` 在 `pages.py`(brand 變數一處改全頁更新)
 - 任何 router 增加 template variable,**所有 template 必須一致使用**(brand_zh / brand_en / brand_full)
 
-### 2026-04-26 / Step 2 / 私人信箱差點被寫進 git author(嚴重踩坑)
-- 我準備 commit Step 2 時用 `git -c user.email=<user 私人信箱>` 嘗試提交
-- user 主動發現並阻止 → 強制改用專案 placeholder 信箱
-- **永久鐵律(寫進「Git 紀律」也不嫌多)**:
-  1. **任何 commit 前**,先 `git config --local user.name "ETF Watch Dev"` + `user.email "dev@etfwatch.local"`
+### 2026-04-26 / Step 2 / 私人信箱差點被寫進 git author(嚴重踩坑 + 已修復)
+- 我準備 commit Step 2 時用 `git -c user.email=<user 私人信箱>` inline 提交
+- Step 1 commit 也用了同樣方式,**git 歷史已污染**
+- user 主動發現要求停止 → 全部歷史用 `git filter-branch --env-filter` 改寫
+- 改寫後所有 commit author = `ETF Watch Dev <swer77731@gmail.com>`(專案專屬信箱)
+- **永久鐵律**:
+  1. **任何 commit 前**,先 `git config --local user.name "ETF Watch Dev"` + `user.email "swer77731@gmail.com"`
   2. **不准** 用 `git -c user.email=...` inline 蓋 config(難稽核、易誤用)
-  3. **不准** 用 user 提供的私人信箱(a35615666 / c8c886 開頭)做 commit author
+  3. **不准** 用 user 私人信箱做 commit author / template 內容 / 任何寫入檔案
   4. 第一次進入新專案 / 新環境 → 立刻檢查 `git config --local user.email`
-- ⚠️ Step 1 commit (c664e71) 因為這次踩坑前已用了私人信箱,**git 歷史已污染**
-  - 處理方案待 user 拍:
-    a. 接受污染(若不上 GitHub 公開 repo)
-    b. 推前用 `git filter-repo` / `git rebase -i` 改寫 author(會變更所有 hash)
+  5. 任何「需要信箱」的場景(法律頁聯絡人、support email、license 標示)→ 統一用 `swer77731@gmail.com`
 
 ### 2026-04-26 / Step 2 / 重複渲染區塊禁止 inline 寫死(踩坑後立法)
 - 排行榜 6 個區塊原本 inline 在 index.html 寫死,改 footer 文案時只動到第一個,其他遺漏 → user 抓到不一致
