@@ -3,7 +3,7 @@
 
 {% macro ranking_section(sec, descriptions) %}
 {% set is_leverage = (sec.kind in ("leverage_pos", "leverage_neg")) %}
-<section class="relative {% if is_leverage %}bg-card border-2 border-amber-500/30{% else %}bg-card border border-border{% endif %} rounded-lg p-5 sm:p-7 mb-7 pb-12">
+<section class="relative section-card {% if is_leverage %}section-card-warn{% endif %} rounded-xl p-5 sm:p-7 mb-7 pb-12">
   <header class="mb-5 flex items-baseline justify-between gap-4 flex-wrap">
     <div>
       <h2 class="text-xl sm:text-2xl font-semibold">{{ sec.title }}</h2>

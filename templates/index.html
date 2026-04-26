@@ -16,32 +16,48 @@
 } %}
 
 {% block content %}
-<section class="mb-8">
-  <h1 class="text-2xl sm:text-3xl font-semibold mb-1">{{ brand_zh }}</h1>
-  <div class="text-sm sm:text-base text-muted tracking-widest mb-3">{{ brand_en }}</div>
-  <p class="text-base text-muted">
-    每天 14:30 自動更新 · 報酬已含配息再投入 · 對照大盤指數
+
+{# === Hero === #}
+<section class="mb-10 relative">
+  <div class="flex items-center gap-2 text-xs text-muted tracking-widest mb-4">
+    <span class="live-dot"></span>
+    <span>LIVE · 即時排行</span>
+    <span class="hidden sm:inline">·</span>
+    <span class="hidden sm:inline num">{{ market.taiex_date if market else "—" }}</span>
+  </div>
+
+  <h1 class="text-3xl sm:text-5xl font-bold mb-2 tracking-tight">
+    <span class="hero-text">{{ brand_zh }}</span>
+  </h1>
+  <div class="text-sm sm:text-base text-muted tracking-[0.3em] mb-4 font-medium">{{ brand_en }}</div>
+  <p class="text-sm sm:text-base text-muted max-w-2xl leading-relaxed">
+    台灣 ETF 排行 · 績效比較 · 配息再投入計算。<br class="sm:hidden">
+    每天 14:30 自動更新,看 ETF 最直覺的觀察室。
   </p>
 </section>
 
+{# === 市場概況(TAIEX 大盤一處呈現) === #}
 {% if market and market.taiex_close %}
-<section class="relative bg-card border border-border rounded-lg p-5 sm:p-7 mb-7">
-  <header class="mb-4 flex items-baseline justify-between gap-4 flex-wrap">
-    <div>
-      <h2 class="text-xl sm:text-2xl font-semibold">市場概況</h2>
-      <div class="text-sm sm:text-base text-muted mt-2">大盤(TAIEX)收盤點位與各期間漲跌</div>
+<section class="relative section-card rounded-xl p-5 sm:p-7 mb-7">
+  <header class="mb-5 flex items-baseline justify-between gap-4 flex-wrap">
+    <div class="flex items-center gap-3">
+      <div class="w-1 h-7 bg-accent rounded-full" style="box-shadow: 0 0 8px var(--c-accent-glow);"></div>
+      <div>
+        <h2 class="text-xl sm:text-2xl font-semibold">市場概況</h2>
+        <div class="text-sm text-muted mt-1">大盤(TAIEX)收盤點位與各期間漲跌</div>
+      </div>
     </div>
-    <div class="text-sm text-muted num">截至 {{ market.taiex_date }}</div>
+    <div class="text-xs sm:text-sm text-muted num">截至 {{ market.taiex_date }}</div>
   </header>
 
-  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-    <div class="bg-bg/40 border border-border/40 rounded-md p-4">
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+    <div class="bg-bg-soft border border-border rounded-lg p-4 transition hover:border-accent/40">
       <div class="text-xs sm:text-sm text-muted mb-1">大盤收盤</div>
-      <div class="text-xl sm:text-2xl font-semibold num">{{ "%.2f"|format(market.taiex_close) }}</div>
+      <div class="text-xl sm:text-2xl font-semibold num text-fg">{{ "%.2f"|format(market.taiex_close) }}</div>
     </div>
     {% for key in ["1m", "3m", "ytd"] %}
       {% set r = market.returns[key] %}
-      <div class="bg-bg/40 border border-border/40 rounded-md p-4">
+      <div class="bg-bg-soft border border-border rounded-lg p-4 transition hover:border-accent/40">
         <div class="text-xs sm:text-sm text-muted mb-1">{{ r.label }}</div>
         <div class="text-xl sm:text-2xl font-semibold num
           {% if r.value is none %}text-muted
@@ -61,11 +77,13 @@
 </section>
 {% endif %}
 
+{# === 排行 sections (透過 macro 統一) === #}
 {% for sec in sections %}
   {{ ranking_section(sec, CATEGORY_DESC) }}
 {% endfor %}
 
-<section class="text-xs text-gray-500 text-center mt-10 mb-6 max-w-2xl mx-auto leading-relaxed px-4">
+{# === 全頁底部統一商業免責 === #}
+<section class="text-xs text-muted text-center mt-12 mb-6 max-w-2xl mx-auto leading-relaxed px-4">
   資料來源:FinMind / TAIEX 為台灣加權股價指數 · 報酬以還原股價計算,如與券商略有差異以您券商為準
 </section>
 {% endblock %}

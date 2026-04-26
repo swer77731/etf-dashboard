@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-Hant" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +7,16 @@
 
     <meta name="description" content="台灣 ETF 排行、績效比較、即時新聞,看 ETF 最直覺的觀察室">
     <meta name="keywords" content="台灣 ETF, ETF 排行, ETF 比較, ETF 觀察室, ETF Watch, 台股 ETF">
+
+    {# Theme init — 在 Tailwind 載入之前先設好,避免 flash #}
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('theme') || 'dark';
+          document.documentElement.setAttribute('data-theme', t);
+        } catch (e) { /* ignore */ }
+      })();
+    </script>
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/htmx.org@2.0.3" defer></script>
@@ -18,93 +28,381 @@
         theme: {
           extend: {
             colors: {
-              bg:       '#0a0e1a',
-              card:     '#131829',
-              border:   '#1f2937',
-              fg:       '#e5e7eb',
-              muted:    '#9ca3af',
-              up:       '#ef4444',  /* 台股紅漲 */
-              down:     '#10b981',  /* 台股綠跌 */
-              accent:   '#3b82f6',
+              bg:           'rgb(var(--c-bg) / <alpha-value>)',
+              'bg-soft':    'rgb(var(--c-bg-soft) / <alpha-value>)',
+              card:         'rgb(var(--c-card) / <alpha-value>)',
+              'card-hover': 'rgb(var(--c-card-hover) / <alpha-value>)',
+              border:       'rgb(var(--c-border) / <alpha-value>)',
+              fg:           'rgb(var(--c-fg) / <alpha-value>)',
+              muted:        'rgb(var(--c-muted) / <alpha-value>)',
+              up:           '#ef4444',
+              down:         '#10b981',
+              accent:       'rgb(var(--c-accent) / <alpha-value>)',
             },
             fontFamily: {
               mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+              sans: ['"Noto Sans TC"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
             },
           }
         }
       }
     </script>
 
-    <style>
-      body { background: #0a0e1a; color: #e5e7eb; }
-      .num { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-      table tbody tr:hover { background: #1a2138; }
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-      /* === Stealth Branding 浮水印 === */
-      /* B1: 全頁背景對角線淡字 — pointer-events:none 不擋 hover/選取 */
+    <style>
+      /* === Theme variables (RGB triplets so Tailwind opacity 修飾可用) === */
+      :root[data-theme="dark"] {
+        --c-bg:           10 14 26;
+        --c-bg-soft:      15 20 36;
+        --c-card:         19 24 41;
+        --c-card-hover:   26 33 56;
+        --c-border:       31 41 55;
+        --c-fg:           229 231 235;
+        --c-muted:        156 163 175;
+        --c-accent:       59 130 246;
+        --c-accent-glow:  rgba(59, 130, 246, 0.35);
+        --c-watermark-bg: 31 41 55;
+        --c-watermark-card: 75 85 99;
+        --c-wm-bg-op:     0.07;
+        --c-wm-card-op:   0.45;
+        --c-grid:         rgba(59, 130, 246, 0.05);
+        --c-hero-gradient: linear-gradient(135deg, rgb(96 165 250) 0%, rgb(229 231 235) 60%, rgb(167 139 250) 100%);
+      }
+      :root[data-theme="light"] {
+        --c-bg:           248 250 252;
+        --c-bg-soft:      241 245 249;
+        --c-card:         255 255 255;
+        --c-card-hover:   241 245 249;
+        --c-border:       226 232 240;
+        --c-fg:           15 23 42;
+        --c-muted:        100 116 139;
+        --c-accent:       37 99 235;
+        --c-accent-glow:  rgba(37, 99, 235, 0.20);
+        --c-watermark-bg: 148 163 184;
+        --c-watermark-card: 100 116 139;
+        --c-wm-bg-op:     0.10;
+        --c-wm-card-op:   0.30;
+        --c-grid:         rgba(37, 99, 235, 0.06);
+        --c-hero-gradient: linear-gradient(135deg, rgb(37 99 235) 0%, rgb(15 23 42) 60%, rgb(124 58 237) 100%);
+      }
+
+      html { scroll-behavior: smooth; }
+      body {
+        background: rgb(var(--c-bg));
+        color: rgb(var(--c-fg));
+        font-family: 'Noto Sans TC', ui-sans-serif, system-ui, sans-serif;
+        transition: background 0.25s ease, color 0.25s ease;
+      }
+
+      .num {
+        font-variant-numeric: tabular-nums;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      table tbody tr { transition: background 0.12s ease; }
+      table tbody tr:hover { background: rgb(var(--c-card-hover) / 0.7); }
+
+      [x-cloak] { display: none !important; }
+
+      /* === Background grid (subtle tech accent) === */
+      .grid-bg {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background-image:
+          linear-gradient(var(--c-grid) 1px, transparent 1px),
+          linear-gradient(90deg, var(--c-grid) 1px, transparent 1px);
+        background-size: 64px 64px;
+        mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 30%, transparent 80%);
+        -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 30%, transparent 80%);
+      }
+
+      /* === Watermark (對角線散布,主題感應)=== */
       .watermark-bg {
         position: fixed;
         inset: 0;
         z-index: 0;
         pointer-events: none;
-        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='200' viewBox='0 0 320 200'><text x='40' y='110' font-family='Inter,system-ui,Arial,sans-serif' font-size='24' font-weight='600' fill='%231f2937' fill-opacity='0.55' transform='rotate(-30 160 100)'>ETF Watch</text></svg>");
-        background-repeat: repeat;
-        background-size: 320px 200px;
-        opacity: 0.07;
+        background-color: rgb(var(--c-watermark-bg));
+        -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='200' viewBox='0 0 320 200'><text x='40' y='110' font-family='Inter,system-ui,Arial,sans-serif' font-size='24' font-weight='600' fill='black' transform='rotate(-30 160 100)'>ETF Watch</text></svg>");
+                mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='200' viewBox='0 0 320 200'><text x='40' y='110' font-family='Inter,system-ui,Arial,sans-serif' font-size='24' font-weight='600' fill='black' transform='rotate(-30 160 100)'>ETF Watch</text></svg>");
+        -webkit-mask-repeat: repeat;
+                mask-repeat: repeat;
+        -webkit-mask-size: 320px 200px;
+                mask-size: 320px 200px;
+        opacity: var(--c-wm-bg-op);
       }
-      /* 確保內容浮在背景之上 */
-      header, main, footer { position: relative; z-index: 1; }
 
-      /* B2: 卡片右下角 ETF Watch 字樣 */
       .card-watermark {
         position: absolute;
         right: 1rem;
         bottom: 0.75rem;
         font-size: 0.75rem;
-        color: #374151;
-        opacity: 0.45;
+        color: rgb(var(--c-watermark-card));
+        opacity: var(--c-wm-card-op);
         font-weight: 600;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.08em;
         pointer-events: none;
         user-select: none;
       }
+
+      /* === Tech polish === */
+      .hero-text {
+        background: var(--c-hero-gradient);
+        -webkit-background-clip: text;
+                background-clip: text;
+        color: transparent;
+      }
+
+      .section-card {
+        background: rgb(var(--c-card));
+        border: 1px solid rgb(var(--c-border));
+        transition: border-color 0.2s ease, box-shadow 0.25s ease, transform 0.2s ease;
+      }
+      .section-card:hover {
+        border-color: rgb(var(--c-accent) / 0.6);
+        box-shadow: 0 0 0 1px rgb(var(--c-accent) / 0.2), 0 12px 40px -16px var(--c-accent-glow);
+      }
+      .section-card-warn {
+        border: 2px solid rgb(245 158 11 / 0.35);
+      }
+      .section-card-warn:hover {
+        border-color: rgb(245 158 11 / 0.65);
+        box-shadow: 0 0 0 1px rgb(245 158 11 / 0.2), 0 12px 40px -16px rgba(245, 158, 11, 0.3);
+      }
+
+      /* Live pulse dot */
+      .live-dot {
+        position: relative;
+        width: 0.5rem; height: 0.5rem;
+        border-radius: 9999px;
+        background: rgb(16 185 129);
+      }
+      .live-dot::after {
+        content: '';
+        position: absolute;
+        inset: -4px;
+        border-radius: 9999px;
+        background: rgb(16 185 129);
+        opacity: 0.5;
+        animation: live-pulse 1.8s ease-out infinite;
+      }
+      @keyframes live-pulse {
+        0%   { transform: scale(0.7); opacity: 0.6; }
+        70%  { transform: scale(1.6); opacity: 0; }
+        100% { transform: scale(1.6); opacity: 0; }
+      }
+
+      /* Sidebar nav active marker */
+      .nav-item {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 0.625rem;
+        padding: 0.55rem 0.85rem;
+        border-radius: 0.5rem;
+        font-size: 0.9rem;
+        color: rgb(var(--c-muted));
+        transition: background 0.15s ease, color 0.15s ease;
+      }
+      .nav-item:hover {
+        background: rgb(var(--c-card-hover) / 0.7);
+        color: rgb(var(--c-fg));
+      }
+      .nav-item.active {
+        color: rgb(var(--c-accent));
+        background: rgb(var(--c-accent) / 0.08);
+      }
+      .nav-item.active::before {
+        content: '';
+        position: absolute;
+        left: -0.85rem; top: 0.5rem; bottom: 0.5rem;
+        width: 3px;
+        background: rgb(var(--c-accent));
+        border-radius: 2px;
+        box-shadow: 0 0 8px var(--c-accent-glow);
+      }
+      .nav-item.disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .nav-badge {
+        margin-left: auto;
+        padding: 0.05rem 0.45rem;
+        font-size: 0.65rem;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        border-radius: 9999px;
+        background: rgb(var(--c-border) / 0.7);
+        color: rgb(var(--c-muted));
+      }
+
+      /* Theme toggle pill */
+      .theme-pill {
+        display: inline-flex;
+        align-items: center;
+        background: rgb(var(--c-bg-soft));
+        border: 1px solid rgb(var(--c-border));
+        border-radius: 9999px;
+        padding: 0.2rem;
+        gap: 0.1rem;
+      }
+      .theme-pill button {
+        font-size: 0.75rem;
+        padding: 0.3rem 0.7rem;
+        border-radius: 9999px;
+        color: rgb(var(--c-muted));
+        transition: background 0.15s ease, color 0.15s ease;
+      }
+      .theme-pill button.on {
+        background: rgb(var(--c-accent));
+        color: white;
+      }
+
+      /* Scrollbar polish */
+      ::-webkit-scrollbar { width: 10px; height: 10px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb {
+        background: rgb(var(--c-border));
+        border-radius: 9999px;
+      }
+      ::-webkit-scrollbar-thumb:hover { background: rgb(var(--c-muted) / 0.5); }
     </style>
     {% block head %}{% endblock %}
 </head>
-<body class="min-h-screen bg-bg text-fg">
+<body x-data="appShell()" x-init="init()">
+
+    <div class="grid-bg"></div>
     <div class="watermark-bg"></div>
 
-    <header class="border-b border-border bg-card/80 backdrop-blur sticky top-0 z-20">
-        <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
-            <a href="/" class="flex items-center gap-2 sm:gap-3 min-w-0">
-                <div class="w-9 h-9 shrink-0 rounded bg-accent/20 border border-accent/40 flex items-center justify-center text-accent font-bold text-base">E</div>
-                <div class="min-w-0">
-                    <div class="text-base sm:text-lg font-semibold tracking-wide truncate">{{ brand_zh }}</div>
-                    <div class="hidden sm:block text-xs text-muted tracking-widest">{{ brand_en }}</div>
-                </div>
-            </a>
-            <nav class="flex items-center gap-3 sm:gap-6 text-sm text-muted shrink-0">
-                <a href="/" class="hover:text-fg transition">首頁</a>
-                <a href="/api/health" class="hover:text-fg transition">健康</a>
-                <a href="/docs" class="hover:text-fg transition">API</a>
-            </nav>
-        </div>
-    </header>
+    {# Mobile overlay #}
+    <div x-show="sidebarOpen" x-cloak x-transition.opacity
+         @click="sidebarOpen=false"
+         class="lg:hidden fixed inset-0 bg-black/60 z-30"></div>
 
-    <main class="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+    {# === Sidebar === #}
+    <aside class="fixed top-0 bottom-0 left-0 w-64 z-40 flex flex-col p-5
+                  bg-card border-r border-border
+                  transform transition-transform duration-200 ease-out
+                  lg:translate-x-0"
+           :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
+           style="background: linear-gradient(180deg, rgb(var(--c-card)) 0%, rgb(var(--c-bg-soft)) 100%);">
+
+      <a href="/" class="flex items-center gap-3 mb-8 group">
+        <div class="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-accent text-lg
+                    bg-accent/10 border border-accent/40
+                    transition group-hover:shadow-[0_0_20px_var(--c-accent-glow)]">E</div>
+        <div class="min-w-0">
+          <div class="font-semibold text-fg truncate">{{ brand_zh }}</div>
+          <div class="text-[0.65rem] text-muted tracking-[0.25em]">{{ brand_en }}</div>
+        </div>
+      </a>
+
+      <nav class="flex-1 overflow-y-auto">
+        <div class="text-[0.65rem] uppercase tracking-widest text-muted mb-2 px-3">主導航</div>
+        <a href="/" class="nav-item active mb-1">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+          排行榜
+        </a>
+
+        <div class="text-[0.65rem] uppercase tracking-widest text-muted mb-2 mt-6 px-3">即將推出</div>
+        <a href="#" class="nav-item disabled mb-1">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          ETF 詳情
+          <span class="nav-badge">Step 2.5</span>
+        </a>
+        <a href="#" class="nav-item disabled mb-1">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
+          績效比較
+          <span class="nav-badge">Step 3</span>
+        </a>
+        <a href="#" class="nav-item disabled">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg>
+          新聞
+          <span class="nav-badge">Step 4</span>
+        </a>
+      </nav>
+
+      <div class="space-y-3 pt-4 border-t border-border">
+        <div class="flex items-center justify-between px-3">
+          <span class="text-xs text-muted">主題</span>
+          <div class="theme-pill">
+            <button @click="setTheme('dark')" :class="theme==='dark' ? 'on' : ''" aria-label="dark theme">暗</button>
+            <button @click="setTheme('light')" :class="theme==='light' ? 'on' : ''" aria-label="light theme">亮</button>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 px-3 text-xs text-muted">
+          <span class="live-dot"></span>
+          <span>每天 14:30 自動更新</span>
+        </div>
+
+        <div class="px-3 text-[0.7rem] text-muted/80 flex items-center gap-2 flex-wrap">
+          <a href="/terms" class="hover:text-fg transition">條款</a>
+          <span aria-hidden="true">·</span>
+          <a href="/privacy" class="hover:text-fg transition">隱私</a>
+          <span aria-hidden="true">·</span>
+          <a href="/disclaimer" class="hover:text-fg transition">免責</a>
+        </div>
+      </div>
+    </aside>
+
+    {# === Main column (left padded for sidebar on lg+) === #}
+    <div class="lg:pl-64 min-h-screen flex flex-col relative">
+
+      {# Mobile top bar — only visible < lg #}
+      <header class="lg:hidden sticky top-0 z-20 backdrop-blur bg-card/85 border-b border-border px-4 py-3 flex items-center justify-between">
+        <button @click="sidebarOpen=true" class="p-2 -ml-2 text-fg" aria-label="open menu">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div class="font-semibold text-fg truncate px-2">{{ brand_zh }}</div>
+        <button @click="setTheme(theme==='dark' ? 'light' : 'dark')" class="p-2 -mr-2 text-muted hover:text-fg" aria-label="toggle theme">
+          <svg x-show="theme==='dark'" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+          <svg x-show="theme==='light'" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+        </button>
+      </header>
+
+      <main class="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-10 py-6 sm:py-10 relative">
         {% block content %}{% endblock %}
-    </main>
+      </main>
 
-    <footer class="max-w-6xl mx-auto px-4 sm:px-6 py-6 text-xs text-gray-500 border-t border-border mt-12">
+      <footer class="max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-10 py-6 mt-12 text-xs text-muted border-t border-border">
         <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-center">
-            <a href="/terms" class="hover:text-fg transition">使用條款</a>
-            <span aria-hidden="true">·</span>
-            <a href="/privacy" class="hover:text-fg transition">隱私權</a>
-            <span aria-hidden="true">·</span>
-            <a href="/disclaimer" class="hover:text-fg transition">免責聲明</a>
-            <span class="hidden sm:inline" aria-hidden="true">|</span>
-            <span class="block sm:inline w-full sm:w-auto">© 2026 {{ brand_full }} · 資料來源:FinMind</span>
+          <a href="/terms" class="hover:text-fg transition">使用條款</a>
+          <span aria-hidden="true">·</span>
+          <a href="/privacy" class="hover:text-fg transition">隱私權</a>
+          <span aria-hidden="true">·</span>
+          <a href="/disclaimer" class="hover:text-fg transition">免責聲明</a>
+          <span class="hidden sm:inline" aria-hidden="true">|</span>
+          <span class="block sm:inline w-full sm:w-auto">© 2026 {{ brand_full }} · 資料來源:FinMind</span>
         </div>
-    </footer>
+      </footer>
+    </div>
+
+    <script>
+      function appShell() {
+        return {
+          sidebarOpen: false,
+          theme: (function () {
+            try { return localStorage.getItem('theme') || 'dark'; }
+            catch (e) { return 'dark'; }
+          })(),
+          init() {
+            document.documentElement.setAttribute('data-theme', this.theme);
+            // Close sidebar when window resizes to lg+
+            window.addEventListener('resize', () => {
+              if (window.innerWidth >= 1024) this.sidebarOpen = false;
+            });
+          },
+          setTheme(t) {
+            this.theme = t;
+            document.documentElement.setAttribute('data-theme', t);
+            try { localStorage.setItem('theme', t); } catch (e) {}
+          },
+        };
+      }
+    </script>
 </body>
 </html>
