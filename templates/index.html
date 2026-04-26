@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}{{ app_name }} — 首頁{% endblock %}
+
+{% block content %}
+<section class="mb-8">
+    <h1 class="text-3xl font-semibold mb-2">Taiwan ETF Dashboard</h1>
+    <p class="text-muted">輕量、快速、暗色系。Step 1 骨架已就緒。</p>
+</section>
+
+<section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+    <div class="bg-card border border-border rounded-lg p-5">
+        <div class="text-xs text-muted mb-1">已上線階段</div>
+        <div class="text-2xl font-semibold">Step 1</div>
+        <div class="text-sm text-muted mt-1">FastAPI + SQLite + 排程</div>
+    </div>
+    <div class="bg-card border border-border rounded-lg p-5">
+        <div class="text-xs text-muted mb-1">後端服務</div>
+        <div class="text-2xl font-semibold flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-down inline-block"></span>
+            <span>OK</span>
+        </div>
+        <div class="text-sm text-muted mt-1">FastAPI lifespan 啟動成功</div>
+    </div>
+    <div class="bg-card border border-border rounded-lg p-5"
+         x-data="{ status: '檢查中…', cls: 'text-muted' }"
+         x-init="
+            fetch('/api/health').then(r => r.json()).then(d => {
+                status = d.status === 'ok' && d.db === 'ok' ? '健康' : '異常';
+                cls = d.status === 'ok' && d.db === 'ok' ? 'text-down' : 'text-up';
+            }).catch(() => { status = '錯誤'; cls = 'text-up'; });
+         ">
+        <div class="text-xs text-muted mb-1">/api/health</div>
+        <div class="text-2xl font-semibold" :class="cls" x-text="status"></div>
+        <div class="text-sm text-muted mt-1">DB + App 即時檢查</div>
+    </div>
+</section>
+
+<section class="bg-card border border-border rounded-lg p-6 mb-8">
+    <h2 class="text-lg font-semibold mb-3">開發路線</h2>
+    <ol class="space-y-2 text-sm">
+        <li class="flex items-center gap-3">
+            <span class="text-down">●</span>
+            <span class="num text-muted w-12">Step 1</span>
+            <span>骨架(FastAPI + SQLAlchemy + 暗色首頁 + 排程心跳)</span>
+        </li>
+        <li class="flex items-center gap-3 opacity-50">
+            <span class="text-muted">○</span>
+            <span class="num text-muted w-12">Step 2</span>
+            <span>ETF 排行榜(每日 14:30 排程抓資料 → SQLite)</span>
+        </li>
+        <li class="flex items-center gap-3 opacity-50">
+            <span class="text-muted">○</span>
+            <span class="num text-muted w-12">Step 3</span>
+            <span>績效比較圖表(ECharts 暗色系)</span>
+        </li>
+        <li class="flex items-center gap-3 opacity-50">
+            <span class="text-muted">○</span>
+            <span class="num text-muted w-12">Step 4</span>
+            <span>新聞牆</span>
+        </li>
+        <li class="flex items-center gap-3 opacity-50">
+            <span class="text-muted">○</span>
+            <span class="num text-muted w-12">Step 5</span>
+            <span>Telegram 推播</span>
+        </li>
+        <li class="flex items-center gap-3 opacity-50">
+            <span class="text-muted">○</span>
+            <span class="num text-muted w-12">Step 6</span>
+            <span>會員系統</span>
+        </li>
+        <li class="flex items-center gap-3 opacity-50">
+            <span class="text-muted">○</span>
+            <span class="num text-muted w-12">Step 7</span>
+            <span>訂閱金流</span>
+        </li>
+    </ol>
+</section>
+
+<section class="bg-card border border-border rounded-lg p-6">
+    <h2 class="text-lg font-semibold mb-3">資料表</h2>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="text-left text-muted border-b border-border">
+                    <th class="py-2 pr-4">Table</th>
+                    <th class="py-2 pr-4">用途</th>
+                    <th class="py-2">關鍵欄位</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="border-b border-border/50">
+                    <td class="py-2 pr-4 font-mono text-accent">etf_list</td>
+                    <td class="py-2 pr-4">ETF 主檔</td>
+                    <td class="py-2 num text-muted">code, name, issuer, index_tracked</td>
+                </tr>
+                <tr class="border-b border-border/50">
+                    <td class="py-2 pr-4 font-mono text-accent">daily_kbar</td>
+                    <td class="py-2 pr-4">每日 OHLCV</td>
+                    <td class="py-2 num text-muted">etf_id, date, o/h/l/c/v</td>
+                </tr>
+                <tr>
+                    <td class="py-2 pr-4 font-mono text-accent">news</td>
+                    <td class="py-2 pr-4">新聞</td>
+                    <td class="py-2 num text-muted">title, url, published_at, etf_tags</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

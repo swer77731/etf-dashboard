@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ app_name }}{% endblock %}</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.3" defer></script>
+    <script src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js" defer></script>
+
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              bg:       '#0a0e1a',
+              card:     '#131829',
+              border:   '#1f2937',
+              fg:       '#e5e7eb',
+              muted:    '#9ca3af',
+              up:       '#ef4444',  /* 台股紅漲 */
+              down:     '#10b981',  /* 台股綠跌 */
+              accent:   '#3b82f6',
+            },
+            fontFamily: {
+              mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+            },
+          }
+        }
+      }
+    </script>
+
+    <style>
+      body { background: #0a0e1a; color: #e5e7eb; }
+      .num { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      table tbody tr:hover { background: #1a2138; }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body class="min-h-screen bg-bg text-fg">
+    <header class="border-b border-border bg-card/60 backdrop-blur sticky top-0 z-10">
+        <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+            <a href="/" class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded bg-accent/20 border border-accent/40 flex items-center justify-center text-accent font-bold">E</div>
+                <div>
+                    <div class="text-base font-semibold tracking-wide">{{ app_name }}</div>
+                    <div class="text-xs text-muted">env: {{ app_env }}</div>
+                </div>
+            </a>
+            <nav class="flex items-center gap-6 text-sm text-muted">
+                <a href="/" class="hover:text-fg transition">首頁</a>
+                <a href="/api/health" class="hover:text-fg transition">/health</a>
+                <a href="/docs" class="hover:text-fg transition">/docs</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-6 py-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="max-w-6xl mx-auto px-6 py-6 text-xs text-muted border-t border-border mt-12">
+        © {{ app_name }} — Step 1 skeleton
+    </footer>
+</body>
+</html>
