@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}隱私權政策 — {{ brand_full }}{% endblock %}
+
+{% block content %}
+<article class="max-w-3xl mx-auto">
+  <header class="mb-8">
+    <h1 class="text-2xl sm:text-3xl font-semibold mb-2">隱私權政策</h1>
+    <p class="text-sm text-muted">最後更新:2026-04-26</p>
+  </header>
+
+  <div class="bg-card border border-border rounded-lg p-6 sm:p-8 space-y-6 text-base sm:text-lg leading-relaxed">
+
+    <section>
+      <p>
+        「{{ brand_zh }}」(以下簡稱「本站」)十分重視您的隱私權。
+        本政策說明本站如何蒐集、使用及保護您的資料。
+        當您使用本站,即表示您已同意本政策之內容。
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-semibold mb-3">一、Cookie 與追蹤工具</h2>
+      <p>本站使用 Cookie 與類似技術,目的限於以下用途:</p>
+      <ul class="list-disc ml-6 mt-3 space-y-2">
+        <li>記住您的使用偏好(例如夜間模式、語言、已選 ETF 清單)</li>
+        <li>網站流量分析(例如 Google Analytics),協助本站改善體驗</li>
+        <li>系統運作必要(例如登入狀態,未來會員系統推出後使用)</li>
+      </ul>
+      <p class="mt-3">
+        您可以在瀏覽器設定中關閉 Cookie,但部分功能可能因此無法使用。
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-semibold mb-3">二、本站不販售您的個人資料</h2>
+      <p>
+        本站<strong class="text-fg">絕不販售、出租、或交換您的個人資料</strong>給任何第三方。
+        例外情況僅限:
+      </p>
+      <ul class="list-disc ml-6 mt-3 space-y-2">
+        <li>取得您事前明確同意</li>
+        <li>司法機關依法定程序要求(例如法院命令)</li>
+        <li>為保護本站、其他使用者或公眾之合法權益所必需</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-semibold mb-3">三、會員資料(未來功能)</h2>
+      <p>
+        若本站日後推出會員系統,所蒐集之資料(如電子郵件、暱稱)將僅用於:
+      </p>
+      <ul class="list-disc ml-6 mt-3 space-y-2">
+        <li>提供您所申請之服務(例如電子郵件提醒、訂閱推播)</li>
+        <li>客戶服務與技術支援</li>
+        <li>本站重大公告通知</li>
+      </ul>
+      <p class="mt-3">
+        密碼一律以單向加密(bcrypt 或同等強度演算法)儲存,
+        本站員工亦無法以明文方式取得您的密碼。
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-semibold mb-3">四、資料保留與刪除</h2>
+      <p>
+        若您日後成為會員並要求刪除帳號,本站將於合理期間內刪除可識別您身分之個資。
+        匿名化之統計資料(例如「總瀏覽次數」)可能繼續保留供分析用。
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-semibold mb-3">五、第三方連結</h2>
+      <p>
+        本站可能含有指向第三方網站之連結。
+        當您點擊離開本站,即受該第三方之隱私權政策規範,
+        本站對該等網站之資料蒐集行為不負責任。
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-semibold mb-3">六、政策修改</h2>
+      <p>
+        本站保留隨時修改本政策之權利,修改後之內容自公布時起生效。
+        重大修改將以網站公告通知。
+      </p>
+    </section>
+
+  </div>
+
+  <div class="mt-8 text-sm text-muted text-center">
+    <a href="/" class="hover:text-fg transition">← 回首頁</a>
+  </div>
+</article>
+{% endblock %}

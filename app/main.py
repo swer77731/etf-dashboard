@@ -11,7 +11,7 @@ from app.config import PROJECT_ROOT, settings
 from app.database import init_db
 from app.routers import api as api_router
 from app.routers import pages as pages_router
-from app.scheduler import shutdown_scheduler, start_scheduler
+from app.scheduler import shutdown_scheduler, start_scheduler, startup_sync_if_needed
 
 logging.basicConfig(
     level=logging.INFO,
@@ -25,6 +25,7 @@ async def lifespan(app: FastAPI):
     logger.info("Booting %s (env=%s)", settings.app_name, settings.app_env)
     init_db()
     start_scheduler()
+    startup_sync_if_needed()  # 背景跑,不卡 web 啟動
     logger.info("Startup complete — listening on %s:%s", settings.host, settings.port)
     try:
         yield

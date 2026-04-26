@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}免責聲明 — {{ app_name }}{% endblock %}
+
+{% block content %}
+<article class="max-w-3xl mx-auto">
+  <header class="mb-8">
+    <h1 class="text-2xl sm:text-3xl font-semibold mb-2">免責聲明</h1>
+    <p class="text-sm text-muted">最後更新:2026-04-26</p>
+  </header>
+
+  <div class="bg-card border border-border rounded-lg p-6 sm:p-8 space-y-6 text-base sm:text-lg leading-relaxed">
+
+    <section>
+      <p>
+        本網站「{{ app_name }}」提供之 ETF 資訊、排行、走勢圖表等內容,
+        <strong class="text-fg">僅供參考,不構成任何投資建議、招攬或邀約</strong>。
+        使用本網站即代表您已閱讀並同意以下條款。
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-semibold mb-3">一、資料來源與準確性</h2>
+      <p>
+        本站資料引用自 FinMind API、台灣證券交易所、櫃買中心等公開資訊來源。
+        本站已盡力確保資料正確,但<strong class="text-fg">不保證資料即時、完整或無誤</strong>。
+        實際下單與成交價格,請以您的券商系統為準。
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-semibold mb-3">二、投資風險自負</h2>
+      <p>
+        ETF 投資有其風險,可能虧損本金。<strong class="text-fg">過去績效不代表未來表現</strong>。
+        任何依據本站資訊所做之投資決策,其風險與結果由使用者自行承擔,
+        本站及其開發者不負任何法律責任。
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-semibold mb-3">三、槓桿型與反向型 ETF 風險警示</h2>
+      <p>
+        槓桿型 ETF(如 2 倍正向)及反向型 ETF 適合<strong class="text-fg">短線操作</strong>,
+        長期持有可能因每日結算複利效果(俗稱「波動衰減」)導致虧損,
+        即使追蹤標的最終上漲,投資人仍可能賠錢。
+        新手請先熟悉產品結構,並充分了解風險後再進場。
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-semibold mb-3">四、資料更新時間</h2>
+      <p>
+        本站日 K 棒資料於每交易日收盤後同步,<strong class="text-fg">並非即時行情</strong>。
+        請勿以本站資料作為日內當沖之判斷依據。
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-semibold mb-3">五、不構成投資建議</h2>
+      <p>
+        本站非金融顧問,亦未取得任何投顧執照。
+        本站所有內容(包括但不限於排行榜、走勢圖、報酬統計)皆為一般性資訊,
+        <strong class="text-fg">並非針對您個人財務狀況之投資建議</strong>。
+        投資前請自行研究,或諮詢合格之理財專業人士。
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-semibold mb-3">六、第三方連結</h2>
+      <p>
+        本站可能含有指向第三方網站(如券商、證交所、新聞媒體)之連結。
+        本站不對該等第三方網站之內容、隱私權政策或任何後果負責。
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-semibold mb-3">七、智慧財產權</h2>
+      <p>
+        本站之原創內容(版面設計、文字說明、自製圖表)受著作權法保護,
+        未經書面同意,不得轉載、複製或商業使用。
+        引用之第三方資料(如 FinMind、證交所),其智慧財產權歸原資料來源所有。
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-semibold mb-3">八、條款修改</h2>
+      <p>
+        本站保留隨時修改本聲明之權利,修改後之內容自公布時起生效。
+        請使用者定期回看本頁,以掌握最新條款。
+      </p>
+    </section>
+
+  </div>
+
+  <div class="mt-8 text-sm text-muted text-center">
+    <a href="/" class="hover:text-fg transition">← 回首頁</a>
+  </div>
+</article>
+{% endblock %}

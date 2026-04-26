@@ -21,6 +21,14 @@ class ETF(Base):
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     issuer: Mapped[str | None] = mapped_column(String(64), nullable=True)
     index_tracked: Mapped[str | None] = mapped_column(String(128), nullable=True)
+
+    # 分類:active / market / dividend / overseas / theme / leverage / bond / other / index
+    category: Mapped[str] = mapped_column(String(16), nullable=False, default="other", index=True)
+
+    # 上市日期 / 是否還在交易(下市的 ETF 排程跳過)
+    listed_date: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
+
     last_updated: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
     )

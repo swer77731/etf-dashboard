@@ -1,23 +1,98 @@
 """HTML page routes — server-rendered Jinja2 + HTMX."""
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from app.config import settings, PROJECT_ROOT
+from app.config import PROJECT_ROOT, settings
+from app.services import ranking
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(PROJECT_ROOT / "templates"))
 
 
+def _common_ctx() -> dict:
+    """共用品牌 context — 所有頁面都會用到。"""
+    return {
+        "app_name": settings.app_name,
+        "app_env": settings.app_env,
+        "brand_zh": settings.app_name,
+        "brand_en": settings.app_brand_en,
+        "brand_full": settings.app_brand_full,
+    }
+
+
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
+    """首頁 — 大盤概況 + 6 個排行榜 sections。"""
+    try:
+        market = ranking.get_market_overview()
+    except Exception:
+        logger.exception("[index] market_overview failed")
+        market = None
+
+    sections = []
+
+    try:
+        sections.append({
+            "kind": "top_movers",
+            "category": "top",
+            "title": "近月最火 ETF",
+            "subtitle": "不分類別,看誰最近表現最強",
+            "data": ranking.get_top_movers("1m", limit=10),
+        })
+    except Exception:
+        logger.exception("[index] top_movers failed")
+        sections.append({"kind": "top_movers", "category": "top", "title": "近月最火 ETF", "data": None})
+
+    for cat_code, cat_label in [("active", "主動式"), ("market", "市值型"), ("dividend", "高股息")]:
+        try:
+            sections.append({
+                "kind": "category",
+                "category": cat_code,
+                "title": f"{cat_label}(近 3 個月)",
+                "data": ranking.get_ranking(cat_code, "3m", limit=10),
+            })
+        except Exception:
+            logger.exception("[index] category %s failed", cat_code)
+            sections.append({"kind": "category", "category": cat_code, "title": cat_label, "data": None})
+
+    for direction, kind, title in [
+        ("positive", "leverage_pos", "槓桿型 ETF(高風險)— 近 3 個月"),
+        ("inverse",  "leverage_neg", "反向型 ETF(高風險)— 近 3 個月"),
+    ]:
+        try:
+            sections.append({
+                "kind": kind,
+                "category": kind,
+                "title": title,
+                "data": ranking.get_leverage_ranking("3m", direction, limit=10),
+            })
+        except Exception:
+            logger.exception("[index] leverage %s failed", direction)
+            sections.append({"kind": kind, "category": kind, "title": title, "data": None})
+
     return templates.TemplateResponse(
-        request,
-        "index.html",
-        {
-            "app_name": settings.app_name,
-            "app_env": settings.app_env,
-        },
+        request, "index.html",
+        {**_common_ctx(), "sections": sections, "market": market},
     )
+
+
+@router.get("/disclaimer", response_class=HTMLResponse)
+async def disclaimer(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(request, "legal/disclaimer.html", _common_ctx())
+
+
+@router.get("/terms", response_class=HTMLResponse)
+async def terms(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(request, "legal/terms.html", _common_ctx())
+
+
+@router.get("/privacy", response_class=HTMLResponse)
+async def privacy(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(request, "legal/privacy.html", _common_ctx())

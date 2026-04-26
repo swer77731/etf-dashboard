@@ -1,1 +1,1 @@
-"""Taiwan ETF Dashboard application package."""
+"""ETF 觀察室 / ETF Watch — application package."""

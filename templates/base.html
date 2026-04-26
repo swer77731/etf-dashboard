@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}{{ app_name }}{% endblock %}</title>
+    <title>{% block title %}{{ brand_full }}{% endblock %}</title>
+
+    <meta name="description" content="台灣 ETF 排行、績效比較、即時新聞,看 ETF 最直覺的觀察室">
+    <meta name="keywords" content="台灣 ETF, ETF 排行, ETF 比較, ETF 觀察室, ETF Watch, 台股 ETF">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/htmx.org@2.0.3" defer></script>
@@ -36,33 +39,72 @@
       body { background: #0a0e1a; color: #e5e7eb; }
       .num { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
       table tbody tr:hover { background: #1a2138; }
+
+      /* === Stealth Branding 浮水印 === */
+      /* B1: 全頁背景對角線淡字 — pointer-events:none 不擋 hover/選取 */
+      .watermark-bg {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='200' viewBox='0 0 320 200'><text x='40' y='110' font-family='Inter,system-ui,Arial,sans-serif' font-size='24' font-weight='600' fill='%231f2937' fill-opacity='0.55' transform='rotate(-30 160 100)'>ETF Watch</text></svg>");
+        background-repeat: repeat;
+        background-size: 320px 200px;
+        opacity: 0.07;
+      }
+      /* 確保內容浮在背景之上 */
+      header, main, footer { position: relative; z-index: 1; }
+
+      /* B2: 卡片右下角 ETF Watch 字樣 */
+      .card-watermark {
+        position: absolute;
+        right: 1rem;
+        bottom: 0.75rem;
+        font-size: 0.75rem;
+        color: #374151;
+        opacity: 0.45;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        pointer-events: none;
+        user-select: none;
+      }
     </style>
     {% block head %}{% endblock %}
 </head>
 <body class="min-h-screen bg-bg text-fg">
-    <header class="border-b border-border bg-card/60 backdrop-blur sticky top-0 z-10">
-        <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-            <a href="/" class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded bg-accent/20 border border-accent/40 flex items-center justify-center text-accent font-bold">E</div>
-                <div>
-                    <div class="text-base font-semibold tracking-wide">{{ app_name }}</div>
-                    <div class="text-xs text-muted">env: {{ app_env }}</div>
+    <div class="watermark-bg"></div>
+
+    <header class="border-b border-border bg-card/80 backdrop-blur sticky top-0 z-20">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
+            <a href="/" class="flex items-center gap-2 sm:gap-3 min-w-0">
+                <div class="w-9 h-9 shrink-0 rounded bg-accent/20 border border-accent/40 flex items-center justify-center text-accent font-bold text-base">E</div>
+                <div class="min-w-0">
+                    <div class="text-base sm:text-lg font-semibold tracking-wide truncate">{{ brand_zh }}</div>
+                    <div class="hidden sm:block text-xs text-muted tracking-widest">{{ brand_en }}</div>
                 </div>
             </a>
-            <nav class="flex items-center gap-6 text-sm text-muted">
+            <nav class="flex items-center gap-3 sm:gap-6 text-sm text-muted shrink-0">
                 <a href="/" class="hover:text-fg transition">首頁</a>
-                <a href="/api/health" class="hover:text-fg transition">/health</a>
-                <a href="/docs" class="hover:text-fg transition">/docs</a>
+                <a href="/api/health" class="hover:text-fg transition">健康</a>
+                <a href="/docs" class="hover:text-fg transition">API</a>
             </nav>
         </div>
     </header>
 
-    <main class="max-w-6xl mx-auto px-6 py-8">
+    <main class="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {% block content %}{% endblock %}
     </main>
 
-    <footer class="max-w-6xl mx-auto px-6 py-6 text-xs text-muted border-t border-border mt-12">
-        © {{ app_name }} — Step 1 skeleton
+    <footer class="max-w-6xl mx-auto px-4 sm:px-6 py-6 text-xs text-gray-500 border-t border-border mt-12">
+        <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-center">
+            <a href="/terms" class="hover:text-fg transition">使用條款</a>
+            <span aria-hidden="true">·</span>
+            <a href="/privacy" class="hover:text-fg transition">隱私權</a>
+            <span aria-hidden="true">·</span>
+            <a href="/disclaimer" class="hover:text-fg transition">免責聲明</a>
+            <span class="hidden sm:inline" aria-hidden="true">|</span>
+            <span class="block sm:inline w-full sm:w-auto">© 2026 {{ brand_full }} · 資料來源:FinMind</span>
+        </div>
     </footer>
 </body>
 </html>

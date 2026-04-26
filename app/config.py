@@ -21,7 +21,9 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    app_name: str = "Taiwan ETF Dashboard"
+    app_name: str = "ETF 觀察室"
+    app_brand_en: str = "ETF Watch"
+    app_brand_full: str = "ETF 觀察室 · ETF Watch"
     app_env: str = Field(default="dev", description="dev / prod")
     debug: bool = True
 
@@ -36,6 +38,11 @@ class Settings(BaseSettings):
     scheduler_timezone: str = "Asia/Taipei"
     daily_fetch_hour: int = 14
     daily_fetch_minute: int = 30
+
+    finmind_api_token: str | None = Field(
+        default=None,
+        description="FinMind API token — 免費版可空,填了拿較高 rate limit",
+    )
 
     telegram_bot_token: str | None = None
     telegram_admin_chat_id: str | None = None

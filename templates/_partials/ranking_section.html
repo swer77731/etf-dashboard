@@ -1,0 +1,38 @@
+{# 排行榜單一區塊 — 所有 6 個區塊都用同一份結構,改一處全部更新。 #}
+{% from "_partials/ranking_table.html" import ranking_table %}
+
+{% macro ranking_section(sec, descriptions) %}
+{% set is_leverage = (sec.kind in ("leverage_pos", "leverage_neg")) %}
+<section class="relative {% if is_leverage %}bg-card border-2 border-amber-500/30{% else %}bg-card border border-border{% endif %} rounded-lg p-5 sm:p-7 mb-7 pb-12">
+  <header class="mb-5 flex items-baseline justify-between gap-4 flex-wrap">
+    <div>
+      <h2 class="text-xl sm:text-2xl font-semibold">{{ sec.title }}</h2>
+      {% set desc_key = sec.kind if sec.kind in descriptions else (sec.category if sec.category in descriptions else None) %}
+      {% if sec.subtitle %}
+        <div class="text-sm sm:text-base text-muted mt-2">{{ sec.subtitle }}</div>
+      {% elif desc_key %}
+        <div class="text-sm sm:text-base text-muted mt-2">{{ descriptions[desc_key] }}</div>
+      {% endif %}
+    </div>
+    {% if sec.data and sec.data.row_count > 0 %}
+      <div class="text-sm text-muted num">
+        {{ sec.data.period_start }} ~ {{ sec.data.today }}
+      </div>
+    {% endif %}
+  </header>
+
+  {% if is_leverage %}
+  <div class="mb-5 px-4 py-3 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-200/90 text-sm sm:text-base">
+    槓桿 / 反向型 ETF 適合短線操作。長期持有可能因每日結算複利效果(波動衰減)而虧損,新手請先熟悉產品結構再進場。
+  </div>
+  {% endif %}
+
+  {{ ranking_table(sec.data, show_category=(sec.kind == "top_movers")) }}
+
+  {# 對照大盤統一在頁面頂部「市場概況」呈現,per-section 不重複。#}
+  {# vs 大盤 仍在表格欄位,每筆 ETF 各自顯示。#}
+
+  {# 浮水印 — 截圖任何區塊都帶到。商業免責統一放頁面最下方,不重複。 #}
+  <div class="card-watermark">ETF Watch</div>
+</section>
+{% endmacro %}

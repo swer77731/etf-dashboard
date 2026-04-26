@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}使用條款 — {{ app_name }}{% endblock %}
+
+{% block content %}
+<article class="max-w-3xl mx-auto">
+  <header class="mb-8">
+    <h1 class="text-2xl sm:text-3xl font-semibold mb-2">使用條款</h1>
+    <p class="text-sm text-muted">最後更新:2026-04-26</p>
+  </header>
+
+  <div class="bg-card border border-border rounded-lg p-6 sm:p-8 space-y-6 text-base sm:text-lg leading-relaxed">
+
+    <section>
+      <p>
+        歡迎使用「{{ app_name }}」(以下簡稱「本站」)。
+        當您瀏覽、註冊或使用本站任何功能時,即表示您已閱讀並同意本條款。
+        若您不同意,請立即停止使用本站。
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-semibold mb-3">一、智慧財產權</h2>
+      <p>
+        本站之原創內容(包括但不限於版面設計、文字說明、自製圖表、分類規則、UI 元件、程式碼)
+        受著作權法及其他智慧財產權法律保護,著作權歸本站所有。
+      </p>
+      <p class="mt-3">
+        未經本站書面同意,
+        <strong class="text-fg">禁止任何形式之轉載、複製、修改、散布、商業使用</strong>
+        (包含但不限於整站抓取、API 反向工程、UI 抄襲)。
+        違反者本站保留法律追訴權。
+      </p>
+      <p class="mt-3">
+        引用之第三方資料(如 FinMind、台灣證券交易所、櫃買中心),
+        其智慧財產權歸原資料來源所有。
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-semibold mb-3">二、禁止行為</h2>
+      <p>使用本站時,您同意不得進行下列行為:</p>
+      <ul class="list-disc ml-6 mt-3 space-y-2">
+        <li>使用爬蟲、機器人、自動化腳本大量抓取本站資料</li>
+        <li>對本站進行壓力測試、阻斷服務攻擊或其他破壞行為</li>
+        <li>嘗試破解、繞過或反向工程本站之技術機制</li>
+        <li>冒用他人身分,或散布不實、違法、侵權之內容</li>
+        <li>將本站資料用於違法、欺詐、洗錢等目的</li>
+      </ul>
+      <p class="mt-3">
+        本站發現上述行為,有權立即終止您之使用權限,並依法追究責任。
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-semibold mb-3">三、商業使用須授權</h2>
+      <p>
+        若您欲將本站資料、API 或內容用於商業用途
+        (例如:整合至自家 APP、報告、付費服務、媒體報導),
+        請事先來信取得書面授權,
+        <strong class="text-fg">未經授權不得商業使用</strong>。
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-semibold mb-3">四、服務變更與終止</h2>
+      <p>
+        本站保留隨時修改、暫停或終止部分或全部服務之權利,且不負告知義務。
+        因服務變更或終止造成之不便或損失,本站不負賠償責任。
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-semibold mb-3">五、免責與責任限制</h2>
+      <p>
+        本站所提供之投資相關資訊僅供參考,
+        詳細風險告知請見
+        <a href="/disclaimer" class="text-accent hover:underline">免責聲明</a>。
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-semibold mb-3">六、條款修改</h2>
+      <p>
+        本站保留隨時修改本條款之權利,修改後之內容自公布時起生效。
+        重大修改本站將以網站公告方式通知,請使用者定期回看。
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-semibold mb-3">七、準據法與管轄</h2>
+      <p>
+        本條款之解釋與適用,以及與本站有關之爭議,
+        均以中華民國法律為準據法,並以
+        <strong class="text-fg">台灣台北地方法院為第一審管轄法院</strong>。
+      </p>
+    </section>
+
+  </div>
+
+  <div class="mt-8 text-sm text-muted text-center">
+    <a href="/" class="hover:text-fg transition">← 回首頁</a>
+  </div>
+</article>
+{% endblock %}

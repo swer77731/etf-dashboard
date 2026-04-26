@@ -39,6 +39,9 @@ Thumbs.db
 # Claude Code metadata
 .claude/
 
+# Debug / scratch outputs
+scripts/out/
+
 # Logs
 *.log
 logs/

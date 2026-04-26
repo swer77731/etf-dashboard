@@ -1,0 +1,62 @@
+{# 排行榜表格 macro — 給每個 section 用,確保表格欄位 100% 一致。 #}
+
+{% macro fmt_pct(v, signed=True) -%}
+  {%- if v is none -%}—{%- else -%}
+    {%- if signed and v > 0 -%}+{%- endif -%}{{ "%.2f"|format(v) }}%
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro pct_color(v) -%}
+  {%- if v is none -%}text-muted
+  {%- elif v > 0 -%}text-up
+  {%- elif v < 0 -%}text-down
+  {%- else -%}text-fg
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro ranking_table(data, show_category=False) %}
+  {% if data is none or data.row_count == 0 %}
+    <div class="text-base text-muted py-10 text-center">
+      資料更新中,請稍候。
+    </div>
+  {% else %}
+    <div class="overflow-x-auto -mx-4 sm:mx-0">
+      <table class="w-full text-base min-w-[640px] num">
+        <thead>
+          <tr class="text-left text-muted border-b border-border">
+            <th class="py-3 px-4 sm:px-3 font-medium w-12 text-base">#</th>
+            <th class="py-3 px-3 font-medium text-base">代號</th>
+            <th class="py-3 px-3 font-medium text-base">名稱</th>
+            {% if show_category %}
+            <th class="py-3 px-3 font-medium text-base hidden sm:table-cell">類別</th>
+            {% endif %}
+            <th class="py-3 px-3 font-medium text-base text-right">收盤</th>
+            <th class="py-3 px-3 font-medium text-base text-right">期間報酬</th>
+            <th class="py-3 px-3 font-medium text-base text-right">vs 大盤</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in data.rows %}
+          <tr class="border-b border-border/40 hover:bg-bg/40">
+            <td class="py-3 px-4 sm:px-3 text-muted text-base">{{ loop.index }}</td>
+            <td class="py-3 px-3 font-mono text-accent text-base sm:text-lg">{{ r.code }}</td>
+            <td class="py-3 px-3 truncate max-w-[200px] text-base">{{ r.name }}</td>
+            {% if show_category %}
+            <td class="py-3 px-3 text-muted text-base hidden sm:table-cell">{{ r.category_label }}</td>
+            {% endif %}
+            <td class="py-3 px-3 text-right text-base sm:text-lg">
+              {%- if r.last_close is not none -%}{{ "%.2f"|format(r.last_close) }}{%- else -%}—{%- endif -%}
+            </td>
+            <td class="py-3 px-3 text-right text-base sm:text-lg font-semibold {{ pct_color(r.period_return_pct) }}">
+              {{ fmt_pct(r.period_return_pct) }}
+            </td>
+            <td class="py-3 px-3 text-right text-base sm:text-lg font-semibold {{ pct_color(r.vs_index_pct) }}">
+              {{ fmt_pct(r.vs_index_pct) }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+{% endmacro %}
