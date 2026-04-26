@@ -1,0 +1,34 @@
+{# 品牌 LOGO 元件 — has_logo 為 True 時顯示 SVG,否則退回「E」placeholder。
+
+   user 把 logo.svg(或 logo.png)放進 static/img/,_common_ctx() 自動偵測,
+   所有用 brand_mark macro 的位置全部一鍵切換。
+
+   sizes:
+   - "lg" (default) → sidebar / 大型 LOGO  (40 × 40)
+   - "md"           → mobile header        (32 × 32)
+   - "sm"           → ECharts 角落         (24 × 24)
+#}
+
+{% macro brand_mark(size="lg", logo_url=None, has_logo=False, brand_zh="ETF 觀察室", with_glow=True) %}
+{% if size == "lg" %}
+  {% set wh = "w-10 h-10" %}
+  {% set tx = "text-lg" %}
+{% elif size == "md" %}
+  {% set wh = "w-8 h-8" %}
+  {% set tx = "text-base" %}
+{% else %}
+  {% set wh = "w-6 h-6" %}
+  {% set tx = "text-xs" %}
+{% endif %}
+
+{% if has_logo and logo_url %}
+  <img src="{{ logo_url }}" alt="{{ brand_zh }} LOGO"
+       class="{{ wh }} rounded-lg object-contain
+              {% if with_glow %}transition group-hover:shadow-[0_0_20px_var(--c-accent-glow)]{% endif %}">
+{% else %}
+  <div class="{{ wh }} rounded-lg flex items-center justify-center font-bold text-accent {{ tx }}
+              bg-accent/10 border border-accent/40
+              {% if with_glow %}transition group-hover:shadow-[0_0_20px_var(--c-accent-glow)]{% endif %}"
+       aria-label="{{ brand_zh }} LOGO placeholder">E</div>
+{% endif %}
+{% endmacro %}

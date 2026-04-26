@@ -38,39 +38,43 @@
 
 {# === 市場概況(TAIEX 大盤一處呈現) === #}
 {% if market and market.taiex_close %}
-<section class="relative section-card rounded-xl p-5 sm:p-7 mb-7">
-  <header class="mb-5 flex items-baseline justify-between gap-4 flex-wrap">
-    <div class="flex items-center gap-3">
-      <div class="w-1 h-7 bg-accent rounded-full" style="box-shadow: 0 0 8px var(--c-accent-glow);"></div>
-      <div>
-        <h2 class="text-xl sm:text-2xl font-semibold">市場概況</h2>
-        <div class="text-sm text-muted mt-1">大盤(TAIEX)收盤點位與各期間漲跌</div>
-      </div>
-    </div>
-    <div class="text-xs sm:text-sm text-muted num">截至 {{ market.taiex_date }}</div>
-  </header>
+<section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7">
+  <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
 
-  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-    <div class="bg-bg-soft border border-border rounded-lg p-4 transition hover:border-accent/40">
-      <div class="text-xs sm:text-sm text-muted mb-1">大盤收盤</div>
-      <div class="text-xl sm:text-2xl font-semibold num text-fg">{{ "%.2f"|format(market.taiex_close) }}</div>
-    </div>
-    {% for key in ["1m", "3m", "ytd"] %}
-      {% set r = market.returns[key] %}
-      <div class="bg-bg-soft border border-border rounded-lg p-4 transition hover:border-accent/40">
-        <div class="text-xs sm:text-sm text-muted mb-1">{{ r.label }}</div>
-        <div class="text-xl sm:text-2xl font-semibold num
-          {% if r.value is none %}text-muted
-          {% elif r.value > 0 %}text-up
-          {% elif r.value < 0 %}text-down
-          {% else %}text-fg{% endif %}">
-          {%- if r.value is none -%}—
-          {%- else -%}
-            {%- if r.value > 0 -%}+{%- endif -%}{{ "%.2f"|format(r.value) }}%
-          {%- endif -%}
+  <div class="card-content">
+    <header class="mb-5 flex items-baseline justify-between gap-4 flex-wrap">
+      <div class="flex items-center gap-3">
+        <div class="w-1 h-7 bg-accent rounded-full" style="box-shadow: 0 0 8px var(--c-accent-glow);"></div>
+        <div>
+          <h2 class="text-xl sm:text-2xl font-semibold">市場概況</h2>
+          <div class="text-sm text-muted mt-1">大盤(TAIEX)收盤點位與各期間漲跌</div>
         </div>
       </div>
-    {% endfor %}
+      <div class="text-xs sm:text-sm text-muted num">截至 {{ market.taiex_date }}</div>
+    </header>
+
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+      <div class="bg-bg-soft border border-border rounded-lg p-4 transition hover:border-accent/40">
+        <div class="text-xs sm:text-sm text-muted mb-1">大盤收盤</div>
+        <div class="text-xl sm:text-2xl font-semibold num text-fg">{{ "%.2f"|format(market.taiex_close) }}</div>
+      </div>
+      {% for key in ["1m", "3m", "ytd"] %}
+        {% set r = market.returns[key] %}
+        <div class="bg-bg-soft border border-border rounded-lg p-4 transition hover:border-accent/40">
+          <div class="text-xs sm:text-sm text-muted mb-1">{{ r.label }}</div>
+          <div class="text-xl sm:text-2xl font-semibold num
+            {% if r.value is none %}text-muted
+            {% elif r.value > 0 %}text-up
+            {% elif r.value < 0 %}text-down
+            {% else %}text-fg{% endif %}">
+            {%- if r.value is none -%}—
+            {%- else -%}
+              {%- if r.value > 0 -%}+{%- endif -%}{{ "%.2f"|format(r.value) }}%
+            {%- endif -%}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
   </div>
 
   <div class="card-watermark">ETF Watch</div>

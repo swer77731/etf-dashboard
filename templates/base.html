@@ -8,6 +8,14 @@
     <meta name="description" content="台灣 ETF 排行、績效比較、即時新聞,看 ETF 最直覺的觀察室">
     <meta name="keywords" content="台灣 ETF, ETF 排行, ETF 比較, ETF 觀察室, ETF Watch, 台股 ETF">
 
+    {# Favicon — 偵測 static/img/favicon.ico 存在才掛,避免 404 #}
+    {% if favicon_url %}
+    <link rel="icon" href="{{ favicon_url }}">
+    {% endif %}
+    {% if has_logo and logo_url.endswith('.svg') %}
+    <link rel="icon" type="image/svg+xml" href="{{ logo_url }}">
+    {% endif %}
+
     {# Theme init — 在 Tailwind 載入之前先設好,避免 flash #}
     <script>
       (function () {
@@ -16,6 +24,8 @@
           document.documentElement.setAttribute('data-theme', t);
         } catch (e) { /* ignore */ }
       })();
+      // 給 ECharts chart-watermark.js 用的全域 LOGO URL(無 LOGO 時為 null,自動退回純文字)
+      window.ETF_WATCH_LOGO_URL = {% if has_logo %}"{{ logo_url }}"{% else %}null{% endif %};
     </script>
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -62,12 +72,19 @@
         --c-muted:        156 163 175;
         --c-accent:       59 130 246;
         --c-accent-glow:  rgba(59, 130, 246, 0.35);
-        --c-watermark-bg: 31 41 55;
-        --c-watermark-card: 75 85 99;
-        --c-wm-bg-op:     0.07;
-        --c-wm-card-op:   0.45;
+        /* 浮水印:暗色系下要用淺灰才看得到 */
+        --c-watermark-bg:    148 163 184;   /* slate-400 */
+        --c-watermark-card:  203 213 225;   /* slate-300 */
+        --c-wm-bg-op:        0.08;
+        --c-wm-card-op:      0.40;
         --c-grid:         rgba(59, 130, 246, 0.05);
-        --c-hero-gradient: linear-gradient(135deg, rgb(96 165 250) 0%, rgb(229 231 235) 60%, rgb(167 139 250) 100%);
+        /* 變色油墨 hero gradient(暗色系:亮藍 → 紫 → 桃紅 → 青) */
+        --c-hero-gradient: linear-gradient(120deg,
+          rgb(96 165 250) 0%,
+          rgb(167 139 250) 25%,
+          rgb(244 114 182) 50%,
+          rgb(56 189 248) 75%,
+          rgb(96 165 250) 100%);
       }
       :root[data-theme="light"] {
         --c-bg:           248 250 252;
@@ -79,12 +96,19 @@
         --c-muted:        100 116 139;
         --c-accent:       37 99 235;
         --c-accent-glow:  rgba(37, 99, 235, 0.20);
-        --c-watermark-bg: 148 163 184;
-        --c-watermark-card: 100 116 139;
-        --c-wm-bg-op:     0.10;
-        --c-wm-card-op:   0.30;
+        /* 浮水印:亮色系下要用較深灰 */
+        --c-watermark-bg:    100 116 139;   /* slate-500 */
+        --c-watermark-card:  71 85 105;     /* slate-600 */
+        --c-wm-bg-op:        0.10;
+        --c-wm-card-op:      0.35;
         --c-grid:         rgba(37, 99, 235, 0.06);
-        --c-hero-gradient: linear-gradient(135deg, rgb(37 99 235) 0%, rgb(15 23 42) 60%, rgb(124 58 237) 100%);
+        /* 變色油墨 hero gradient(亮色系:深藍 → 紫 → 玫紅 → 藍) */
+        --c-hero-gradient: linear-gradient(120deg,
+          rgb(37 99 235) 0%,
+          rgb(124 58 237) 25%,
+          rgb(219 39 119) 50%,
+          rgb(2 132 199) 75%,
+          rgb(37 99 235) 100%);
       }
 
       html { scroll-behavior: smooth; }
@@ -146,14 +170,48 @@
         letter-spacing: 0.08em;
         pointer-events: none;
         user-select: none;
+        z-index: 1;
+      }
+
+      /* 卡片中央大字浮水印 — 截圖時帶到品牌,但不擋資料閱讀 */
+      .card-watermark-center {
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%) rotate(-8deg);
+        font-size: clamp(2.25rem, 7vw, 4.5rem);
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        color: rgb(var(--c-watermark-card));
+        opacity: 0.06;
+        pointer-events: none;
+        user-select: none;
+        white-space: nowrap;
+        z-index: 0;
+      }
+      /* 卡片內容浮在中央浮水印之上 */
+      .card-content {
+        position: relative;
+        z-index: 1;
       }
 
       /* === Tech polish === */
+      /* 變色油墨效果 — gradient + background-position 動畫 */
       .hero-text {
         background: var(--c-hero-gradient);
+        background-size: 300% 300%;
         -webkit-background-clip: text;
                 background-clip: text;
         color: transparent;
+        animation: hero-shift 14s ease-in-out infinite;
+      }
+      @keyframes hero-shift {
+        0%   { background-position:   0% 50%; }
+        50%  { background-position: 100% 50%; }
+        100% { background-position:   0% 50%; }
+      }
+      /* 尊重 user 的 reduce-motion 設定 — 停止動畫但保留漸層 */
+      @media (prefers-reduced-motion: reduce) {
+        .hero-text { animation: none; }
       }
 
       .section-card {
@@ -272,6 +330,7 @@
     </style>
     {% block head %}{% endblock %}
 </head>
+{% from "_partials/brand_mark.html" import brand_mark %}
 <body x-data="appShell()" x-init="init()">
 
     <div class="grid-bg"></div>
@@ -291,9 +350,7 @@
            style="background: linear-gradient(180deg, rgb(var(--c-card)) 0%, rgb(var(--c-bg-soft)) 100%);">
 
       <a href="/" class="flex items-center gap-3 mb-8 group">
-        <div class="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-accent text-lg
-                    bg-accent/10 border border-accent/40
-                    transition group-hover:shadow-[0_0_20px_var(--c-accent-glow)]">E</div>
+        {{ brand_mark(size="lg", logo_url=logo_url, has_logo=has_logo, brand_zh=brand_zh) }}
         <div class="min-w-0">
           <div class="font-semibold text-fg truncate">{{ brand_zh }}</div>
           <div class="text-[0.65rem] text-muted tracking-[0.25em]">{{ brand_en }}</div>
@@ -357,7 +414,10 @@
         <button @click="sidebarOpen=true" class="p-2 -ml-2 text-fg" aria-label="open menu">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
-        <div class="font-semibold text-fg truncate px-2">{{ brand_zh }}</div>
+        <a href="/" class="flex items-center gap-2 group min-w-0 flex-1 justify-center">
+          {{ brand_mark(size="md", logo_url=logo_url, has_logo=has_logo, brand_zh=brand_zh, with_glow=False) }}
+          <span class="font-semibold text-fg truncate">{{ brand_zh }}</span>
+        </a>
         <button @click="setTheme(theme==='dark' ? 'light' : 'dark')" class="p-2 -mr-2 text-muted hover:text-fg" aria-label="toggle theme">
           <svg x-show="theme==='dark'" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
           <svg x-show="theme==='light'" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>

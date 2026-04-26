@@ -16,6 +16,29 @@ router = APIRouter()
 templates = Jinja2Templates(directory=str(PROJECT_ROOT / "templates"))
 
 
+_LOGO_SVG = PROJECT_ROOT / "static" / "img" / "logo.svg"
+_LOGO_PNG = PROJECT_ROOT / "static" / "img" / "logo.png"
+_FAVICON  = PROJECT_ROOT / "static" / "img" / "favicon.ico"
+
+
+def _detect_brand_assets() -> dict:
+    """偵測 LOGO / favicon 是否存在,讓 template 自動切換。
+
+    user 把檔案丟進 static/img/ 後,所有頁面自動使用 LOGO,不必改程式碼。
+    """
+    if _LOGO_SVG.exists():
+        logo_url = "/static/img/logo.svg"
+    elif _LOGO_PNG.exists():
+        logo_url = "/static/img/logo.png"
+    else:
+        logo_url = None
+    return {
+        "logo_url": logo_url,
+        "favicon_url": "/static/img/favicon.ico" if _FAVICON.exists() else None,
+        "has_logo": logo_url is not None,
+    }
+
+
 def _common_ctx() -> dict:
     """共用品牌 context — 所有頁面都會用到。"""
     return {
@@ -24,6 +47,7 @@ def _common_ctx() -> dict:
         "brand_zh": settings.app_name,
         "brand_en": settings.app_brand_en,
         "brand_full": settings.app_brand_full,
+        **_detect_brand_assets(),
     }
 
 
