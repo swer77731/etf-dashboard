@@ -26,6 +26,44 @@ logger = logging.getLogger(__name__)
 DEFAULT_NEWS_CATEGORIES = ("active", "market", "dividend")
 
 
+# FinMind TaiwanStockNews 實際 schema(2026-04-27 驗證):
+#   { date: "YYYY-MM-DD HH:MM:SS", stock_id, link, source, title }
+# 但欄位名 / 格式未來可能變,寫成容錯版本。
+_NEWS_DATE_KEYS = ("date", "publish_time", "time", "publishedAt", "published_at")
+_NEWS_DATE_FORMATS = ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d")
+
+
+def _parse_news_datetime(row: dict) -> datetime | None:
+    """從 FinMind row 拿日期 — 多欄位名 + 多格式容錯。
+
+    解析失敗會 log.warning(欄位 keys + 嘗試的字串),讓未來 schema 改變立刻看見。
+    """
+    raw = None
+    used_key = None
+    for key in _NEWS_DATE_KEYS:
+        v = row.get(key)
+        if v:
+            raw = str(v).strip()
+            used_key = key
+            break
+    if not raw:
+        return None
+
+    # 切到最大可能長度(YYYY-MM-DDTHH:MM:SS = 19 chars)
+    s = raw[:19]
+    for fmt in _NEWS_DATE_FORMATS:
+        try:
+            return datetime.strptime(s, fmt)
+        except (ValueError, TypeError):
+            continue
+
+    logger.warning(
+        "[news_sync] cannot parse date %r (key=%s, available_keys=%s)",
+        raw, used_key, list(row.keys()),
+    )
+    return None
+
+
 def list_news_target_codes(categories: Iterable[str] = DEFAULT_NEWS_CATEGORIES) -> list[str]:
     """挑要抓新聞的 ETF 代號集 — 預設主流 3 類。"""
     with session_scope() as session:
@@ -80,11 +118,7 @@ def _persist_news(rows: list[dict], etf_code: str) -> int:
         for url, r in by_url.items():
             title = (r.get("title") or "").strip()
             source = (r.get("source") or "").strip()
-            date_str = r.get("date")
-            try:
-                pub_dt = datetime.strptime(date_str, "%Y-%m-%d") if date_str else None
-            except (ValueError, TypeError):
-                pub_dt = None
+            pub_dt = _parse_news_datetime(r)
 
             existing = existing_map.get(url)
             if existing:

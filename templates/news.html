@@ -86,10 +86,10 @@
   }
   .news-row:hover .news-title { color: rgb(var(--c-accent)); }
 
+  /* news-row 永遠 relative — 給 stretched-link + 紅縱線都用 */
+  .news-row { position: relative; }
+
   /* 「最新」一抹紅縱線 — 給最近 24h 內的新聞 */
-  .news-row.is-today {
-    position: relative;
-  }
   .news-row.is-today::before {
     content: '';
     position: absolute;
@@ -97,7 +97,22 @@
     width: 3px;
     background: rgb(239 68 68);
     border-radius: 2px;
+    z-index: 2;
   }
+
+  /* Stretched link — 點整列任何空白處都跳新聞;ETF tags 在 z-index:2 之上仍可獨立點 */
+  .news-title-link {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+  }
+  .news-title-link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+  .news-etf-tag { position: relative; z-index: 2; }
 </style>
 {% endblock %}
 
@@ -146,27 +161,31 @@
   <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
   <div class="card-content">
     {% for n in items %}
-      {# Jinja2 macro 算相對時間(從伺服器的 UTC ISO 字串) #}
       {% set pub_date = n.published_at[:10] if n.published_at else '' %}
       {% set is_today = pub_date == today_iso %}
-      <a href="{{ n.url }}" target="_blank" rel="noopener noreferrer"
-         class="news-row group {% if is_today %}is-today{% endif %}"
-         data-published="{{ n.published_at or '' }}">
+      {# 外層 div(非 <a>),避免 nested <a>;標題用 stretched link 包整列點擊 #}
+      <div class="news-row group {% if is_today %}is-today{% endif %}"
+           data-published="{{ n.published_at or '' }}">
         <div class="flex items-center gap-2 flex-wrap">
-          {# 時間 pill — JS 改寫成相對時間;失敗 fallback 顯示日期 #}
-          <span class="news-time-pill" data-time-pill>
-            <span class="live-dot" style="display:none;"></span>
-            <span data-time-text>{{ pub_date or '—' }}</span>
-          </span>
+          {# 時間 pill — 只在有 published_at 時顯示;
+             JS 會改寫成「2026-04-25 · 5 天前」並列格式 #}
+          {% if n.published_at %}
+            <span class="news-time-pill" data-time-pill>
+              <span class="live-dot" style="display:none;"></span>
+              <span data-time-text>{{ pub_date }}</span>
+            </span>
+          {% endif %}
           {% if n.source %}
             <span class="news-source-tag">{{ n.source }}</span>
           {% endif %}
           {% for tag in n.etf_tags[:5] %}
-            <a href="/etf/{{ tag }}" class="news-etf-tag" onclick="event.stopPropagation()">{{ tag }}</a>
+            <a href="/etf/{{ tag }}" class="news-etf-tag">{{ tag }}</a>
           {% endfor %}
         </div>
-        <div class="news-title">{{ n.title }}</div>
-      </a>
+        <a href="{{ n.url }}" target="_blank" rel="noopener noreferrer" class="news-title-link">
+          <div class="news-title">{{ n.title }}</div>
+        </a>
+      </div>
     {% endfor %}
   </div>
   <div class="card-watermark">ETF Watch</div>
@@ -208,35 +227,48 @@
 </div>
 
 <script>
-  // 把每則新聞的時間 pill 改寫成相對時間(剛剛 / N 小時前 / 昨天 / N 天前)
+  // pill 顯示「絕對日期 · 相對時間」並列(例:「2026-04-25 · 5 天前」)
   // 6 小時內顯紅 + 跳動點,凸顯快訊感
+  // published_at 為 NULL 的 row 沒 pill(模板已 if 包裹),這邊跳過
   (function () {
     function relTime(iso) {
-      if (!iso) return { text: '—', fresh: false };
+      if (!iso) return null;
       var d = new Date(iso);
-      if (isNaN(d.getTime())) return { text: iso.slice(0, 10), fresh: false };
+      if (isNaN(d.getTime())) return null;
+      var iso10 = iso.slice(0, 10);
       var now = new Date();
       var diffMin = Math.floor((now - d) / 60000);
-      if (diffMin < 1)  return { text: '剛剛',          fresh: true };
-      if (diffMin < 60) return { text: diffMin + ' 分鐘前', fresh: true };
-      var diffHr = Math.floor(diffMin / 60);
-      if (diffHr < 6)   return { text: diffHr + ' 小時前', fresh: true };
-      if (diffHr < 24)  return { text: diffHr + ' 小時前', fresh: false };
-      var diffDay = Math.floor(diffHr / 24);
-      if (diffDay === 1) return { text: '昨天',           fresh: false };
-      if (diffDay < 7)   return { text: diffDay + ' 天前', fresh: false };
-      // 超過 1 週 → 直接顯日期
-      return { text: iso.slice(0, 10), fresh: false };
+      var rel = '';
+      var fresh = false;
+      if (diffMin < 1)        { rel = '剛剛';            fresh = true; }
+      else if (diffMin < 60)  { rel = diffMin + ' 分鐘前'; fresh = true; }
+      else {
+        var diffHr = Math.floor(diffMin / 60);
+        if (diffHr < 6)       { rel = diffHr + ' 小時前'; fresh = true; }
+        else if (diffHr < 24) { rel = diffHr + ' 小時前'; }
+        else {
+          var diffDay = Math.floor(diffHr / 24);
+          if (diffDay === 1)      rel = '昨天';
+          else if (diffDay < 30)  rel = diffDay + ' 天前';
+          // 超過 30 天就不秀相對時間,只留絕對日期
+        }
+      }
+      return { absolute: iso10, relative: rel, fresh: fresh };
     }
 
     document.querySelectorAll('.news-row').forEach(function (row) {
       var pub = row.getAttribute('data-published');
       if (!pub) return;
       var info = relTime(pub);
+      if (!info) return;
       var pill = row.querySelector('[data-time-pill]');
       var text = row.querySelector('[data-time-text]');
       var dot  = pill ? pill.querySelector('.live-dot') : null;
-      if (text) text.textContent = info.text;
+      if (text) {
+        text.textContent = info.relative
+          ? info.absolute + ' · ' + info.relative
+          : info.absolute;
+      }
       if (info.fresh && pill) {
         pill.classList.add('is-fresh');
         if (dot) dot.style.display = 'inline-block';

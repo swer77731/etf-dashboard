@@ -193,7 +193,9 @@ def get_upcoming_dividends(days: int = 14, today: date | None = None,
             .where(ETF.category != "index")
             .where(Dividend.ex_date >= start)
             .where(Dividend.ex_date <= end)
-            .where(Dividend.cash_dividend > 0)
+            # 收 NULL(待公告金額)+ 排除 0 元 / 負數
+            # plan Q1 by user: 「用戶要的是『知道幾號除息,金額還在等』」
+            .where((Dividend.cash_dividend > 0) | Dividend.cash_dividend.is_(None))
             .order_by(Dividend.ex_date.asc())
         ).all()
 
@@ -311,16 +313,17 @@ def get_next_announced(etf_id: int, today: date | None = None,
     """
     today = today or date.today()
     with session_scope() as s:
-        # 1. 先找未來
+        # 1. 先找未來 — 收待公告(cash_dividend IS NULL)+ 排除 0/負
         d = s.scalars(
             select(Dividend)
             .where(Dividend.etf_id == etf_id)
             .where(Dividend.ex_date >= today)
-            .where(Dividend.cash_dividend > 0)
+            .where((Dividend.cash_dividend > 0) | Dividend.cash_dividend.is_(None))
             .order_by(Dividend.ex_date.asc())
             .limit(1)
         ).first()
-        # 2. fallback 到最近一次過去
+        # 2. fallback 到最近一次過去 — **保留排除 NULL**
+        # (歷史已實現的配息不該是 NULL,NULL = 壞資料,fallback 應跳過)
         if not d and fallback_to_recent:
             d = s.scalars(
                 select(Dividend)
