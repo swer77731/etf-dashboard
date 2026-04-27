@@ -1461,12 +1461,21 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
   - 公告日殖利率 vs 最新殖利率 vs 過去 30 天區間
   - 配息歷史改 5 年:**年度小計表**(配息次數 / 總額 / 估算年化殖利率)+ **細項表**
   - 走勢圖標題改成「上市至今走勢」when 資料 < 360 天 + 警示「資料未滿 1 年」
-- [ ] Phase 1B-2: TWSE 除權息公告爬蟲(populate 未來 ex_date)
-- [ ] Phase 2A: 首頁瘦身(縮 hero / Top 5 / 6 類別卡 2x3 / 新聞 5 則)
-- [ ] Phase 2B: 各類別獨立排行頁 `/ranking/{category}`(完整 Top 10~30 + 多期間)
-- [ ] Phase 3:  `/dividend-calendar` 月曆 + 列表雙模式
-- [ ] Phase 4: 聯絡作者頁 `/contact` + Changelog
-- [ ] Step 2.5 Phase 3:十大持股 + 產業分布(需爬蟲,獨立工程)
+- [x] Phase 1B-2: TWSE 除權息公告爬蟲(populate 未來 ex_date) ✅ 2026-04-27
+- [x] Phase Holdings: ETF 持股分析 + 紀律 #20 ✅ 2026-04-27
+  - migration 003 / 004(holdings + holdings_change + sync_status 三欄擴張)
+  - CMoney API(`DtNo=59449513` + `action=getdtnodata` + `FilterNo=0`)
+  - 10 交易日 batches → distinct etf_id 計 missing
+  - `/api/etf/{code}/holdings` + `/holdings_change`、`/test_holdings` debug、scheduler 整合
+  - `/holdings` 前端頁:Alpine 自動完成 + ECharts 橫向 bar + 集中度警示 + 變動 + 共同持股
+- [x] Phase 2A: 首頁瘦身(縮 hero / Top 5 / 6 類別卡 2x3 / 新聞 5 則)✅ 2026-04-27
+- [x] Phase 2B: 各類別獨立排行頁 `/ranking/{kind}`(Top 30 + 多期間 tab)✅ 2026-04-27
+- [x] Phase 3:  `/dividend-calendar` 月曆 + 列表雙模式 ✅ 2026-04-27
+  - `dividend_metrics.get_dividends_in_range(start, end)` 共用 helper
+  - 月份左右切換 + 模式 toggle + 紅色週日 + 今天紅框
+  - NULL cash_dividend → 顯示「金額未公告」
+- [x] Phase 4: `/contact` 聯絡頁 + `/changelog` 更新日誌 ✅ 2026-04-27
+- [ ] Step 2.5 Phase 3 (etf 詳情頁):十大持股 + 產業分布(需爬蟲,獨立工程)
 - [ ] Step 6:會員系統(Step 5 TG 推播延後 / 訂閱金流 user 思考中)
 
 ---
@@ -1852,3 +1861,4 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
 2026-04-26 09:30 | Step 1 骨架 | ✅ | FastAPI + SQLAlchemy 2.0 + SQLite + AsyncIOScheduler + 暗色首頁全部就緒,/api/health 與 heartbeat 皆驗證通過
 2026-04-27 08:00 | Step 4 News + UX 批量改造 | ✅ | 資料主權鐵律入 CLAUDE.md;ETF chip-autocomplete + 多格式日期 + 圖表 legend hint;新聞快訊化(7d 預設 + 相對時間 + 紅縱線);sidebar 字體放大;新增 Phase 1-3 規劃(配息公布欄 / 首頁瘦身 / 配息日曆)
 2026-04-27 09:00 | Phase 1 配息公布欄 + 詳情頁殖利率卡 + 全站搜尋 | ✅ | dividend_metrics 共用 helper、首頁「即將配息」三組(空狀態 graceful)、詳情頁「最近一次配息」+ 5 年細項 + 年度小計、全站 ETF 搜尋 sidebar 上方、走勢圖 < 1 年顯示「上市至今」+ 警示;發現 FinMind 不回未來 ex_date → 待 Phase 1B-2 TWSE 爬蟲補
+2026-04-27 16:00 | Phase 2A / 2B / 3 / 4 一輪做完 | ✅ | 首頁 6 類別卡 2x3 + Top 5 + 新聞 5 則;`/ranking/{kind}` 各類別 Top 30 + 5 期間 tab;`/dividend-calendar` 月曆 + 列表雙模式 + 紅色週日;`/contact` + `/changelog` 上線 + sidebar 底部小字導覽。所有頁面採紀律 #19 字級基準,新增 helper `dividend_metrics.get_dividends_in_range` + partial `ranking_card.html` / `news_preview.html`
