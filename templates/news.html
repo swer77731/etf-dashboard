@@ -37,36 +37,39 @@
     color: rgb(var(--c-accent));
   }
 
-  /* 快訊每則卡 */
+  /* 快訊每則卡 — 緊湊 1-line layout */
   .news-row {
-    padding: 1rem 0.85rem;
+    position: relative;
+    padding: 0.6rem 0.85rem;
     border-bottom: 1px solid rgb(var(--c-border) / 0.4);
     transition: background 0.12s ease;
-    display: block;
   }
   .news-row:hover {
     background: rgb(var(--c-card-hover) / 0.5);
   }
   .news-row:last-child { border-bottom: none; }
 
-  .news-time-pill {
-    display: inline-flex; align-items: center; gap: 0.35rem;
-    font-size: 0.78rem;
-    color: rgb(var(--c-muted));
+  /* row 內部:左側 [tag + title] + 右側 [meta] */
+  .news-row-flex {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    flex-wrap: wrap;
   }
-  .news-time-pill.is-fresh { color: rgb(239 68 68); font-weight: 600; }   /* 紅 — 6h 內 */
-  .news-time-pill .live-dot { width: 0.4rem; height: 0.4rem; }
+  .news-row-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
 
-  .news-source-tag {
-    font-size: 0.7rem;
-    padding: 0.1rem 0.55rem;
-    border-radius: 9999px;
-    background: rgb(var(--c-bg-soft));
-    border: 1px solid rgb(var(--c-border));
-    color: rgb(var(--c-muted));
-  }
+  /* ETF 代號 — 主要視覺,藍色 chip 保留 */
   .news-etf-tag {
-    font-size: 0.78rem;
+    position: relative;
+    z-index: 2;
+    font-size: 0.85rem;
     font-family: ui-monospace, monospace;
     color: rgb(var(--c-accent));
     padding: 0.05rem 0.45rem;
@@ -74,37 +77,17 @@
     background: rgb(var(--c-accent) / 0.08);
     border: 1px solid rgb(var(--c-accent) / 0.25);
     transition: background 0.12s ease;
+    flex-shrink: 0;
   }
   .news-etf-tag:hover { background: rgb(var(--c-accent) / 0.18); }
 
-  .news-title {
-    font-size: 1.05rem;
-    line-height: 1.45;
-    color: rgb(var(--c-fg));
-    margin-top: 0.4rem;
-    transition: color 0.15s ease;
-  }
-  .news-row:hover .news-title { color: rgb(var(--c-accent)); }
-
-  /* news-row 永遠 relative — 給 stretched-link + 紅縱線都用 */
-  .news-row { position: relative; }
-
-  /* 「最新」一抹紅縱線 — 給最近 24h 內的新聞 */
-  .news-row.is-today::before {
-    content: '';
-    position: absolute;
-    left: 0; top: 1rem; bottom: 1rem;
-    width: 3px;
-    background: rgb(239 68 68);
-    border-radius: 2px;
-    z-index: 2;
-  }
-
-  /* Stretched link — 點整列任何空白處都跳新聞;ETF tags 在 z-index:2 之上仍可獨立點 */
+  /* 標題 — 主要文字,佔大寬 */
   .news-title-link {
-    display: block;
+    display: inline-block;
     text-decoration: none;
     color: inherit;
+    flex: 1 1 auto;
+    min-width: 0;
   }
   .news-title-link::after {
     content: '';
@@ -112,7 +95,25 @@
     inset: 0;
     z-index: 1;
   }
-  .news-etf-tag { position: relative; z-index: 2; }
+  .news-title {
+    font-size: 1rem;
+    line-height: 1.4;
+    color: rgb(var(--c-fg));
+    transition: color 0.15s ease;
+  }
+  .news-row:hover .news-title { color: rgb(var(--c-accent)); }
+
+  /* Meta — 來源 · 時間,純灰色文字,無框 */
+  .news-meta {
+    flex-shrink: 0;
+    font-size: 0.8rem;
+    color: rgb(var(--c-muted));
+    white-space: nowrap;
+  }
+  .news-meta.is-fresh {
+    color: rgb(239 68 68);
+    font-weight: 600;
+  }
 
   /* 隱藏 row(filter / pagination 都用這個 class) */
   .news-row.is-hidden { display: none; }
@@ -186,7 +187,7 @@
 <section class="mb-3 flex items-center gap-2 flex-wrap">
   <a href="{{ base_qs }}days=7"
      class="news-tab {% if days_filter == '7' %}is-active{% endif %}">
-    近 7 天 <span class="count num">{{ counts['7'] }}</span>
+    今日消息 <span class="count num">{{ counts['7'] }}</span>
   </a>
   <a href="{{ base_qs }}days=30"
      class="news-tab {% if days_filter == '30' %}is-active{% endif %}">
@@ -212,31 +213,30 @@
   <div class="card-content">
     {% for n in items %}
       {% set pub_date = n.published_at[:10] if n.published_at else '' %}
-      {% set is_today = pub_date == today_iso %}
       {% set search_text = ((n.etf_tags|join(' ')) ~ ' ' ~ n.title)|lower %}
-      {# 外層 div(非 <a>),避免 nested <a>;標題用 stretched link 包整列點擊 #}
-      <div class="news-row group {% if is_today %}is-today{% endif %}"
+      {# 緊湊 1-line layout:[ETF chip] [標題........]   [來源 · 時間] #}
+      <div class="news-row"
            data-index="{{ loop.index0 }}"
            data-search="{{ search_text }}"
            data-published="{{ n.published_at or '' }}">
-        <div class="flex items-center gap-2 flex-wrap">
-          {# 時間 pill — 只在有 published_at 時顯示;JS 改寫成人類友善格式(剛剛 / X 小時前 / 昨天 / X 天前 / YYYY-MM-DD) #}
-          {% if n.published_at %}
-            <span class="news-time-pill" data-time-pill>
-              <span class="live-dot" style="display:none;"></span>
-              <span data-time-text>{{ pub_date }}</span>
+        <div class="news-row-flex">
+          <div class="news-row-main">
+            {% for tag in n.etf_tags[:3] %}
+              <a href="/etf/{{ tag }}" class="news-etf-tag">{{ tag }}</a>
+            {% endfor %}
+            <a href="{{ n.url }}" target="_blank" rel="noopener noreferrer" class="news-title-link">
+              <span class="news-title">{{ n.title }}</span>
+            </a>
+          </div>
+          {# 右側 meta:來源 · 時間(純灰色文字,無框) #}
+          {% if n.source or n.published_at %}
+            <span class="news-meta" data-meta>
+              {% if n.source %}{{ n.source }}{% endif %}
+              {% if n.source and n.published_at %} · {% endif %}
+              {% if n.published_at %}<span data-time-text>{{ pub_date }}</span>{% endif %}
             </span>
           {% endif %}
-          {% if n.source %}
-            <span class="news-source-tag">{{ n.source }}</span>
-          {% endif %}
-          {% for tag in n.etf_tags[:5] %}
-            <a href="/etf/{{ tag }}" class="news-etf-tag">{{ tag }}</a>
-          {% endfor %}
         </div>
-        <a href="{{ n.url }}" target="_blank" rel="noopener noreferrer" class="news-title-link">
-          <div class="news-title">{{ n.title }}</div>
-        </a>
       </div>
     {% endfor %}
   </div>
@@ -310,14 +310,11 @@
       if (!pub) return;
       var info = humanTime(pub);
       if (!info) return;
-      var pill = row.querySelector('[data-time-pill]');
+      var meta = row.querySelector('[data-meta]');
       var text = row.querySelector('[data-time-text]');
-      var dot  = pill ? pill.querySelector('.live-dot') : null;
       if (text) text.textContent = info.text;
-      if (info.fresh && pill) {
-        pill.classList.add('is-fresh');
-        if (dot) dot.style.display = 'inline-block';
-      }
+      // < 6hr fresh:meta 整段變紅(包含來源 · 時間)
+      if (info.fresh && meta) meta.classList.add('is-fresh');
     });
 
     // --- Filter + Pagination state ---
@@ -329,7 +326,7 @@
     var btnNext = document.getElementById('news-next');
     var pageLabel = document.getElementById('news-page-label');
 
-    var PAGE_SIZE = 30;
+    var PAGE_SIZE = 50;
     var currentPage = 1;
     var currentQuery = '';
 
