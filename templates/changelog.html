@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block title %}更新日誌 — {{ brand_full }}{% endblock %}
+
+{% block head %}
+<style>
+  .cl-entry {
+    position: relative;
+    padding-left: 1.4rem;
+    border-left: 2px solid rgb(var(--c-border));
+    padding-bottom: 1.5rem;
+  }
+  .cl-entry::before {
+    content: "";
+    position: absolute;
+    left: -7px; top: 0.4rem;
+    width: 12px; height: 12px;
+    background: rgb(var(--c-accent));
+    border-radius: 50%;
+    box-shadow: 0 0 0 4px rgb(var(--c-bg));
+  }
+  .cl-entry:last-child {
+    border-left-color: transparent;
+    padding-bottom: 0;
+  }
+  .cl-tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    padding: 1px 6px;
+    border-radius: 0.25rem;
+    background: rgb(var(--c-accent) / 0.15);
+    border: 1px solid rgb(var(--c-accent) / 0.4);
+    color: rgb(var(--c-accent));
+    margin-left: 0.4rem;
+    font-weight: 500;
+    vertical-align: 1px;
+  }
+  .cl-tag.tag-fix { background: rgb(245 158 11 / 0.15); border-color: rgb(245 158 11 / 0.4); color: rgb(252 211 77); }
+  .cl-tag.tag-docs { background: rgb(148 163 184 / 0.15); border-color: rgb(148 163 184 / 0.4); color: rgb(203 213 225); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<section class="mb-6 relative">
+  <div class="text-xs text-muted tracking-widest mb-2">
+    <a href="/" class="hover:text-accent">首頁</a>
+    <span class="mx-1">/</span>
+    <span>更新日誌</span>
+  </div>
+
+  <h1 class="text-2xl sm:text-3xl font-bold mb-2 tracking-tight leading-tight">
+    <span class="hero-text">更新日誌</span>
+  </h1>
+  <p class="text-sm sm:text-base text-muted">
+    {{ brand_zh }} 的功能變動紀錄。最新的在最上面。
+  </p>
+</section>
+
+<section class="relative overflow-hidden section-card rounded-xl p-6 sm:p-8 mb-7">
+  <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
+
+  <div class="card-content">
+
+    <div class="cl-entry">
+      <div class="text-base sm:text-lg font-semibold mb-1">
+        2026-04-27 — Phase 2 / 3 / 4 上線
+        <span class="cl-tag">feat</span>
+      </div>
+      <ul class="text-sm sm:text-base text-fg/90 leading-relaxed list-disc list-inside space-y-1 ml-1">
+        <li>首頁瘦身:6 類別卡 2x3 grid + 新聞快訊 5 則</li>
+        <li>新增 <a href="/ranking/active?p=3m" class="text-accent hover:underline">/ranking/{kind}</a> 各類別獨立排行頁,完整 Top 30 + 多期間切換</li>
+        <li>新增 <a href="/dividend-calendar" class="text-accent hover:underline">/dividend-calendar</a> 配息日曆(月曆 + 列表雙模式)</li>
+        <li>新增 /contact 聯絡頁、/changelog 本頁</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="text-base sm:text-lg font-semibold mb-1">
+        2026-04-27 — ETF 持股分析
+        <span class="cl-tag">feat</span>
+      </div>
+      <ul class="text-sm sm:text-base text-fg/90 leading-relaxed list-disc list-inside space-y-1 ml-1">
+        <li>新增 <a href="/holdings" class="text-accent hover:underline">/holdings</a> 持股分析頁:Top 10 持股對比 ECharts、個股集中度警示、買超 / 賣超 / 新增變動、共同持股</li>
+        <li>每日自動同步全市場 ETF 持股 + 變動明細</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="text-base sm:text-lg font-semibold mb-1">
+        2026-04-27 — 配息相關
+        <span class="cl-tag">feat</span>
+      </div>
+      <ul class="text-sm sm:text-base text-fg/90 leading-relaxed list-disc list-inside space-y-1 ml-1">
+        <li>首頁新增「即將配息」公布欄,按月配 / 季配 / 半年年配三組分類</li>
+        <li>ETF 詳情頁新增「下次配息預告 / 最近一次」+ 即時殖利率卡</li>
+        <li>配息歷史改為 5 年:年度小計表 + 細項表</li>
+        <li>TWSE 除權息預告爬蟲上線(補未來 ex_date)</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="text-base sm:text-lg font-semibold mb-1">
+        2026-04-27 — UX 批量改造
+        <span class="cl-tag">feat</span>
+      </div>
+      <ul class="text-sm sm:text-base text-fg/90 leading-relaxed list-disc list-inside space-y-1 ml-1">
+        <li>績效比較頁:ETF chip 自動完成 + 多格式日期 + 鍵盤導航(↑↓ Enter Backspace)</li>
+        <li>累積報酬圖:dashed banner「點 ETF 名稱可勾選」+ 全部顯示 / 隱藏 + 反向選</li>
+        <li>新聞牆:近 7 天預設 + 期間 tab + 相對時間(剛剛 / N 分鐘前 / N 小時前)+ 當日紅縱線</li>
+        <li>Sidebar 主導航字級放大,改善老花閱讀</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="text-base sm:text-lg font-semibold mb-1">
+        2026-04-26 — Step 4 新聞牆
+        <span class="cl-tag">feat</span>
+      </div>
+      <ul class="text-sm sm:text-base text-fg/90 leading-relaxed list-disc list-inside space-y-1 ml-1">
+        <li>新增 <a href="/news" class="text-accent hover:underline">/news</a> 新聞列表頁 + 單 ETF 過濾</li>
+        <li>每日 14:30 同步主流類別(主動 + 市值 + 高股息)~55 支 ETF 相關新聞</li>
+        <li>ETF 詳情頁新增「相關新聞」區塊</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="text-base sm:text-lg font-semibold mb-1">
+        2026-04-26 — Step 3 績效比較
+        <span class="cl-tag">feat</span>
+      </div>
+      <ul class="text-sm sm:text-base text-fg/90 leading-relaxed list-disc list-inside space-y-1 ml-1">
+        <li>新增 <a href="/compare" class="text-accent hover:underline">/compare</a> 自選 ETF + 自訂期間比較頁(上限 6 支)</li>
+        <li>統計指標:總報酬、年化、年化波動、夏普、Sortino、最大回撤、最佳 / 最差年</li>
+        <li>累積報酬折線圖,槓桿型粗線、反向型虛線(Default-Safe / Optional-Powerful)</li>
+        <li>專業術語 hover tooltip 白話解釋</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="text-base sm:text-lg font-semibold mb-1">
+        2026-04-26 — Step 2.5 ETF 詳情頁
+        <span class="cl-tag">feat</span>
+      </div>
+      <ul class="text-sm sm:text-base text-fg/90 leading-relaxed list-disc list-inside space-y-1 ml-1">
+        <li>新增 <a href="/etf/0050" class="text-accent hover:underline">/etf/{code}</a> 詳情頁:6 期間報酬、近 1 年走勢圖、配息歷史</li>
+        <li>採 Hybrid B/D 公式:短期用 raw close + 加回現金股利,長期用 adj close 處理 split</li>
+        <li>排行榜代號可直接點選跳詳情頁</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="text-base sm:text-lg font-semibold mb-1">
+        2026-04-26 — Step 2 ETF 排行榜
+        <span class="cl-tag">feat</span>
+      </div>
+      <ul class="text-sm sm:text-base text-fg/90 leading-relaxed list-disc list-inside space-y-1 ml-1">
+        <li>全市場 252 支 ETF 自動分類 + 排行</li>
+        <li>近月最火、主動式、市值型、高股息、槓桿、反向 6 區塊</li>
+        <li>vs 大盤(TAIEX)欄位 + 紅綠標示</li>
+        <li>每日 14:30 自動更新</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="text-base sm:text-lg font-semibold mb-1">
+        2026-04-26 — Step 1 骨架
+        <span class="cl-tag">feat</span>
+      </div>
+      <ul class="text-sm sm:text-base text-fg/90 leading-relaxed list-disc list-inside space-y-1 ml-1">
+        <li>FastAPI + SQLAlchemy 2.0 + SQLite + APScheduler 基礎設施</li>
+        <li>暗色 / 亮色雙主題切換</li>
+        <li>{{ brand_full }} 上線</li>
+      </ul>
+    </div>
+
+  </div>
+  <div class="card-watermark">ETF Watch</div>
+</section>
+
+<section class="text-xs text-muted text-center mt-12 mb-6 max-w-2xl mx-auto leading-relaxed px-4">
+  有功能建議?歡迎 <a href="/contact" class="text-accent hover:underline">來信告訴我們</a>
+</section>
+
+{% endblock %}

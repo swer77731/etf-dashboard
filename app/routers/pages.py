@@ -519,6 +519,16 @@ async def test_holdings(request: Request, code: str = "0050") -> HTMLResponse:
     )
 
 
+@router.get("/contact", response_class=HTMLResponse)
+async def contact(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(request, "contact.html", _common_ctx())
+
+
+@router.get("/changelog", response_class=HTMLResponse)
+async def changelog(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(request, "changelog.html", _common_ctx())
+
+
 @router.get("/disclaimer", response_class=HTMLResponse)
 async def disclaimer(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "legal/disclaimer.html", _common_ctx())
