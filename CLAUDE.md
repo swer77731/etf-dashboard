@@ -102,6 +102,55 @@ session 死掉、context 滿、對話被壓縮都不要緊,
 進度區塊裡的失敗也要明確標示 ❌,不要用模糊用詞掩蓋。
 **失敗策略也是教材**,留著供下次參考。
 
+### 18. 不准把 API token / 密碼漏進 log 或 error message(2026-04-27 鎖定 by user — 鐵律)
+
+> 「2026-04-27 finmind 400 錯誤訊息把完整 token 印出來,user 截圖到 chat 整段 token 暴露,要重新產生 token 才能補救。」— user 原話
+
+#### 規則
+- 任何外部 HTTP wrapper(`finmind.request`、未來新加的)**raise / log error 前必先 redact**
+- 過濾欄位:`token`、`password`、`api_key`、`secret`、`Authorization` header value
+- 用 `***` / `[REDACTED]` 取代,**不准原樣 raise httpx 例外**(它的 `__str__` 含完整 URL + query string)
+- 範圍:**所有寫進 log 的字串、所有 raise 的 message、所有 return 給 caller 的 error**
+
+#### 為什麼
+2026-04-27 跑 `finmind.request` 觸發 400 錯誤時,`logger.warning("...: %s", e)` 把 httpx 例外原樣輸出,
+URL 含 `?token=eyJ0eXAi...`(JWT 完整),user 截圖到 chat → token 整段曝光 → **必須 rotate token**。
+
+#### 落地實作 pattern
+
+```python
+import re
+
+# 任何看起來像敏感的 query param,統一打碼
+_SECRET_RE = re.compile(
+    r"(token|password|api[_-]?key|secret|authorization)=([^&\s]+)",
+    re.IGNORECASE,
+)
+
+def _redact(s: str) -> str:
+    return _SECRET_RE.sub(r"\1=***", s or "")
+```
+
+在 raise / log 前呼叫:
+```python
+logger.warning("...: %s", _redact(str(e)))
+raise XxxError(_redact(str(last_err)))
+```
+
+#### 落地檢查清單(每次新 _sync 加外部 API wrapper 前自問)
+- [ ] HTTP error 路徑會 raise 例外嗎?例外含完整 URL 嗎?
+- [ ] log warning / error 路徑有過 `_redact`?
+- [ ] return 給 caller 的 error message 有過 `_redact`?
+- [ ] grep 所有 token / password / Authorization header 用法,有沒有可能漏進 stdout / log file?
+
+#### 例外
+- 完全內部錯誤(沒外部呼叫,例如 SQLAlchemy 失敗)→ 不需 redact
+- Test 環境用假 token(`test_token_xxx`)→ 不必 redact 也 OK,但養成習慣比較好
+
+跟紀律 #11 / #14 / #15 / #16 / #17 一起鎖,**再犯記點 + 視嚴重度 user 立刻 rotate token**。
+
+---
+
 ### 17. 不准從 user 訊息複製 code 執行(2026-04-27 鎖定 by user — 鐵律)
 
 > 「User 的剪貼簿環境會把 Python 的 `.` 轉成 markdown 連結,直接 copy-paste 執行就壞;Claude Code 自己最知道 schema、import 路徑,自己寫的 code 比 copy 的乾淨。」— user 原話

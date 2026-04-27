@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import threading
 import time
 from dataclasses import dataclass
@@ -19,6 +20,21 @@ import httpx
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+# 紀律 #18:過濾敏感欄位防 log / error message 洩漏
+# 樣本:?token=eyJ0... → ?token=[REDACTED]
+_SECRET_RE = re.compile(
+    r"(token|password|api[_-]?key|secret|authorization)=([^&\s]+)",
+    re.IGNORECASE,
+)
+
+
+def _redact(s: str) -> str:
+    """打碼 URL / 字串裡的 token / password 等敏感欄位。"""
+    if not s:
+        return s
+    return _SECRET_RE.sub(r"\1=[REDACTED]", str(s))
 
 # === 常數 ===
 DATA_URL = "https://api.finmindtrade.com/api/v4/data"
@@ -170,11 +186,15 @@ def request(
         except httpx.HTTPError as e:
             last_err = e
             wait = 2 ** attempt
+            # 紀律 #18:redact token 才能進 log
             logger.warning("[finmind] http error attempt %d/%d: %s — retry in %ds",
-                          attempt, max_retries, e, wait)
+                          attempt, max_retries, _redact(str(e)), wait)
             time.sleep(wait)
 
-    raise FinMindError(f"FinMind request failed after {max_retries} retries: {last_err}")
+    # 紀律 #18:raise 出去的 message 也要 redact
+    raise FinMindError(
+        f"FinMind request failed after {max_retries} retries: {_redact(str(last_err))}"
+    )
 
 
 def log_quota(prefix: str = "") -> Quota:
