@@ -250,7 +250,7 @@
               <template x-for="b in ch.buy.slice(0, 10)" :key="b.stock_code">
                 <li class="flex justify-between gap-2">
                   <span class="truncate"><span class="font-mono" x-text="b.stock_code"></span> <span x-text="b.stock_name"></span></span>
-                  <span class="dir-buy whitespace-nowrap" x-text="'+' + b.shares_diff.toLocaleString()"></span>
+                  <span class="dir-buy whitespace-nowrap" x-text="'+' + Math.round(b.shares_diff/1000).toLocaleString() + ' 張'"></span>
                 </li>
               </template>
               <li x-show="ch.buy.length === 0" class="text-muted">—</li>
@@ -265,7 +265,7 @@
               <template x-for="s in ch.sell.slice(0, 10)" :key="s.stock_code">
                 <li class="flex justify-between gap-2">
                   <span class="truncate"><span class="font-mono" x-text="s.stock_code"></span> <span x-text="s.stock_name"></span></span>
-                  <span class="dir-sell whitespace-nowrap" x-text="s.shares_diff.toLocaleString()"></span>
+                  <span class="dir-sell whitespace-nowrap" x-text="Math.round(s.shares_diff/1000).toLocaleString() + ' 張'"></span>
                 </li>
               </template>
               <li x-show="ch.sell.length === 0" class="text-muted">—</li>
@@ -280,7 +280,7 @@
               <template x-for="n in ch.new.slice(0, 10)" :key="n.stock_code">
                 <li class="flex justify-between gap-2">
                   <span class="truncate"><span class="font-mono" x-text="n.stock_code"></span> <span x-text="n.stock_name"></span></span>
-                  <span class="dir-new whitespace-nowrap" x-text="'+' + n.shares_diff.toLocaleString()"></span>
+                  <span class="dir-new whitespace-nowrap" x-text="'+' + Math.round(n.shares_diff/1000).toLocaleString() + ' 張'"></span>
                 </li>
               </template>
               <li x-show="ch.new.length === 0" class="text-muted">—</li>
