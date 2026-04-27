@@ -177,7 +177,10 @@
         <span class="text-xs text-muted num" x-text="`已選 ${codes.length} / 6`"></span>
       </div>
 
-      <div class="picker-shell bg-bg-soft border border-border rounded-md p-2 transition">
+      {# @click.outside 必須在 picker-shell(含 input + dropdown 的父層),
+         不能放 dropdown 上 — 否則點 input 會觸發 click.outside 立刻關閉。 #}
+      <div class="picker-shell bg-bg-soft border border-border rounded-md p-2 transition"
+           @click.outside="open=false">
         <div class="flex flex-wrap gap-1.5 items-center">
           <template x-for="(c, i) in codes" :key="c.code + '_' + i">
             <span class="etf-chip">
@@ -202,14 +205,13 @@
                  @keydown.enter.prevent="onEnter()"
                  @keydown.escape="open=false"
                  @keydown.backspace="onBackspace()"
-                 :placeholder="codes.length === 0 ? '輸入代號或名稱搜尋,例如 0050、台積電、高股息' : '繼續加入(輸入代號或名稱)'"
+                 :placeholder="codes.length === 0 ? '輸入 ETF 代號數字,例如 0050、00878' : '繼續加入(輸入代號數字)'"
                  :disabled="codes.length >= 6"
                  class="flex-1 min-w-[180px] bg-transparent px-1.5 py-1 text-base text-fg outline-none placeholder:text-muted/60 disabled:opacity-50" />
         </div>
 
-        {# 建議下拉 #}
+        {# 建議下拉(@click.outside 不放這,放父層 picker-shell 上)#}
         <div x-show="open && (suggestions.length > 0 || loading)" x-cloak
-             @click.outside="open=false"
              x-transition.opacity.duration.150ms
              class="picker-suggest">
           <div x-show="loading" class="px-3 py-3 text-sm text-muted">搜尋中…</div>
@@ -240,7 +242,7 @@
       <input type="hidden" name="codes" :value="codes.map(c => c.code).join(',')">
 
       <p class="text-xs text-muted mt-2">
-        提示:點 ✕ 移除 · ↑↓ 選建議 · Enter 加入 · Backspace 刪除最後一支(上限 6)
+        提示:輸入代號數字(005 → 0050/0051/...) · 點 ✕ 移除 · ↑↓ 選建議 · Enter 加入 · Backspace 刪除最後一支(上限 6)
       </p>
     </div>
 
@@ -567,7 +569,8 @@
         }
         this.loading = true;
         try {
-          const res = await fetch(`/api/etf/search?q=${encodeURIComponent(q)}&limit=20`);
+          // code_only=1 → 只比對代號數字,排除名稱模糊搜尋(user 紀律)
+          const res = await fetch(`/api/etf/search?q=${encodeURIComponent(q)}&limit=20&code_only=1`);
           const data = await res.json();
           this.suggestions = data.items || [];
           this.cache[q] = this.suggestions;
