@@ -1041,12 +1041,26 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
   - [x] **News 相對時間**:JS 即時計算「剛剛 / N 分鐘前 / N 小時前 / 昨天 / N 天前」,6h 內紅色 + 跳動點
   - [x] **News 當日新聞紅縱線**:左側 3px 紅 bar 標示「今天的快訊」
   - [x] **Sidebar 主導航字體放大**:0.9rem → 1rem + padding 加大 + icon 1.15rem,主導航 label 加重字
-- [ ] Phase 1A: `dividend_metrics.py` 共用 helper(殖利率 / 頻率推測 / 即將除息)
-- [ ] Phase 1B: 首頁第 4 區「下週配息公布欄」(月配 / 季配 / 半年年配 三組)
-- [ ] Phase 1C: ETF 詳情頁「下次配息預告 + 即時殖利率」卡
+- [x] Phase 1A: `dividend_metrics.py` 共用 helper ✅ 2026-04-27
+  - `compute_yield` / `compute_annualized_yield` / `detect_frequency` / `freq_to_group`
+  - `get_upcoming_dividends(days, past_days)` 三組分(monthly / quarterly / long)
+  - `get_yield_range(days)` / `get_next_announced(fallback_to_recent)` / `get_history_summary(years)`
+  - 0056 驗收:13 筆細項、年度小計準、推測頻率 quarterly、近 30 天殖利率區間 4.7-5.4%(mock 2 元)
+- [x] Phase 1B: 首頁「即將配息」第 4 區 ✅ 2026-04-27
+  - 三組分(月配 / 季配 / 半年年配 + 副標)
+  - **未來 only**(過去 14 天從 UI 拿掉,user 認為不清楚)
+  - 空狀態 graceful + 三支 ETF 跳轉連結
+- [x] Phase 1B-aux: 全站 ETF 搜尋(`_partials/etf_search.html`)+ Compare 套用日期按鈕 + prefix 配對修(00981A) ✅
+- [x] Phase 1C: ETF 詳情頁「下次配息預告 / 最近一次配息」+ 即時殖利率卡 ✅ 2026-04-27
+  - 沒未來資料時 fallback 到最近一次過去
+  - 公告日殖利率 vs 最新殖利率 vs 過去 30 天區間
+  - 配息歷史改 5 年:**年度小計表**(配息次數 / 總額 / 估算年化殖利率)+ **細項表**
+  - 走勢圖標題改成「上市至今走勢」when 資料 < 360 天 + 警示「資料未滿 1 年」
+- [ ] Phase 1B-2: TWSE 除權息公告爬蟲(populate 未來 ex_date)
 - [ ] Phase 2A: 首頁瘦身(縮 hero / Top 5 / 6 類別卡 2x3 / 新聞 5 則)
 - [ ] Phase 2B: 各類別獨立排行頁 `/ranking/{category}`(完整 Top 10~30 + 多期間)
 - [ ] Phase 3:  `/dividend-calendar` 月曆 + 列表雙模式
+- [ ] Phase 4: 聯絡作者頁 `/contact` + Changelog
 - [ ] Step 2.5 Phase 3:十大持股 + 產業分布(需爬蟲,獨立工程)
 - [ ] Step 6:會員系統(Step 5 TG 推播延後 / 訂閱金流 user 思考中)
 
@@ -1151,6 +1165,19 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
 - 症狀:`powershell -Command "... | Where-Object { $_.State -eq 'Listen' }"` → bash 把 `$_.State` 當成變數展開成 `extglob.State`
 - 解法:**用 single quote 包整個 -Command**(`powershell -Command 'Where-Object { $_.State -eq ... }'`)或**用 -ExpandProperty 取代 $_**
 - 教訓:Windows + bash + powershell 三層引號,$_ 千萬別暴露在 bash 雙引號內
+
+### 2026-04-27 / Phase 1 / FinMind `TaiwanStockDividend` 不回未來除息日
+- 症狀:首頁「下週配息公布欄」UI 蓋好,DB 卻沒任何 ex_date >= today 的記錄
+- 探勘:focused sync 55 ETFs(active+market+dividend)結果 `Future ex_dates total: 0`
+- 結論:FinMind 此 dataset 只回**已實現**配息,end_date 設未來也沒用
+- 解法:UI 改顯示「未來 only」+ 空狀態 graceful;同時開 Phase 1B-2 task 寫 TWSE 公告爬蟲補未來資料
+- 教訓:資料源能力先 prove(打 API 看真實回傳),再寫 UI;假設「設 end_date 就有未來」=錯
+
+### 2026-04-27 / Phase 1 / Windows 上 stale uvicorn worker 殘留
+- 症狀:改了 dividend_metrics.py 加 past_days 參數 + pages.py 呼叫,首頁卻持續顯示舊行為
+- 探勘:`Get-Process python` 看到 5 個 python.exe,其中一個 PID 從更早 session 遺留(08:25)還在 listen 8000
+- 解法:powershell port-based kill 加上 fallback `Stop-Process` 多個 PID,接著 `python run.py` 重啟
+- 教訓:**Windows uvicorn `--reload` 偶爾不會清舊 worker**,改完不認 → port-based kill 全部相關 python.exe 後再起
 
 ---
 
@@ -1419,3 +1446,4 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
 
 2026-04-26 09:30 | Step 1 骨架 | ✅ | FastAPI + SQLAlchemy 2.0 + SQLite + AsyncIOScheduler + 暗色首頁全部就緒,/api/health 與 heartbeat 皆驗證通過
 2026-04-27 08:00 | Step 4 News + UX 批量改造 | ✅ | 資料主權鐵律入 CLAUDE.md;ETF chip-autocomplete + 多格式日期 + 圖表 legend hint;新聞快訊化(7d 預設 + 相對時間 + 紅縱線);sidebar 字體放大;新增 Phase 1-3 規劃(配息公布欄 / 首頁瘦身 / 配息日曆)
+2026-04-27 09:00 | Phase 1 配息公布欄 + 詳情頁殖利率卡 + 全站搜尋 | ✅ | dividend_metrics 共用 helper、首頁「即將配息」三組(空狀態 graceful)、詳情頁「最近一次配息」+ 5 年細項 + 年度小計、全站 ETF 搜尋 sidebar 上方、走勢圖 < 1 年顯示「上市至今」+ 警示;發現 FinMind 不回未來 ex_date → 待 Phase 1B-2 TWSE 爬蟲補

@@ -12,7 +12,7 @@ from datetime import date, datetime, timedelta
 from fastapi import HTTPException
 
 from app.config import PROJECT_ROOT, settings
-from app.services import etf_metrics, news_sync, performance, ranking
+from app.services import dividend_metrics, etf_metrics, news_sync, performance, ranking
 
 logger = logging.getLogger(__name__)
 
@@ -105,9 +105,24 @@ async def index(request: Request) -> HTMLResponse:
             logger.exception("[index] leverage %s failed", direction)
             sections.append({"kind": kind, "category": kind, "title": title, "data": None})
 
+    # Phase 1B 配息公布欄 — 未來 14 天「即將除息」
+    # (FinMind TaiwanStockDividend 不回未來,需 Phase 1B-2 TWSE 爬蟲補,
+    #  目前資料只到「已除息」,UI 顯示空狀態 + 友善文字)
+    try:
+        upcoming = dividend_metrics.get_upcoming_dividends(days=14, past_days=0)
+    except Exception:
+        logger.exception("[index] upcoming_dividends failed")
+        upcoming = None
+
     return templates.TemplateResponse(
         request, "index.html",
-        {**_common_ctx(), "sections": sections, "market": market},
+        {
+            **_common_ctx(),
+            "sections": sections,
+            "market": market,
+            "upcoming_dividends": upcoming,
+            "upcoming_group_labels": dividend_metrics.GROUP_LABELS,
+        },
     )
 
 

@@ -23,6 +23,10 @@ from app.services.etf_universe import list_active_etfs
 logger = logging.getLogger(__name__)
 
 HISTORY_YEARS = 5
+# 已公告但還沒除息的 dividend 也要進 DB(首頁「下週配息公布欄」用)
+FUTURE_LOOKAHEAD_DAYS = 120
+# 增量同步 re-fetch 最近 N 天,捕捉「已宣告金額後續微調」的情況
+REFETCH_RECENT_DAYS = 45
 
 
 def _five_years_ago(today: date | None = None) -> date:
@@ -86,7 +90,9 @@ def _persist_divs(etf_id: int, rows: list[dict]) -> int:
 
 
 def sync_one_etf(etf: ETF, end: date | None = None) -> dict:
-    end = end or date.today()
+    """end 預設為「今天 + FUTURE_LOOKAHEAD_DAYS」,以撈進已公告但還沒除息的 dividend。"""
+    today = date.today()
+    end = end or (today + timedelta(days=FUTURE_LOOKAHEAD_DAYS))
     if etf.category == "index":
         return {"code": etf.code, "rows": 0, "mode": "skip-index"}
 
@@ -94,10 +100,11 @@ def sync_one_etf(etf: ETF, end: date | None = None) -> dict:
         last = _last_ex_date(session, etf.id)
 
     if last is None:
-        start = _five_years_ago(end)
+        start = _five_years_ago(today)
         mode = "backfill"
     else:
-        start = last + timedelta(days=1)
+        # 增量也回退 N 天 re-fetch,捕捉「公告後改金額」的更新(UPSERT 會覆寫)
+        start = max(_five_years_ago(today), last - timedelta(days=REFETCH_RECENT_DAYS))
         mode = "incremental"
         if start > end:
             return {"code": etf.code, "rows": 0, "mode": "up-to-date"}

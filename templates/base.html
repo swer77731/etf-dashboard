@@ -351,6 +351,7 @@
     {% block head %}{% endblock %}
 </head>
 {% from "_partials/brand_mark.html" import brand_mark %}
+{% from "_partials/etf_search.html" import etf_search %}
 <body x-data="appShell()" x-init="init()">
 
     <div class="grid-bg"></div>
@@ -376,6 +377,11 @@
           <div class="text-[0.65rem] text-muted tracking-[0.25em]">{{ brand_en }}</div>
         </div>
       </a>
+
+      {# 全站 ETF 搜尋 — 任何頁面打代號/名稱直接跳詳情頁 #}
+      <div class="mb-5">
+        {{ etf_search(placeholder='搜尋 ETF...', size='sm') }}
+      </div>
 
       <nav class="flex-1 overflow-y-auto">
         <div class="text-xs uppercase tracking-[0.2em] text-muted/80 font-semibold mb-3 px-3">主導航</div>
@@ -463,6 +469,57 @@
     </div>
 
     <script>
+      // 全站 ETF 搜尋 — sidebar / mobile bar 共用
+      function globalEtfSearch() {
+        return {
+          query: '',
+          open: false,
+          loading: false,
+          suggestions: [],
+          activeIdx: -1,
+          cache: {},
+          init() {},
+          async ensure() {
+            if (this.suggestions.length === 0) await this.fetch();
+          },
+          async fetch() {
+            const q = this.query.trim();
+            if (this.cache[q]) {
+              this.suggestions = this.cache[q];
+              this.activeIdx = this.suggestions.length > 0 ? 0 : -1;
+              return;
+            }
+            this.loading = true;
+            try {
+              const r = await fetch(`/api/etf/search?q=${encodeURIComponent(q)}&limit=20`);
+              const d = await r.json();
+              this.suggestions = d.items || [];
+              this.cache[q] = this.suggestions;
+              this.activeIdx = this.suggestions.length > 0 ? 0 : -1;
+            } catch (e) {
+              this.suggestions = []; this.activeIdx = -1;
+            } finally {
+              this.loading = false;
+            }
+          },
+          moveActive(d) {
+            if (!this.suggestions.length) return;
+            const n = this.suggestions.length;
+            this.activeIdx = ((this.activeIdx + d) % n + n) % n;
+          },
+          onEnter() {
+            // 1. 有 highlight 的建議 → 跳那個
+            if (this.activeIdx >= 0 && this.suggestions[this.activeIdx]) {
+              window.location.href = '/etf/' + this.suggestions[this.activeIdx].code;
+              return;
+            }
+            // 2. 純打代號(沒等 API 回來)→ 直接跳那個代號
+            const q = this.query.trim().toUpperCase();
+            if (q) window.location.href = '/etf/' + q;
+          },
+        };
+      }
+
       function appShell() {
         return {
           sidebarOpen: false,

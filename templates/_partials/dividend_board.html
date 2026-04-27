@@ -1,0 +1,113 @@
+{# 配息公布欄 partial — 首頁 + /dividend-calendar 共用 #}
+{# 用法:{{ dividend_board(upcoming, group_labels, compact=True) }} #}
+
+{% macro div_board(upcoming, group_labels, compact=True, max_per_group=5) %}
+{% if upcoming %}
+<section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7">
+  <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
+
+  <div class="card-content">
+    <header class="mb-5 flex items-baseline justify-between gap-4 flex-wrap">
+      <div class="flex items-center gap-3">
+        <div class="w-1 h-7 bg-accent rounded-full" style="box-shadow: 0 0 8px var(--c-accent-glow);"></div>
+        <div>
+          <h2 class="text-xl sm:text-2xl font-semibold flex items-center gap-2.5">
+            <span class="live-dot"></span>
+            <span>即將配息</span>
+          </h2>
+          <div class="text-sm text-muted mt-1">
+            未來 14 天即將除息的 ETF,按配息頻率分組
+          </div>
+        </div>
+      </div>
+      <div class="text-xs sm:text-sm text-muted num">截至 {{ upcoming.as_of }}</div>
+    </header>
+
+    {% if upcoming.total == 0 %}
+    <div class="bg-bg-soft border border-border rounded-lg p-6 sm:p-8 text-center">
+      <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-card border border-border mb-3">
+        <svg class="w-6 h-6 text-muted" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+      </div>
+      <div class="text-base text-fg font-semibold mb-1">未來 14 天暫無已公告除息</div>
+      <div class="text-sm text-muted leading-relaxed max-w-md mx-auto">
+        各發行商陸續公告中,每天 14:30 自動同步最新除息訊息。<br>
+        想看歷史配息可進到單支 ETF 詳情頁,例如
+        <a href="/etf/0056" class="text-accent hover:underline font-mono">0056</a>
+        ·
+        <a href="/etf/00878" class="text-accent hover:underline font-mono">00878</a>
+        ·
+        <a href="/etf/0050" class="text-accent hover:underline font-mono">0050</a>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if upcoming.total > 0 %}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
+      {% for grp_key, grp_label in [
+          ('monthly',   group_labels['monthly']),
+          ('quarterly', group_labels['quarterly']),
+          ('long',      group_labels['long'])
+        ] %}
+        {% set items = upcoming.groups[grp_key] %}
+        <div class="div-board-col bg-bg-soft border border-border rounded-lg p-4 transition hover:border-accent/40">
+          <div class="mb-3">
+            <div class="text-base font-semibold text-fg">{{ grp_label[0] }}</div>
+            <div class="text-xs text-muted mt-0.5">{{ grp_label[1] }}</div>
+          </div>
+
+          {% if items %}
+            <ul class="space-y-2.5">
+              {% for it in items[:max_per_group] %}
+                {% set is_future = it.days_to_ex >= 0 %}
+                {% set is_today = it.days_to_ex == 0 %}
+                <li class="py-2 px-2 -mx-2 rounded-md hover:bg-card-hover/60 transition group">
+                  <div class="flex items-baseline justify-between gap-2 mb-0.5">
+                    <div class="flex items-baseline gap-2 min-w-0">
+                      <a href="/etf/{{ it.code }}" class="font-mono text-base font-bold text-accent hover:underline">{{ it.code }}</a>
+                      <span class="text-base font-semibold text-fg truncate">{{ it.name }}</span>
+                    </div>
+                    <span class="num text-base font-semibold shrink-0
+                      {% if is_today %}text-up
+                      {% elif is_future %}text-up/90
+                      {% else %}text-muted
+                      {% endif %}">
+                      {%- if is_today -%}今天除息
+                      {%- elif is_future -%}剩 {{ it.days_to_ex }} 天
+                      {%- else -%}已除息 {{ -it.days_to_ex }} 天
+                      {%- endif -%}
+                    </span>
+                  </div>
+                  <div class="flex items-baseline justify-between gap-2 text-sm">
+                    <span class="num text-muted">{{ it.ex_date[5:] }} 除息</span>
+                    <div class="flex items-baseline gap-3 shrink-0">
+                      <span class="num text-fg font-semibold">{{ "%.3f"|format(it.cash_dividend) }} 元</span>
+                      {% if it.yield_pct %}
+                        <span class="num text-muted">殖利率 {{ "%.2f"|format(it.yield_pct) }}%</span>
+                      {% endif %}
+                    </div>
+                  </div>
+                </li>
+              {% endfor %}
+            </ul>
+            {% if items|length > max_per_group %}
+              <div class="text-sm text-muted mt-2.5 text-right">… 還有 {{ items|length - max_per_group }} 筆</div>
+            {% endif %}
+          {% else %}
+            <div class="text-base text-muted py-4 text-center">這段期間沒有事件</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="mt-4 text-xs text-muted text-center">
+      註:除息日當天(含)前買進該 ETF 才能領這次配息;殖利率以最新收盤推估,實際以發放日為準
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card-watermark">ETF Watch</div>
+</section>
+{% endif %}
+{% endmacro %}

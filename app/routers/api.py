@@ -71,20 +71,20 @@ async def quota() -> dict:
 @router.get("/etf/search")
 async def search_etf(
     q: str = Query("", description="代號或名稱關鍵字"),
-    limit: int = Query(12, ge=1, le=50),
+    limit: int = Query(20, ge=1, le=80),
     session: Session = Depends(get_session),
 ) -> dict:
     """ETF autocomplete 搜尋 — 給 compare 頁的 chip 選擇器。
 
-    比對策略:
-    - 代號開頭配對(0050 → 0050, 0050B 等)優先排序
-    - 代號子字串配對次優
-    - 中文名稱子字串再次
-    - 排除 index 類別(TAIEX 大盤不該被當 ETF 選)
+    排序優先級:
+    1. 代號完全相等(打 0050 → 0050 第一)
+    2. 代號開頭配對(0050 → 0050B、00500;00981 → 009810~9 + 00981A/T)
+    3. 名稱子字串配對(高股息 → 所有 ETF)
+    排除 index 類別(TAIEX 大盤不該被當 ETF 選)
     """
     keyword = (q or "").strip().upper()
     if not keyword:
-        # 空字串 → 回最熱門幾支(0050 / 0056 / 00878 等市值/高股息)
+        # 空字串 → 回最熱門幾支
         rows = session.scalars(
             select(ETF)
             .where(ETF.is_active.is_(True))
@@ -95,15 +95,17 @@ async def search_etf(
     else:
         like = f"%{keyword}%"
         prefix = f"{keyword}%"
-        # 排除大盤指數
         rows = session.scalars(
             select(ETF)
             .where(ETF.is_active.is_(True))
             .where(ETF.category != "index")
             .where((ETF.code.ilike(like)) | (ETF.name.like(like)))
             .order_by(
-                # 代號開頭配對的排最前
+                # 1. 完全相等最前(打 0050 → 0050 排第一)
+                (ETF.code == keyword).desc(),
+                # 2. 代號開頭配對(00981 → 009810~9 + 00981A/T)
                 ETF.code.ilike(prefix).desc(),
+                # 3. 字母順排(009810,009811,...,00981A,00981T)
                 ETF.code.asc(),
             )
             .limit(limit)

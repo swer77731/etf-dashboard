@@ -245,14 +245,15 @@
     </div>
 
     {# === 日期區 === #}
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div>
+    <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+      <div class="sm:col-span-5">
         <label class="block text-sm text-muted mb-2">起始日</label>
         <div class="date-shell">
           <input type="text"
                  x-model="startText"
                  @blur="normalizeDate('start')"
-                 @keydown.enter.prevent="normalizeDate('start')"
+                 @keydown.enter="normalizeDate('start')"
+                 @input="markDirty()"
                  placeholder="YYYY-MM-DD 或 20250101"
                  class="num">
           <button type="button" @click.prevent="openPicker('start')"
@@ -268,13 +269,14 @@
         <input type="hidden" name="start" :value="startISO">
       </div>
 
-      <div>
+      <div class="sm:col-span-5">
         <label class="block text-sm text-muted mb-2">結束日</label>
         <div class="date-shell">
           <input type="text"
                  x-model="endText"
                  @blur="normalizeDate('end')"
-                 @keydown.enter.prevent="normalizeDate('end')"
+                 @keydown.enter="normalizeDate('end')"
+                 @input="markDirty()"
                  placeholder="YYYY-MM-DD 或 20250101"
                  class="num">
           <button type="button" @click.prevent="openPicker('end')"
@@ -289,19 +291,32 @@
         </div>
         <input type="hidden" name="end" :value="endISO">
       </div>
+
+      {# 套用日期按鈕 — user 改完日期就點這個套用 #}
+      <div class="sm:col-span-2">
+        <button type="submit"
+                @click="normalizeDate('start'); normalizeDate('end')"
+                class="w-full bg-accent text-white px-4 py-2.5 rounded-md font-semibold hover:opacity-90 transition shadow-[0_0_18px_var(--c-accent-glow)] flex items-center justify-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+          </svg>
+          套用
+        </button>
+      </div>
     </div>
 
-    {# === 提交 + 快速期間 === #}
+    {# === 快速期間 + 大尺寸主提交按鈕 === #}
     <div class="flex items-center gap-3 flex-wrap pt-1">
-      <button type="submit"
-              class="bg-accent text-white px-5 py-2.5 rounded-md font-semibold hover:opacity-90 transition shadow-[0_0_18px_var(--c-accent-glow)]">
-        比較
-      </button>
-      <span class="text-xs text-muted ml-2">快速期間:</span>
+      <span class="text-xs text-muted">快速期間:</span>
       <button type="button" class="range-chip" :class="activeRange==='ytd' ? 'is-active' : ''" @click.prevent="quickRange('ytd')">YTD</button>
       <button type="button" class="range-chip" :class="activeRange==='1y' ? 'is-active' : ''" @click.prevent="quickRange('1y')">近 1 年</button>
       <button type="button" class="range-chip" :class="activeRange==='3y' ? 'is-active' : ''" @click.prevent="quickRange('3y')">近 3 年</button>
       <button type="button" class="range-chip" :class="activeRange==='5y' ? 'is-active' : ''" @click.prevent="quickRange('5y')">近 5 年</button>
+
+      <span x-show="dirty" x-cloak class="ml-auto text-xs text-amber-300 inline-flex items-center gap-1.5">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        有未套用的變更
+      </span>
     </div>
   </form>
 </section>
@@ -454,12 +469,16 @@
       startText: opts.initialStart,
       endText:   opts.initialEnd,
       activeRange: '',
+      dirty: false,
 
       init() {
         this.startText = this.startISO;
         this.endText   = this.endISO;
         this.activeRange = this.detectRange();
+        this.dirty = false;
       },
+
+      markDirty() { this.dirty = true; },
 
       // === 日期 ===
       parseDate(s) {
@@ -475,9 +494,11 @@
         const text = which === 'start' ? this.startText : this.endText;
         const iso = this.parseDate(text);
         if (iso) {
+          const before = which === 'start' ? this.startISO : this.endISO;
           if (which === 'start') { this.startISO = iso; this.startText = iso; }
           else                    { this.endISO   = iso; this.endText   = iso; }
           this.activeRange = this.detectRange();
+          if (before !== iso) this.dirty = true;
         } else {
           // 還原成上次合法值
           if (which === 'start') this.startText = this.startISO;
@@ -497,6 +518,7 @@
         if (which === 'start') { this.startISO = val; this.startText = val; }
         else                    { this.endISO   = val; this.endText   = val; }
         this.activeRange = this.detectRange();
+        this.dirty = true;
       },
       todayISO() { return new Date().toISOString().slice(0, 10); },
       addYears(iso, n) {
@@ -514,6 +536,7 @@
         this.startISO = start;
         this.startText = start;
         this.activeRange = which;
+        this.dirty = true;
       },
       detectRange() {
         const today = this.endISO;
@@ -544,7 +567,7 @@
         }
         this.loading = true;
         try {
-          const res = await fetch(`/api/etf/search?q=${encodeURIComponent(q)}&limit=12`);
+          const res = await fetch(`/api/etf/search?q=${encodeURIComponent(q)}&limit=20`);
           const data = await res.json();
           this.suggestions = data.items || [];
           this.cache[q] = this.suggestions;
@@ -570,9 +593,10 @@
         this.suggestions = [];
         this.activeIdx = -1;
         this.open = false;
+        this.dirty = true;
       },
 
-      removeAt(i) { this.codes.splice(i, 1); },
+      removeAt(i) { this.codes.splice(i, 1); this.dirty = true; },
 
       onBackspace() {
         if (this.query === '' && this.codes.length > 0) this.codes.pop();

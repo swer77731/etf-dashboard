@@ -29,6 +29,7 @@ from app.services.ranking import (
     _index_period_return,
     _is_anomalous,
 )
+from app.services import dividend_metrics as _dm
 
 
 # Hybrid 策略:短期用 B 公式(對 YP 較貼),長期用 D 公式(adj_close 自動處理分割)
@@ -196,31 +197,100 @@ def get_etf_detail(code: str, today: date | None = None) -> dict | None:
         else:
             today_change_pct = None
 
-        return {
-            "code": etf.code,
-            "name": etf.name,
-            "category": etf.category,
-            "category_label": label_of(etf.category),
-            "issuer": etf.issuer,
-            "index_tracked": etf.index_tracked,
-            "first_data_date": first_kbar.isoformat() if first_kbar else None,
-            "last_kbar": {
-                "date": last_kbar[0].isoformat() if last_kbar else None,
-                "open": last_kbar[1] if last_kbar else None,
-                "high": last_kbar[2] if last_kbar else None,
-                "low": last_kbar[3] if last_kbar else None,
-                "close": last_kbar[4] if last_kbar else None,
-                "volume": last_kbar[5] if last_kbar else None,
-            } if last_kbar else None,
-            "today_change_pct": today_change_pct,
-            "periods": periods,
-            "trend_etf": trend_series,
-            "trend_taiex": taiex_series,
-            "dividends": dividends,
-            "dividend_count_1y": sum(
-                1 for d in dividends if d["ex_date"] >= (today - timedelta(days=365)).isoformat()
-            ),
-            "dividend_sum_1y": sum(
-                d["cash"] for d in dividends if d["ex_date"] >= (today - timedelta(days=365)).isoformat()
-            ),
-        }
+    # Phase 1C 配息卡 & 5 年細項(在 with 區塊外取,避免 nested session)
+    next_announced = _dm.get_next_announced(etf_id_for_div := _get_etf_id(code))
+    history_summary = _dm.get_history_summary(etf_id_for_div, years=5, today=today) if etf_id_for_div else None
+
+    # 「下次配息預告」是否有資料 + 即時殖利率區間(用最新公告金額算過去 30 天區間)
+    if next_announced and next_announced.cash_dividend > 0:
+        yield_range_30d = _dm.get_yield_range(etf_id_for_div, next_announced.cash_dividend, days=30)
+    else:
+        yield_range_30d = None
+
+    # 走勢圖實際天數 → 用來決定 label「近 1 年」or「近 N 個月」
+    trend_days = 0
+    if trend_series:
+        from datetime import date as _date
+        first_d = _date.fromisoformat(trend_series[0]["date"])
+        last_d  = _date.fromisoformat(trend_series[-1]["date"])
+        trend_days = (last_d - first_d).days
+
+    return {
+        "code": etf.code,
+        "name": etf.name,
+        "category": etf.category,
+        "category_label": label_of(etf.category),
+        "issuer": etf.issuer,
+        "index_tracked": etf.index_tracked,
+        "first_data_date": first_kbar.isoformat() if first_kbar else None,
+        "last_kbar": {
+            "date": last_kbar[0].isoformat() if last_kbar else None,
+            "open": last_kbar[1] if last_kbar else None,
+            "high": last_kbar[2] if last_kbar else None,
+            "low": last_kbar[3] if last_kbar else None,
+            "close": last_kbar[4] if last_kbar else None,
+            "volume": last_kbar[5] if last_kbar else None,
+        } if last_kbar else None,
+        "today_change_pct": today_change_pct,
+        "periods": periods,
+        "trend_etf": trend_series,
+        "trend_taiex": taiex_series,
+        "trend_days": trend_days,
+        "trend_is_full_year": trend_days >= 360,   # < 360 天就標「資料未滿 1 年」
+        "dividends": dividends,
+        "dividend_count_1y": sum(
+            1 for d in dividends if d["ex_date"] >= (today - timedelta(days=365)).isoformat()
+        ),
+        "dividend_sum_1y": sum(
+            d["cash"] for d in dividends if d["ex_date"] >= (today - timedelta(days=365)).isoformat()
+        ),
+        # Phase 1C
+        "next_announced": _next_announced_to_dict(next_announced),
+        "yield_range_30d": _yield_range_to_dict(yield_range_30d),
+        "history_summary": history_summary,
+        "frequency": next_announced.frequency if next_announced else _dm.detect_frequency(etf_id_for_div) if etf_id_for_div else None,
+        "frequency_label": (next_announced.frequency_label if next_announced else
+                            _dm.FREQ_LABEL_ZH.get(_dm.detect_frequency(etf_id_for_div) or "", "—")
+                            if etf_id_for_div else "—"),
+    }
+
+
+def _get_etf_id(code: str) -> int | None:
+    """單獨小 helper 拿 etf_id(避免 nested session in dividend_metrics calls)。"""
+    with session_scope() as s:
+        e = s.scalar(select(ETF).where(ETF.code == code.upper()))
+        return e.id if e else None
+
+
+def _next_announced_to_dict(n) -> dict | None:
+    if not n:
+        return None
+    return {
+        "ex_date": n.ex_date.isoformat(),
+        "payment_date": n.payment_date.isoformat() if n.payment_date else None,
+        "announce_date": n.announce_date.isoformat() if n.announce_date else None,
+        "cash_dividend": n.cash_dividend,
+        "days_to_ex": n.days_to_ex,
+        "days_to_pay": n.days_to_pay,
+        "announce_close_date": n.announce_close_date.isoformat() if n.announce_close_date else None,
+        "announce_close": n.announce_close,
+        "announce_yield_pct": n.announce_yield_pct,
+        "latest_close_date": n.latest_close_date.isoformat() if n.latest_close_date else None,
+        "latest_close": n.latest_close,
+        "latest_yield_pct": n.latest_yield_pct,
+        "frequency": n.frequency,
+        "frequency_label": n.frequency_label,
+        "is_future": n.days_to_ex >= 0,
+    }
+
+
+def _yield_range_to_dict(y) -> dict | None:
+    if not y or y.samples == 0:
+        return None
+    return {
+        "days": y.days,
+        "min_pct": y.min_pct,
+        "max_pct": y.max_pct,
+        "avg_pct": y.avg_pct,
+        "samples": y.samples,
+    }

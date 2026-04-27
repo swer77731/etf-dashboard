@@ -1,0 +1,54 @@
+{# 全站 ETF 搜尋 — 任何頁面用,點選/Enter 跳到 /etf/{code} 詳情頁 #}
+{# 用法:{{ etf_search(placeholder='搜尋 ETF...', size='sm' or 'md') }} #}
+
+{% macro etf_search(placeholder='搜尋 ETF(輸入代號或名稱)', size='md') %}
+<div x-data="globalEtfSearch()" x-init="init()" class="relative" @keydown.escape="open=false">
+  <div class="relative">
+    <div class="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+      </svg>
+    </div>
+    <input type="text"
+           x-model="query"
+           @focus="open=true; ensure()"
+           @input.debounce.180ms="fetch()"
+           @keydown.down.prevent="moveActive(1)"
+           @keydown.up.prevent="moveActive(-1)"
+           @keydown.enter.prevent="onEnter()"
+           placeholder="{{ placeholder }}"
+           class="w-full bg-bg-soft border border-border rounded-md
+                  {% if size == 'sm' %}pl-9 pr-3 py-2 text-sm{% else %}pl-10 pr-3 py-2.5 text-base{% endif %}
+                  text-fg placeholder:text-muted/70
+                  focus:outline-none focus:border-accent transition" />
+  </div>
+
+  <div x-show="open && (suggestions.length > 0 || loading || (query && !loading))" x-cloak
+       @click.outside="open=false"
+       x-transition.opacity.duration.150ms
+       class="absolute left-0 right-0 mt-2 z-40 bg-card border border-border rounded-md shadow-2xl max-h-80 overflow-y-auto">
+    <div x-show="loading" class="px-3 py-3 text-sm text-muted">搜尋中…</div>
+    <ul x-show="!loading && suggestions.length > 0">
+      <template x-for="(s, idx) in suggestions" :key="s.code">
+        <li>
+          <a :href="'/etf/' + s.code"
+             @mouseenter="activeIdx = idx"
+             :class="activeIdx === idx ? 'bg-accent/10' : ''"
+             class="block px-3 py-2.5 hover:bg-accent/10 transition">
+            <div class="flex items-baseline justify-between gap-3">
+              <div class="flex items-baseline gap-2 min-w-0">
+                <span class="font-mono text-base font-bold text-accent" x-text="s.code"></span>
+                <span class="text-base text-fg/90 truncate" x-text="s.name"></span>
+              </div>
+              <span class="text-xs px-1.5 py-0.5 rounded bg-bg-soft border border-border text-muted shrink-0"
+                    x-text="s.category_label"></span>
+            </div>
+          </a>
+        </li>
+      </template>
+    </ul>
+    <div x-show="!loading && suggestions.length === 0 && query"
+         class="px-3 py-3 text-sm text-muted">找不到符合「<span x-text="query"></span>」的 ETF</div>
+  </div>
+</div>
+{% endmacro %}

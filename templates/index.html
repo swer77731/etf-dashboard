@@ -3,6 +3,7 @@
 {% block title %}{{ brand_full }} — ETF 排行{% endblock %}
 
 {% from "_partials/ranking_section.html" import ranking_section %}
+{% from "_partials/dividend_board.html" import div_board %}
 
 {% set CATEGORY_DESC = {
   "market":   "買到台股市值最大的公司",
@@ -80,6 +81,9 @@
   <div class="card-watermark">ETF Watch</div>
 </section>
 {% endif %}
+
+{# === Phase 1B 配息公布欄(月配 / 季配 / 長間隔三組) === #}
+{{ div_board(upcoming_dividends, upcoming_group_labels, compact=True, max_per_group=5) }}
 
 {# === 排行 sections (透過 macro 統一) === #}
 {% for sec in sections %}

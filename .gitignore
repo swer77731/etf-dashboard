@@ -48,3 +48,6 @@ design/
 # Logs
 *.log
 logs/
+
+# Temp curl/inspect outputs (verify-only, never commit)
+_tmp*.html

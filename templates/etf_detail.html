@@ -122,7 +122,7 @@
   <div class="card-watermark">ETF Watch</div>
 </section>
 
-{# === 3. 近 1 年走勢圖 === #}
+{# === 3. 走勢圖(近 1 年 / 資料未滿 1 年顯示「自上市以來」)=== #}
 <section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7">
   <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
 
@@ -131,8 +131,15 @@
       <div class="flex items-center gap-3">
         <div class="w-1 h-7 bg-accent rounded-full" style="box-shadow: 0 0 8px var(--c-accent-glow);"></div>
         <div>
-          <h2 class="text-xl sm:text-2xl font-semibold">近 1 年走勢</h2>
-          <div class="text-sm text-muted mt-1">還原股價 vs 大盤(TAIEX),以期初 = 100 標準化</div>
+          <h2 class="text-xl sm:text-2xl font-semibold">
+            {% if etf.trend_is_full_year %}近 1 年走勢{% else %}上市至今走勢{% endif %}
+          </h2>
+          <div class="text-sm text-muted mt-1">
+            還原股價 vs 大盤(TAIEX),以期初 = 100 標準化
+            {% if not etf.trend_is_full_year and etf.first_data_date %}
+              · <span class="text-amber-300">資料未滿 1 年(自 {{ etf.first_data_date }} 起,共 {{ etf.trend_days }} 天)</span>
+            {% endif %}
+          </div>
         </div>
       </div>
     </header>
@@ -143,7 +150,109 @@
   <div class="card-watermark">ETF Watch</div>
 </section>
 
-{# === 4. 配息歷史 === #}
+{# === 3.5 Phase 1C 下次配息預告 + 即時殖利率(只在有公告時顯示)=== #}
+{% if etf.next_announced %}
+{% set na = etf.next_announced %}
+<section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7">
+  <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
+
+  <div class="card-content">
+    <header class="mb-5 flex items-baseline gap-3 flex-wrap">
+      <div class="w-1 h-7 bg-accent rounded-full" style="box-shadow: 0 0 8px var(--c-accent-glow);"></div>
+      <div>
+        <h2 class="text-xl sm:text-2xl font-semibold flex items-center gap-2">
+          <span>{% if na.is_future %}下次配息預告{% else %}最近一次配息{% endif %}</span>
+          {% if etf.frequency_label and etf.frequency_label != "—" %}
+            <span class="text-sm font-medium px-2 py-0.5 rounded-full bg-bg-soft border border-border text-muted">{{ etf.frequency_label }}</span>
+          {% endif %}
+        </h2>
+        <div class="text-sm text-muted mt-1">100% 用本地 DB 收盤推估,不打外網 · 截至 {{ na.latest_close_date or '—' }}</div>
+      </div>
+    </header>
+
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-5">
+      <div class="bg-bg-soft border border-border rounded-lg p-4">
+        <div class="text-xs text-muted mb-1.5">配息金額</div>
+        <div class="text-2xl sm:text-3xl font-bold num text-fg">{{ "%.4f"|format(na.cash_dividend) }}</div>
+        <div class="text-xs text-muted mt-1">元 / 股</div>
+      </div>
+      <div class="bg-bg-soft border border-border rounded-lg p-4">
+        <div class="text-xs text-muted mb-1.5">除息日</div>
+        <div class="text-base sm:text-lg font-bold num text-fg">{{ na.ex_date }}</div>
+        <div class="text-sm mt-1
+          {% if na.is_future %}text-up
+          {% else %}text-muted
+          {% endif %}">
+          {% if na.days_to_ex == 0 %}今天除息
+          {% elif na.is_future %}剩 {{ na.days_to_ex }} 天
+          {% else %}已過 {{ -na.days_to_ex }} 天
+          {% endif %}
+        </div>
+      </div>
+      <div class="bg-bg-soft border border-border rounded-lg p-4">
+        <div class="text-xs text-muted mb-1.5">入帳日</div>
+        <div class="text-base sm:text-lg font-bold num text-fg">{{ na.payment_date or "—" }}</div>
+        {% if na.payment_date and na.days_to_pay is not none %}
+          <div class="text-sm mt-1
+            {% if na.days_to_pay > 0 %}text-up
+            {% else %}text-muted
+            {% endif %}">
+            {% if na.days_to_pay > 0 %}剩 {{ na.days_to_pay }} 天
+            {% elif na.days_to_pay == 0 %}今天入帳
+            {% else %}已入帳
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+      <div class="bg-bg-soft border border-border rounded-lg p-4">
+        <div class="text-xs text-muted mb-1.5">最新殖利率</div>
+        {% if na.latest_yield_pct is not none %}
+          <div class="text-2xl sm:text-3xl font-bold num text-up">{{ "%.2f"|format(na.latest_yield_pct) }}%</div>
+          <div class="text-xs text-muted mt-1">收 {{ "%.2f"|format(na.latest_close) }}</div>
+        {% else %}
+          <div class="text-2xl text-muted">—</div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# 殖利率比較 + 過去 30 天區間 #}
+    {% if na.announce_yield_pct is not none or etf.yield_range_30d %}
+    <div class="bg-bg-soft border border-border rounded-lg p-4 sm:p-5">
+      <div class="text-sm text-muted mb-3">即時殖利率(同一筆配息金額,但分母用不同收盤推估)</div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {% if na.announce_yield_pct is not none %}
+          <div>
+            <div class="text-xs text-muted mb-1">公告日殖利率</div>
+            <div class="num text-base font-semibold">{{ "%.2f"|format(na.announce_yield_pct) }}%</div>
+            <div class="text-xs text-muted mt-0.5">公告 {{ na.announce_date or "—" }} · 收 {{ "%.2f"|format(na.announce_close) if na.announce_close else "—" }}</div>
+          </div>
+        {% endif %}
+        {% if na.latest_yield_pct is not none %}
+          <div>
+            <div class="text-xs text-muted mb-1">最新殖利率</div>
+            <div class="num text-base font-semibold text-up">{{ "%.2f"|format(na.latest_yield_pct) }}%</div>
+            <div class="text-xs text-muted mt-0.5">最新 {{ na.latest_close_date }} · 收 {{ "%.2f"|format(na.latest_close) }}</div>
+          </div>
+        {% endif %}
+        {% if etf.yield_range_30d %}
+          <div>
+            <div class="text-xs text-muted mb-1">過去 30 天區間</div>
+            <div class="num text-base font-semibold">
+              {{ "%.2f"|format(etf.yield_range_30d.min_pct) }}% ~ {{ "%.2f"|format(etf.yield_range_30d.max_pct) }}%
+            </div>
+            <div class="text-xs text-muted mt-0.5">平均 {{ "%.2f"|format(etf.yield_range_30d.avg_pct) }}% · {{ etf.yield_range_30d.samples }} 筆</div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card-watermark">ETF Watch</div>
+</section>
+{% endif %}
+
+{# === 4. 配息歷史(5 年細項 + 年度小計)=== #}
 <section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7 pb-12">
   <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
 
@@ -152,37 +261,82 @@
       <div class="flex items-center gap-3">
         <div class="w-1 h-7 bg-accent rounded-full" style="box-shadow: 0 0 8px var(--c-accent-glow);"></div>
         <div>
-          <h2 class="text-xl sm:text-2xl font-semibold">配息歷史</h2>
+          <h2 class="text-xl sm:text-2xl font-semibold">配息歷史(近 5 年)</h2>
           <div class="text-sm text-muted mt-1">
             近 1 年共配息 <span class="text-fg font-semibold num">{{ etf.dividend_count_1y }}</span> 次
             ,合計每股 <span class="text-fg font-semibold num">{{ "%.4f"|format(etf.dividend_sum_1y) }}</span> 元
+            {% if etf.frequency_label and etf.frequency_label != "—" %}
+              · 配息頻率 <span class="text-fg font-semibold">{{ etf.frequency_label }}</span>
+            {% endif %}
           </div>
         </div>
       </div>
     </header>
 
-    {% if etf.dividends %}
-    <div class="overflow-x-auto -mx-4 sm:mx-0">
-      <table class="w-full text-base num min-w-[480px]">
-        <thead>
-          <tr class="text-left text-muted border-b border-border">
-            <th class="py-3 px-3 font-medium">除息日</th>
-            <th class="py-3 px-3 font-medium text-right">每股配息</th>
-            <th class="py-3 px-3 font-medium hidden sm:table-cell">發放日</th>
-            <th class="py-3 px-3 font-medium hidden sm:table-cell">會計年度</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for d in etf.dividends %}
-          <tr class="border-b border-border/40 hover:bg-bg/40">
-            <td class="py-3 px-3">{{ d.ex_date }}</td>
-            <td class="py-3 px-3 text-right font-semibold text-up">{{ "%.4f"|format(d.cash) }}</td>
-            <td class="py-3 px-3 hidden sm:table-cell text-muted">{{ d.payment_date or "—" }}</td>
-            <td class="py-3 px-3 hidden sm:table-cell text-muted">{{ d.fiscal_year or "—" }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    {% if etf.history_summary and etf.history_summary.by_year %}
+    {# 年度小計表 — 一眼看完每年領多少 #}
+    <div class="mb-6">
+      <div class="text-sm text-muted mb-2 font-semibold">年度小計</div>
+      <div class="overflow-x-auto -mx-4 sm:mx-0">
+        <table class="w-full text-base num min-w-[520px]">
+          <thead>
+            <tr class="text-left text-muted border-b border-border bg-bg-soft/40">
+              <th class="py-3 px-3 font-medium">年度</th>
+              <th class="py-3 px-3 font-medium text-right">配息次數</th>
+              <th class="py-3 px-3 font-medium text-right">總額(元/股)</th>
+              <th class="py-3 px-3 font-medium text-right">每次平均</th>
+              <th class="py-3 px-3 font-medium text-right">估算年化殖利率</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for y in etf.history_summary.by_year %}
+            <tr class="border-b border-border/40 hover:bg-bg/40">
+              <td class="py-3 px-3 font-semibold">{{ y.year }}</td>
+              <td class="py-3 px-3 text-right">{{ y.count }} 次</td>
+              <td class="py-3 px-3 text-right font-bold text-up">{{ "%.4f"|format(y.total_cash) }}</td>
+              <td class="py-3 px-3 text-right text-muted">{{ "%.4f"|format(y.avg_per_event) }}</td>
+              <td class="py-3 px-3 text-right">
+                {% if y.estimated_annual_yield_pct is not none %}
+                  <span class="text-up font-semibold">{{ "%.2f"|format(y.estimated_annual_yield_pct) }}%</span>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="text-xs text-muted mt-2">
+        估算年化殖利率 = 該年總配息 ÷ 該年最後一日收盤價(僅供參考)
+      </div>
+    </div>
+
+    {# 細項 — 全部 5 年的逐筆配息 #}
+    <div>
+      <div class="text-sm text-muted mb-2 font-semibold">配息細項({{ etf.history_summary.total_events }} 筆 · 由新到舊)</div>
+      <div class="overflow-x-auto -mx-4 sm:mx-0">
+        <table class="w-full text-base num min-w-[480px]">
+          <thead>
+            <tr class="text-left text-muted border-b border-border">
+              <th class="py-3 px-3 font-medium">除息日</th>
+              <th class="py-3 px-3 font-medium text-right">每股配息</th>
+              <th class="py-3 px-3 font-medium hidden sm:table-cell">入帳日</th>
+              <th class="py-3 px-3 font-medium hidden sm:table-cell">公告日</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in etf.history_summary.rows %}
+            <tr class="border-b border-border/40 hover:bg-bg/40">
+              <td class="py-3 px-3 font-semibold">{{ d.ex_date }}</td>
+              <td class="py-3 px-3 text-right font-bold text-up">{{ "%.4f"|format(d.cash_dividend) }}</td>
+              <td class="py-3 px-3 hidden sm:table-cell text-muted">{{ d.payment_date or "—" }}</td>
+              <td class="py-3 px-3 hidden sm:table-cell text-muted">{{ d.announce_date or "—" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
     {% else %}
     <div class="text-base text-muted py-8 text-center">本 ETF 尚無配息紀錄。</div>
