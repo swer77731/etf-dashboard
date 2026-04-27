@@ -222,6 +222,39 @@ def fetch_twse(start: date, end: date,
 
 SYNC_SOURCE = "twse_dividend_announce"
 
+# 排程抓取窗口:今天 ~ 今天 + 120 天
+# 半年配的公告通常在 ex 前 30~60 天出,留 120 天緩衝
+LOOKAHEAD_DAYS = 120
+
+
+def sync_all(today: date | None = None) -> dict[str, Any]:
+    """Step 4 排程入口:fetch + persist 一氣呵成。
+
+    被 app.scheduler.daily_sync_job 呼叫(每天 14:30)。
+    fetch 失敗也會 record_sync_attempt(failure)讓監控看得到。
+    """
+    today = today or date.today()
+    end = today + timedelta(days=LOOKAHEAD_DAYS)
+
+    try:
+        rows = fetch_twse(today, end, today=today)
+    except Exception as e:
+        logger.exception("[announce_sync] fetch_twse failed")
+        record_sync_attempt(
+            SYNC_SOURCE, success=False, rows=0,
+            error=f"fetch_twse: {type(e).__name__}: {e}",
+        )
+        return {
+            "kept": 0,
+            "skipped_not_etf": 0,
+            "errors": [f"fetch_twse: {e}"],
+            "stage": "fetch",
+        }
+
+    stats = persist(rows)
+    stats["stage"] = "ok" if not stats["errors"] else "persist"
+    return stats
+
 
 def persist(rows: list[dict[str, Any]]) -> dict[str, Any]:
     """把 fetch_twse 結果寫入 dividend table。

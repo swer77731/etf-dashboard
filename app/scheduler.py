@@ -13,7 +13,13 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from app.config import settings
-from app.services import dividend_sync, etf_universe, kbar_sync, news_sync
+from app.services import (
+    dividend_announce_sync,
+    dividend_sync,
+    etf_universe,
+    kbar_sync,
+    news_sync,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +40,10 @@ def daily_sync_job() -> None:
         logger.info("[daily_sync] kbar: %s", k_stats)
         d_stats = dividend_sync.sync_all()
         logger.info("[daily_sync] dividend: %s", d_stats)
+        # TWSE 除權息預告 — 跟在 dividend_sync(FinMind 歷史)後面,
+        # 兩者寫同一張 dividend table:FinMind 已實現 + TWSE 未來公告 互補
+        a_stats = dividend_announce_sync.sync_all()
+        logger.info("[daily_sync] dividend_announce: %s", a_stats)
         n_stats = news_sync.sync_recent()
         logger.info("[daily_sync] news: %s", n_stats)
     except Exception:
