@@ -102,6 +102,43 @@ session 死掉、context 滿、對話被壓縮都不要緊,
 進度區塊裡的失敗也要明確標示 ❌,不要用模糊用詞掩蓋。
 **失敗策略也是教材**,留著供下次參考。
 
+### 16. Phase 完工驗收 = 後端 + 前端 + 用戶實際操作(2026-04-27 鎖定 by user — 鐵律)
+
+> 「不允許『DB 有資料就 commit』、『列表 render 出來就 commit』、『server 起得來就 commit』。」— user 原話
+
+#### 規則
+任何 Phase 標記 ✅ 完工 / commit 前,**三項都要驗,缺一不可**:
+
+1. **後端驗收** — SQL / sync_status / API endpoint 直接查,資料對
+2. **前端驗收** — 開**無痕視窗**(避免 cache,紀律 #11)看 UI 顯示對
+3. **用戶實際操作** — 按按鈕、切 tab、看數字、點連結。模擬真實使用情境
+
+#### 為什麼
+**2026-04-27 News published_at 全 115 筆 NULL bug:**
+- Phase 1 commit 時只驗了「DB 有 115 筆 / 列表 render 得出來」
+- **沒驗「近 7 天 / 近 30 天 tab 點下去看數字對不對」**
+- 隱性 bug 藏到 user 親自切 tab 才發現
+- parser 跟 FinMind schema 不符全部 NULL,但網站表面看起來正常運作
+
+教訓:**"It compiles" 不等於 "it works"**;"server 起得來" 不等於 "用戶操作得通"。
+
+#### 落地檢查清單(每次 Phase 收尾前自問)
+- [ ] 後端:SQL `SELECT MIN/MAX/COUNT` 看欄位範圍對嗎?有 NULL 嗎?
+- [ ] 後端:相關 sync_status `last_success_at` 是新的、`last_error=None` 嗎?
+- [ ] 前端:無痕視窗開 → 主要頁面 UI 顯示對嗎?
+- [ ] 前端:**所有可點元素**(tab / chip / 篩選器 / link)點過一遍嗎?
+- [ ] 前端:**邊界情境**測過嗎?(空狀態、單筆、多筆、過期、未公告)
+- [ ] 用戶操作:模擬「我是散戶」走完最常見的流程,**全部都對**?
+- [ ] 三項都過 → 才 commit Phase ✅
+
+#### 例外
+- 純 docs / migration / refactor commit:無 UI 影響 → 略過前端 + 用戶操作驗收
+- WIP commit(明確標 `wip:` prefix):允許部分驗收,但 Phase ✅ 必須全到位
+
+跟紀律 #11(前端 cache 先驗)、#14(不准用行動代替思考)、#15(不准擅自 kill server)一起鎖,**再犯記點**。
+
+---
+
 ### 15. 不准擅自 kill / restart user 的 server(2026-04-27 鎖定 by user — 鐵律)
 
 > 「你不知道 user 是不是正在用網站(瀏覽器開著),兩個 process 衝突應該用 apscheduler max_instances=1 或 lock 解決,一次性驗收應該直接 call 目標函式,不要跑整個 daily_sync_job。」— user 原話
