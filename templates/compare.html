@@ -345,16 +345,19 @@
     <header class="mb-3">
       <div class="flex items-center gap-3">
         <div class="w-1 h-7 bg-accent rounded-full" style="box-shadow: 0 0 8px var(--c-accent-glow);"></div>
-        <div>
-          <h2 class="text-xl sm:text-2xl font-semibold">累積報酬走勢</h2>
-          <div class="text-sm text-muted mt-1">期初 = 100,後續為當日累積報酬指數</div>
-        </div>
+        <h2 class="text-2xl sm:text-3xl font-semibold">累積報酬走勢</h2>
       </div>
     </header>
 
-    {# 期間日期 — 置中、放大、正色,清楚標明這張圖在比哪段 #}
-    <div class="text-center mb-4">
-      <span class="num text-lg sm:text-xl font-semibold text-fg">{{ result.start }} ~ {{ result.end }}</span>
+    {# 期間日期 — 置中、放大、正色,紀律 #19:再大一階
+       使用 aligned_start(實際對齊起點),不同上市日 ETF 比較會自動對齊 #}
+    <div class="text-center mb-5">
+      <span class="num text-2xl sm:text-3xl font-bold text-fg">{{ result.aligned_start }} ~ {{ result.end }}</span>
+      {% if result.aligned_start != result.start %}
+        <div class="text-sm text-muted mt-2">
+          ※ 因部分 ETF 上市日較晚,自動以最短歷史(<span class="font-mono">{{ result.aligned_start }}</span>)為共同起點
+        </div>
+      {% endif %}
     </div>
 
     {# Legend 勾選提示 banner — 明顯告訴 user 上方 ETF 名稱可點擊切換 #}
@@ -389,51 +392,51 @@
     <header class="mb-5 flex items-baseline gap-3 flex-wrap">
       <div class="w-1 h-7 bg-accent rounded-full" style="box-shadow: 0 0 8px var(--c-accent-glow);"></div>
       <div>
-        <h2 class="text-xl sm:text-2xl font-semibold">績效統計表</h2>
-        <div class="text-sm text-muted mt-1">含 hover 提示的指標,把游標移上去看白話解釋</div>
+        <h2 class="text-2xl sm:text-3xl font-semibold">績效統計表</h2>
+        <div class="text-base text-muted mt-1">滑鼠移到指標名稱看白話解釋</div>
       </div>
     </header>
 
     <div class="overflow-x-auto -mx-4 sm:mx-0">
-      <table class="w-full text-base num min-w-[760px]">
+      <table class="w-full text-lg num min-w-[860px]">
         <thead>
           <tr class="text-left text-muted border-b border-border">
-            <th class="py-3 px-3 font-medium text-base">代號 / 名稱</th>
-            <th class="py-3 px-3 font-medium text-base text-right">總報酬</th>
-            <th class="py-3 px-3 font-medium text-base text-right">{{ tip("年化報酬", "把總報酬攤成「平均一年賺多少 %」") }}</th>
-            <th class="py-3 px-3 font-medium text-base text-right">{{ tip("年化波動", "這支 ETF 每年大約上下擺多大,越小越穩") }}</th>
-            <th class="py-3 px-3 font-medium text-base text-right">{{ tip("夏普值", "每承擔 1 分風險可換到的報酬,越高越好") }}</th>
-            <th class="py-3 px-3 font-medium text-base text-right">{{ tip("Sortino", "跟夏普值類似,但只算「往下跌」的風險") }}</th>
-            <th class="py-3 px-3 font-medium text-base text-right">{{ tip("最大回撤", "從歷史高點曾經跌到多深,負數越大越慘") }}</th>
-            <th class="py-3 px-3 font-medium text-base text-right">最佳年</th>
-            <th class="py-3 px-3 font-medium text-base text-right">最差年</th>
+            <th class="py-3.5 px-3 font-semibold text-base">代號 / 名稱</th>
+            <th class="py-3.5 px-3 font-semibold text-base text-right">總報酬</th>
+            <th class="py-3.5 px-3 font-semibold text-base text-right">{{ tip("年化報酬", "把總報酬攤成「平均一年賺多少 %」") }}</th>
+            <th class="py-3.5 px-3 font-semibold text-base text-right">{{ tip("年化波動", "這支 ETF 每年大約上下擺多大,越小越穩") }}</th>
+            <th class="py-3.5 px-3 font-semibold text-base text-right">{{ tip("夏普值", "每承擔 1 分風險可換到的報酬,越高越好") }}</th>
+            <th class="py-3.5 px-3 font-semibold text-base text-right">{{ tip("Sortino", "跟夏普值類似,但只算「往下跌」的風險") }}</th>
+            <th class="py-3.5 px-3 font-semibold text-base text-right">{{ tip("最大回撤", "從歷史高點曾經跌到多深,負數越大越慘") }}</th>
+            <th class="py-3.5 px-3 font-semibold text-base text-right">最佳年</th>
+            <th class="py-3.5 px-3 font-semibold text-base text-right">最差年</th>
           </tr>
         </thead>
         <tbody>
           {% for s in result.stats %}
           <tr class="border-b border-border/40 hover:bg-bg/40">
-            <td class="py-3 px-3">
-              <a href="/etf/{{ s.code }}" class="font-mono text-accent hover:underline">{{ s.code }}</a>
+            <td class="py-3.5 px-3">
+              <a href="/etf/{{ s.code }}" class="font-mono text-accent hover:underline font-semibold">{{ s.code }}</a>
               <span class="ml-2">{{ s.name }}</span>
               {% if s.leverage_subtype == "positive" %}
-                <span class="ml-2 px-1.5 py-0.5 text-[0.65rem] font-semibold bg-amber-500/20 text-amber-300 rounded">{{ s.leverage_multiplier }} 倍</span>
+                <span class="ml-2 px-1.5 py-0.5 text-xs font-semibold bg-amber-500/20 text-amber-300 rounded">{{ s.leverage_multiplier }} 倍</span>
               {% elif s.leverage_subtype == "inverse" %}
-                <span class="ml-2 px-1.5 py-0.5 text-[0.65rem] font-semibold bg-amber-500/20 text-amber-300 rounded">{{ s.leverage_multiplier }} 倍</span>
+                <span class="ml-2 px-1.5 py-0.5 text-xs font-semibold bg-amber-500/20 text-amber-300 rounded">{{ s.leverage_multiplier }} 倍</span>
               {% endif %}
             </td>
-            <td class="py-3 px-3 text-right font-semibold {{ pct_color(s.total_return_pct) }}">{{ fmt_pct(s.total_return_pct) }}</td>
-            <td class="py-3 px-3 text-right {{ pct_color(s.annualized_return_pct) }}">{{ fmt_pct(s.annualized_return_pct) }}</td>
-            <td class="py-3 px-3 text-right">{{ fmt_pct(s.volatility_pct, signed=False) }}</td>
-            <td class="py-3 px-3 text-right">{{ fmt_num(s.sharpe) }}</td>
-            <td class="py-3 px-3 text-right">{{ fmt_num(s.sortino) }}</td>
-            <td class="py-3 px-3 text-right text-down">{{ fmt_pct(s.max_drawdown_pct) }}</td>
-            <td class="py-3 px-3 text-right">
-              {% if s.best_year %}<span class="text-xs text-muted">{{ s.best_year }} </span>{% endif %}
-              <span class="{{ pct_color(s.best_year_pct) }}">{{ fmt_pct(s.best_year_pct) }}</span>
+            <td class="py-3.5 px-3 text-right font-bold {{ pct_color(s.total_return_pct) }}">{{ fmt_pct(s.total_return_pct) }}</td>
+            <td class="py-3.5 px-3 text-right font-semibold {{ pct_color(s.annualized_return_pct) }}">{{ fmt_pct(s.annualized_return_pct) }}</td>
+            <td class="py-3.5 px-3 text-right">{{ fmt_pct(s.volatility_pct, signed=False) }}</td>
+            <td class="py-3.5 px-3 text-right">{{ fmt_num(s.sharpe) }}</td>
+            <td class="py-3.5 px-3 text-right">{{ fmt_num(s.sortino) }}</td>
+            <td class="py-3.5 px-3 text-right text-down font-semibold">{{ fmt_pct(s.max_drawdown_pct) }}</td>
+            <td class="py-3.5 px-3 text-right">
+              {% if s.best_year %}<span class="text-sm text-muted">{{ s.best_year }} </span>{% endif %}
+              <span class="font-semibold {{ pct_color(s.best_year_pct) }}">{{ fmt_pct(s.best_year_pct) }}</span>
             </td>
-            <td class="py-3 px-3 text-right">
-              {% if s.worst_year %}<span class="text-xs text-muted">{{ s.worst_year }} </span>{% endif %}
-              <span class="{{ pct_color(s.worst_year_pct) }}">{{ fmt_pct(s.worst_year_pct) }}</span>
+            <td class="py-3.5 px-3 text-right">
+              {% if s.worst_year %}<span class="text-sm text-muted">{{ s.worst_year }} </span>{% endif %}
+              <span class="font-semibold {{ pct_color(s.worst_year_pct) }}">{{ fmt_pct(s.worst_year_pct) }}</span>
             </td>
           </tr>
           {% endfor %}

@@ -181,7 +181,17 @@ def _compute_one(etf: ETF, start: date, end: date) -> PerformanceStats | None:
 
 
 def compare_etfs(codes: Iterable[str], start: date, end: date) -> dict:
-    """比較多 ETF — 主要 entry。回 dict 給 template 用。"""
+    """比較多 ETF — 主要 entry。回 dict 給 template 用。
+
+    對齊邏輯(2026-04-27 by user):
+    - 不同上市日的 ETF 比較時(例如 0050 5 年 + 00992A 4 個月),
+      所有 series 一律以「最短歷史 ETF」的起點對齊
+    - 對齊起點 = max(user_start, max(per_etf_earliest_adj_close_date))
+    - 圖表 + 統計表都用對齊起點(整齊一致)
+    - 結果 dict 多 `aligned_start` 欄位,UI 顯示對齊後的真實起點
+    """
+    from sqlalchemy import func as sa_func
+
     code_list = []
     seen: set[str] = set()
     for c in codes:
@@ -199,21 +209,43 @@ def compare_etfs(codes: Iterable[str], start: date, end: date) -> dict:
             e.code: e
             for e in session.scalars(select(ETF).where(ETF.code.in_(code_list))).all()
         }
+        # 查每支 ETF 在 user_start 之後最早可用 adj_close 日期
+        # 用來算對齊起點(最晚的最早日期)
+        per_etf_earliest: dict[str, date] = {}
+        for code, etf in etfs.items():
+            earliest = session.scalar(
+                select(sa_func.min(DailyKBar.date))
+                .where(DailyKBar.etf_id == etf.id)
+                .where(DailyKBar.date >= start)
+                .where(DailyKBar.date <= end)
+                .where(DailyKBar.adj_close.is_not(None))
+            )
+            if earliest:
+                per_etf_earliest[code] = earliest
+
+    # 對齊起點:取「最晚的最早日期」 = 最短歷史那支的起點
+    if per_etf_earliest:
+        aligned_start = max(per_etf_earliest.values())
+    else:
+        aligned_start = start
+    # 確保不超出 user 指定範圍
+    aligned_start = max(aligned_start, start)
 
     for code in code_list:
         etf = etfs.get(code)
         if not etf:
             not_found.append(code)
             continue
-        # detach 給 _compute_one 用(它會自己開 session)
-        stats = _compute_one(etf, start, end)
+        # 用對齊起點計算(所有 ETF 同一個 base_date,圖表 + 統計表整齊)
+        stats = _compute_one(etf, aligned_start, end)
         if stats is None:
             insufficient.append(code)
         else:
             found.append(stats)
 
     return {
-        "start": start.isoformat(),
+        "start": start.isoformat(),                # user 原本要求的起點
+        "aligned_start": aligned_start.isoformat(), # 實際對齊後起點(最短 ETF 的起點)
         "end": end.isoformat(),
         "requested": code_list,
         "stats": found,
