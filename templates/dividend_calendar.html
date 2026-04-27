@@ -13,8 +13,8 @@
     background: rgb(var(--c-bg-soft));
     border: 1px solid rgb(var(--c-border));
     border-radius: 0.5rem;
-    padding: 0.5rem 0.5rem 0.6rem;
-    min-height: 5.5rem;
+    padding: 0.55rem 0.6rem 0.7rem;
+    min-height: 6.5rem;
     display: flex; flex-direction: column;
     overflow: hidden;
   }
@@ -30,39 +30,47 @@
     background: rgb(var(--c-card));
   }
   .cal-day-num {
-    font-size: 0.85rem;
-    font-weight: 600;
+    font-size: 1rem;
+    font-weight: 700;
     color: rgb(var(--c-fg));
-    margin-bottom: 0.35rem;
+    margin-bottom: 0.4rem;
   }
   .cal-day-num.is-sunday { color: rgb(239 68 68); }   /* 紅色週日,台灣習慣 */
   .cal-day-num.is-saturday { color: rgb(96 165 250); }
   .cal-event-pill {
-    display: block;
-    font-size: 0.72rem;
-    line-height: 1.2;
-    padding: 2px 5px;
-    border-radius: 0.25rem;
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    line-height: 1.25;
+    padding: 3px 7px;
+    border-radius: 0.3rem;
     background: rgb(var(--c-accent) / 0.12);
     border: 1px solid rgb(var(--c-accent) / 0.3);
     color: rgb(var(--c-accent));
-    margin-bottom: 2px;
+    margin-bottom: 3px;
     font-family: ui-monospace, monospace;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; overflow: hidden;
   }
   .cal-event-pill:hover {
     background: rgb(var(--c-accent) / 0.25);
   }
+  .cal-pill-code { font-weight: 600; }
+  .cal-pill-yield {
+    font-size: 0.75rem;
+    opacity: 0.85;
+    color: rgb(239 68 68);   /* 殖利率紅色,台股紅漲習慣 + 醒目 */
+  }
   .cal-events-more {
-    font-size: 0.7rem;
+    font-size: 0.78rem;
     color: rgb(var(--c-muted));
     margin-top: auto;
+    padding-top: 2px;
   }
   .cal-weekday-head {
-    font-size: 0.85rem;
+    font-size: 1rem;
     color: rgb(var(--c-muted));
     text-align: center;
-    padding: 0.5rem 0;
+    padding: 0.55rem 0;
     font-weight: 500;
   }
   .cal-weekday-head.is-sunday { color: rgb(239 68 68); }
@@ -178,8 +186,12 @@
               {% if d.is_today %}<span class="text-xs text-accent">·今</span>{% endif %}
             </div>
             {% for ev in d.events[:3] %}
-              <a href="/etf/{{ ev.code }}" class="cal-event-pill" title="{{ ev.name }}{% if ev.cash_dividend %} · {{ ev.cash_dividend }} 元{% endif %}">
-                {{ ev.code }}
+              <a href="/etf/{{ ev.code }}" class="cal-event-pill"
+                 title="{{ ev.name }}{% if ev.cash_dividend %} · 配 {{ ev.cash_dividend }} 元{% endif %}{% if ev.yield_pct %} · 殖利率 {{ '%.2f'|format(ev.yield_pct) }}%{% endif %}">
+                <span class="cal-pill-code">{{ ev.code }}</span>
+                {% if ev.yield_pct %}
+                <span class="cal-pill-yield">{{ "%.2f"|format(ev.yield_pct) }}%</span>
+                {% endif %}
               </a>
             {% endfor %}
             {% if d.events|length > 3 %}
@@ -205,36 +217,44 @@
       {% for ev in events %}
         {% if ev.ex_date != ns.last_day %}
           {% if not loop.first %}</ul>{% endif %}
-          <div class="list-day-header text-base sm:text-lg num">
+          <div class="list-day-header text-lg sm:text-xl num">
             {{ ev.ex_date }}
-            <span class="ml-2 text-sm text-muted font-normal">
+            <span class="ml-2 text-base text-muted font-normal">
               ({{ events_by_day[ev.ex_date]|length }} 支)
             </span>
             {% if ev.ex_date == today_iso %}
-            <span class="ml-2 text-xs text-accent font-normal">· 今天</span>
+            <span class="ml-2 text-sm text-accent font-normal">· 今天</span>
             {% endif %}
           </div>
           <ul class="divide-y divide-border/40">
           {% set ns.last_day = ev.ex_date %}
         {% endif %}
 
-          <li class="py-3 flex items-center gap-3 num">
+          <li class="py-3.5 flex items-center gap-4 num">
             <a href="/etf/{{ ev.code }}" class="flex-1 min-w-0 hover:underline group">
-              <div class="flex items-baseline gap-3">
-                <span class="font-mono text-base sm:text-lg text-accent">{{ ev.code }}</span>
-                <span class="text-sm sm:text-base text-fg/90 truncate">{{ ev.name }}</span>
+              <div class="flex items-baseline gap-3 flex-wrap">
+                <span class="font-mono text-lg sm:text-xl font-semibold text-accent">{{ ev.code }}</span>
+                <span class="text-base sm:text-lg text-fg/90 truncate">{{ ev.name }}</span>
               </div>
             </a>
+            {% if ev.yield_pct %}
             <div class="text-right whitespace-nowrap">
+              <div class="text-lg sm:text-xl font-bold text-up">
+                {{ "%.2f"|format(ev.yield_pct) }}%
+              </div>
+              <div class="text-xs text-muted">單次殖利率</div>
+            </div>
+            {% endif %}
+            <div class="text-right whitespace-nowrap min-w-[7rem]">
               {% if ev.cash_dividend %}
-                <div class="text-base sm:text-lg font-semibold text-up">
+                <div class="text-lg sm:text-xl font-semibold text-fg">
                   {{ "%.4f"|format(ev.cash_dividend) }} 元
                 </div>
               {% else %}
                 <div class="text-sm text-muted italic">金額未公告</div>
               {% endif %}
               {% if ev.payment_date %}
-                <div class="text-xs text-muted">入帳 {{ ev.payment_date }}</div>
+                <div class="text-sm text-muted">入帳 {{ ev.payment_date }}</div>
               {% endif %}
             </div>
           </li>

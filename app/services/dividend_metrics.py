@@ -253,6 +253,7 @@ def get_dividends_in_range(start: date, end: date) -> list[dict]:
     """區間內(含端點)所有 active 非 index ETF 的配息事件,給 /dividend-calendar 用。
 
     依 ex_date 升冪。NULL cash_dividend 也帶進(代表「已公告日期但金額未定」)。
+    每筆同步算單次殖利率(以 ex_date 前一日收盤為基準,沒拿到就 fallback 最新收盤)。
     """
     out: list[dict] = []
     with session_scope() as s:
@@ -268,6 +269,18 @@ def get_dividends_in_range(start: date, end: date) -> list[dict]:
         ).all()
 
         for d, etf in rows:
+            base_close = None
+            base_date = None
+            yield_pct = None
+
+            base = _get_close_on_or_before(s, etf.id, d.ex_date - timedelta(days=1))
+            if base is None:
+                base = _get_latest_close(s, etf.id)
+            if base:
+                base_date, base_close = base[0], base[1]
+            if d.cash_dividend and base_close:
+                yield_pct = compute_yield(d.cash_dividend, base_close)
+
             out.append({
                 "code": etf.code,
                 "name": etf.name,
@@ -276,6 +289,9 @@ def get_dividends_in_range(start: date, end: date) -> list[dict]:
                 "payment_date": d.payment_date.isoformat() if d.payment_date else None,
                 "cash_dividend": d.cash_dividend,
                 "announce_date": d.announce_date.isoformat() if d.announce_date else None,
+                "base_close": base_close,
+                "base_date": base_date.isoformat() if base_date else None,
+                "yield_pct": yield_pct,
             })
     return out
 

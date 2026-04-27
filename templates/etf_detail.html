@@ -439,10 +439,18 @@
     var etfNorm = normalize(etfData);
     var taiexNorm = normalize(taiexData);
 
-    // 顏色由 CSS variable 取
+    // 顏色由 CSS variable 取(--c-accent 等是 "59 130 246" 三段 triplet)
     function cssVar(name) {
       var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
       return v ? 'rgb(' + v + ')' : '#3b82f6';
+    }
+    // canvas addColorStop 不認 rgb(R G B) 空格語法,要 rgba(R,G,B,a)
+    function cssVarRgba(name, alpha) {
+      var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      if (!v) return 'rgba(59,130,246,' + alpha + ')';
+      var p = v.split(/\s+/);
+      if (p.length >= 3) return 'rgba(' + p[0] + ',' + p[1] + ',' + p[2] + ',' + alpha + ')';
+      return 'rgba(59,130,246,' + alpha + ')';
     }
     var accent = cssVar('--c-accent');
     var muted = cssVar('--c-muted');
@@ -494,8 +502,8 @@
             color: {
               type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
               colorStops: [
-                { offset: 0, color: accent + '33' },
-                { offset: 1, color: accent + '00' },
+                { offset: 0, color: cssVarRgba('--c-accent', 0.2) },
+                { offset: 1, color: cssVarRgba('--c-accent', 0)   },
               ],
             },
           },
