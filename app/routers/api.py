@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_session
 from app.models.etf import ETF
+from app.models.holdings import Holding
+from app.models.holdings_change import HoldingsChange
 from app.models.kbar import DailyKBar
 from app.services import finmind, ranking
 
@@ -65,6 +67,108 @@ async def quota() -> dict:
         "room_left_for_us": q.room,
         "near_red_line": q.near_red_line,
         "policy": "我們最多用 50% 配額,剩下留給其他共用者",
+    }
+
+
+@router.get("/etf/{code}/holdings")
+async def get_etf_holdings(
+    code: str,
+    session: Session = Depends(get_session),
+) -> dict:
+    """ETF 持股 — 取最新 batch(latest updated_at)的 Top 10。
+
+    100% 讀本地 holdings table(資料主權鐵律)。
+    """
+    code = code.upper()
+    etf = session.scalar(select(ETF).where(ETF.code == code))
+    if not etf:
+        raise HTTPException(404, f"ETF not found: {code}")
+
+    # 找最新 batch 時間
+    latest_batch = session.scalar(
+        select(func.max(Holding.updated_at)).where(Holding.etf_id == etf.id)
+    )
+    if latest_batch is None:
+        return {"code": code, "name": etf.name, "updated_at": None, "holdings": []}
+
+    rows = session.scalars(
+        select(Holding)
+        .where(Holding.etf_id == etf.id)
+        .where(Holding.updated_at == latest_batch)
+        .order_by(Holding.rank.asc())
+    ).all()
+    return {
+        "code": code,
+        "name": etf.name,
+        "updated_at": latest_batch.isoformat() if latest_batch else None,
+        "holdings": [{
+            "rank": r.rank,
+            "stock_code": r.stock_code,
+            "stock_name": r.stock_name,
+            "weight": r.weight,
+            "sector": r.sector,
+        } for r in rows],
+    }
+
+
+@router.get("/etf/{code}/holdings_change")
+async def get_etf_holdings_change(
+    code: str,
+    session: Session = Depends(get_session),
+) -> dict:
+    """ETF 近 N 日持股變動 — 買超 / 賣超 / 新增。
+
+    100% 讀本地 holdings_change table。
+    """
+    code = code.upper()
+    etf = session.scalar(select(ETF).where(ETF.code == code))
+    if not etf:
+        raise HTTPException(404, f"ETF not found: {code}")
+
+    latest_batch = session.scalar(
+        select(func.max(HoldingsChange.updated_at)).where(HoldingsChange.etf_id == etf.id)
+    )
+    if latest_batch is None:
+        return {
+            "code": code, "name": etf.name, "updated_at": None,
+            "latest_date": None, "previous_date": None,
+            "buy": [], "sell": [], "new": [],
+        }
+
+    rows = session.scalars(
+        select(HoldingsChange)
+        .where(HoldingsChange.etf_id == etf.id)
+        .where(HoldingsChange.updated_at == latest_batch)
+    ).all()
+
+    buy = sorted([r for r in rows if r.change_direction == "buy"],
+                 key=lambda r: r.shares_diff, reverse=True)[:10]
+    sell = sorted([r for r in rows if r.change_direction == "sell"],
+                  key=lambda r: r.shares_diff)[:10]
+    new = sorted([r for r in rows if r.change_direction == "new"],
+                 key=lambda r: r.shares_diff, reverse=True)[:10]
+
+    def _to_dict(r):
+        return {
+            "stock_code": r.stock_code,
+            "stock_name": r.stock_name,
+            "direction": r.change_direction,
+            "shares_diff": r.shares_diff,
+            "weight_latest": r.weight_latest,
+        }
+
+    latest_date = rows[0].latest_date.isoformat() if rows else None
+    previous_date = rows[0].previous_date.isoformat() if rows else None
+
+    return {
+        "code": code,
+        "name": etf.name,
+        "updated_at": latest_batch.isoformat(),
+        "latest_date": latest_date,
+        "previous_date": previous_date,
+        "buy": [_to_dict(r) for r in buy],
+        "sell": [_to_dict(r) for r in sell],
+        "new": [_to_dict(r) for r in new],
     }
 
 

@@ -134,12 +134,11 @@
           <h2 class="text-xl sm:text-2xl font-semibold">
             {% if etf.trend_is_full_year %}近 1 年走勢{% else %}上市至今走勢{% endif %}
           </h2>
-          <div class="text-sm text-muted mt-1">
-            還原股價 vs 大盤(TAIEX),以期初 = 100 標準化
-            {% if not etf.trend_is_full_year and etf.first_data_date %}
-              · <span class="text-amber-300">資料未滿 1 年(自 {{ etf.first_data_date }} 起,共 {{ etf.trend_days }} 天)</span>
-            {% endif %}
-          </div>
+          {% if not etf.trend_is_full_year and etf.first_data_date %}
+            <div class="text-sm text-amber-300 mt-1">
+              資料未滿 1 年(自 {{ etf.first_data_date }} 起,共 {{ etf.trend_days }} 天)
+            </div>
+          {% endif %}
         </div>
       </div>
     </header>

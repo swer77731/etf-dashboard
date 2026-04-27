@@ -247,6 +247,84 @@ async def etf_detail(request: Request, code: str) -> HTMLResponse:
     )
 
 
+@router.get("/test_holdings", response_class=HTMLResponse)
+async def test_holdings(request: Request, code: str = "0050") -> HTMLResponse:
+    """Debug 頁 — 驗證 holdings + holdings_change 資料。
+
+    用法:/test_holdings?code=0050
+    """
+    from app.models.etf import ETF
+    from app.models.holdings import Holding
+    from app.models.holdings_change import HoldingsChange
+    from app.services.sync_status import get_sync_status
+    from app.database import session_scope
+    from sqlalchemy import select, func, desc
+
+    code = code.upper()
+    holdings_data: dict = {}
+    changes_data: dict = {}
+
+    with session_scope() as s:
+        etf = s.scalar(select(ETF).where(ETF.code == code))
+        if etf:
+            # 最新 batch holdings
+            latest_h = s.scalar(
+                select(func.max(Holding.updated_at)).where(Holding.etf_id == etf.id)
+            )
+            if latest_h:
+                rows = s.scalars(
+                    select(Holding).where(Holding.etf_id == etf.id)
+                    .where(Holding.updated_at == latest_h)
+                    .order_by(Holding.rank.asc())
+                ).all()
+                holdings_data = {
+                    "updated_at": latest_h.isoformat(),
+                    "rows": [{
+                        "rank": r.rank, "stock_code": r.stock_code,
+                        "stock_name": r.stock_name, "weight": r.weight,
+                        "sector": r.sector,
+                    } for r in rows],
+                }
+            # 最新 batch changes
+            latest_c = s.scalar(
+                select(func.max(HoldingsChange.updated_at)).where(HoldingsChange.etf_id == etf.id)
+            )
+            if latest_c:
+                cs = s.scalars(
+                    select(HoldingsChange).where(HoldingsChange.etf_id == etf.id)
+                    .where(HoldingsChange.updated_at == latest_c)
+                    .order_by(desc(HoldingsChange.shares_diff))
+                ).all()
+                changes_data = {
+                    "updated_at": latest_c.isoformat(),
+                    "latest_date": cs[0].latest_date.isoformat() if cs else None,
+                    "previous_date": cs[0].previous_date.isoformat() if cs else None,
+                    "buy": [{"stock_code": r.stock_code, "stock_name": r.stock_name,
+                             "shares_diff": r.shares_diff, "weight_latest": r.weight_latest}
+                            for r in cs if r.change_direction == "buy"],
+                    "sell": [{"stock_code": r.stock_code, "stock_name": r.stock_name,
+                              "shares_diff": r.shares_diff, "weight_latest": r.weight_latest}
+                             for r in cs if r.change_direction == "sell"],
+                    "new": [{"stock_code": r.stock_code, "stock_name": r.stock_name,
+                             "shares_diff": r.shares_diff, "weight_latest": r.weight_latest}
+                            for r in cs if r.change_direction == "new"],
+                }
+
+    sync_st = get_sync_status("holdings_cmoney")
+    return templates.TemplateResponse(
+        request, "test_holdings.html",
+        {
+            **_common_ctx(),
+            "code": code,
+            "etf_found": etf is not None,
+            "etf_name": etf.name if etf else None,
+            "holdings": holdings_data,
+            "changes": changes_data,
+            "sync_status": sync_st,
+        },
+    )
+
+
 @router.get("/disclaimer", response_class=HTMLResponse)
 async def disclaimer(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "legal/disclaimer.html", _common_ctx())

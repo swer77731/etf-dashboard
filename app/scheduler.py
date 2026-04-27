@@ -17,6 +17,7 @@ from app.services import (
     dividend_announce_sync,
     dividend_sync,
     etf_universe,
+    holdings_sync,
     kbar_sync,
     news_sync,
 )
@@ -46,6 +47,22 @@ def daily_sync_job() -> None:
         logger.info("[daily_sync] dividend_announce: %s", a_stats)
         n_stats = news_sync.sync_recent()
         logger.info("[daily_sync] news: %s", n_stats)
+        # 持股 + 持股變動(CMoney API)— 抓所有 active ETF
+        # 紀律 #20:expected/actual/missing/errors → record_sync_attempt 持久化
+        try:
+            from sqlalchemy import select
+            from app.database import session_scope
+            from app.models.etf import ETF
+            with session_scope() as s:
+                active_codes = list(s.scalars(
+                    select(ETF.code).where(ETF.is_active.is_(True))
+                    .where(ETF.category != "index")
+                ).all())
+            h_stats = holdings_sync.sync_etf_holdings_cmoney(active_codes)
+            logger.info("[daily_sync] holdings: %s",
+                        {k: (len(v) if isinstance(v, list) else v) for k, v in h_stats.items()})
+        except Exception:
+            logger.exception("[daily_sync] holdings failed")
     except Exception:
         logger.exception("[daily_sync] failed")
     finally:

@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}Test Holdings — {{ code }} — {{ brand_full }}{% endblock %}
+
+{% block content %}
+
+<section class="mb-6">
+  <div class="text-xs text-muted tracking-widest mb-2">DEBUG</div>
+  <h1 class="text-2xl sm:text-3xl font-semibold mb-2">
+    <span class="hero-text">/test_holdings</span>
+  </h1>
+  <p class="text-base text-muted">
+    開發驗證頁 — 檢查 holdings + holdings_change DB 資料。
+  </p>
+</section>
+
+{# 切換 ETF code 的小表單 #}
+<section class="mb-6">
+  <form method="get" action="/test_holdings" class="flex gap-2 items-end">
+    <div class="flex-1 max-w-xs">
+      <label class="block text-sm text-muted mb-1">ETF 代號</label>
+      <input type="text" name="code" value="{{ code }}"
+             class="w-full bg-bg-soft border border-border rounded-md px-3 py-2 font-mono"
+             placeholder="0050">
+    </div>
+    <button type="submit" class="bg-accent text-white px-4 py-2 rounded-md font-semibold">
+      查詢
+    </button>
+  </form>
+</section>
+
+{% if not etf_found %}
+<section class="bg-amber-500/10 border border-amber-500/30 rounded-md p-4 mb-6">
+  <div class="text-amber-200">⚠ 找不到 ETF: <span class="font-mono">{{ code }}</span></div>
+</section>
+{% else %}
+
+<section class="text-base text-muted mb-6">
+  <span class="font-mono text-accent text-lg">{{ code }}</span>
+  <span class="ml-2 text-fg">{{ etf_name }}</span>
+</section>
+
+{# === sync_status 紀律 #20 === #}
+<section class="section-card rounded-xl p-5 mb-6">
+  <h2 class="text-lg font-semibold mb-3">sync_status『holdings_cmoney』</h2>
+  {% if sync_status %}
+  <table class="text-sm num">
+    <tr><td class="pr-4 py-1 text-muted">last_attempt_at</td><td>{{ sync_status.last_attempt_at }}</td></tr>
+    <tr><td class="pr-4 py-1 text-muted">last_success_at</td><td>{{ sync_status.last_success_at or '—' }}</td></tr>
+    <tr><td class="pr-4 py-1 text-muted">rows_synced</td><td>{{ sync_status.rows_synced }}</td></tr>
+    <tr><td class="pr-4 py-1 text-muted">retry_count</td><td>{{ sync_status.retry_count }}</td></tr>
+    <tr><td class="pr-4 py-1 text-muted">missing_count</td><td>{{ sync_status.missing_count }}</td></tr>
+    <tr><td class="pr-4 py-1 text-muted">missing_items</td><td class="font-mono text-xs">{{ sync_status.missing_items }}</td></tr>
+    <tr><td class="pr-4 py-1 text-muted">last_error</td><td class="text-down">{{ sync_status.last_error or '—' }}</td></tr>
+  </table>
+  {% else %}
+  <div class="text-muted">尚未跑過 holdings_cmoney sync</div>
+  {% endif %}
+</section>
+
+{# === Holdings 最新 batch === #}
+<section class="section-card rounded-xl p-5 mb-6">
+  <h2 class="text-lg font-semibold mb-1">Top 10 持股</h2>
+  <div class="text-sm text-muted mb-3">
+    {% if holdings.updated_at %}batch updated_at: {{ holdings.updated_at }}{% else %}尚無資料{% endif %}
+  </div>
+  {% if holdings.rows %}
+  <table class="w-full text-base num">
+    <thead>
+      <tr class="text-left text-muted border-b border-border">
+        <th class="py-2 px-2">Rank</th>
+        <th class="py-2 px-2">代號</th>
+        <th class="py-2 px-2">名稱</th>
+        <th class="py-2 px-2 text-right">權重 %</th>
+        <th class="py-2 px-2">產業</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for h in holdings.rows %}
+      <tr class="border-b border-border/40">
+        <td class="py-2 px-2 font-bold">{{ h.rank }}</td>
+        <td class="py-2 px-2 font-mono">{{ h.stock_code }}</td>
+        <td class="py-2 px-2">{{ h.stock_name }}</td>
+        <td class="py-2 px-2 text-right font-bold text-up">{{ "%.2f"|format(h.weight) }}</td>
+        <td class="py-2 px-2 text-muted">{{ h.sector or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+
+{# === Holdings Change === #}
+<section class="section-card rounded-xl p-5 mb-6">
+  <h2 class="text-lg font-semibold mb-1">持股變動</h2>
+  {% if changes.updated_at %}
+  <div class="text-sm text-muted mb-3">
+    {{ changes.previous_date }} → {{ changes.latest_date }} · batch updated_at: {{ changes.updated_at }}
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div>
+      <h3 class="font-semibold text-up mb-2">📈 買超 ({{ changes.buy|length }})</h3>
+      <table class="w-full text-sm num">
+        {% for c in changes.buy[:10] %}
+        <tr class="border-b border-border/30">
+          <td class="py-1 font-mono">{{ c.stock_code }}</td>
+          <td class="py-1">{{ c.stock_name }}</td>
+          <td class="py-1 text-right text-up">+{{ "{:,}".format(c.shares_diff) }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+
+    <div>
+      <h3 class="font-semibold text-down mb-2">📉 賣超 ({{ changes.sell|length }})</h3>
+      <table class="w-full text-sm num">
+        {% for c in changes.sell[:10] %}
+        <tr class="border-b border-border/30">
+          <td class="py-1 font-mono">{{ c.stock_code }}</td>
+          <td class="py-1">{{ c.stock_name }}</td>
+          <td class="py-1 text-right text-down">{{ "{:,}".format(c.shares_diff) }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+
+    <div>
+      <h3 class="font-semibold text-accent mb-2">🆕 新增 ({{ changes.new|length }})</h3>
+      <table class="w-full text-sm num">
+        {% for c in changes.new[:10] %}
+        <tr class="border-b border-border/30">
+          <td class="py-1 font-mono">{{ c.stock_code }}</td>
+          <td class="py-1">{{ c.stock_name }}</td>
+          <td class="py-1 text-right text-accent">+{{ "{:,}".format(c.shares_diff) }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="text-muted">尚無變動資料</div>
+  {% endif %}
+</section>
+
+{% endif %}
+
+<section class="text-xs text-muted text-center mt-12 mb-6">
+  Debug 頁 · /api/etf/{{ code }}/holdings 跟 /api/etf/{{ code }}/holdings_change 為對應 JSON 端點
+</section>
+
+{% endblock %}
