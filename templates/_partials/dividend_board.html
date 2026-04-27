@@ -82,7 +82,12 @@
                   <div class="flex items-baseline justify-between gap-2 text-sm">
                     <span class="num text-muted">{{ it.ex_date[5:] }} 除息</span>
                     <div class="flex items-baseline gap-3 shrink-0">
-                      <span class="num text-fg font-semibold">{{ "%.3f"|format(it.cash_dividend) }} 元</span>
+                      {# NULL = 待公告(plan Q1 by user),format(None) 會 raise TypeError 必須守門 #}
+                      {% if it.cash_dividend is not none %}
+                        <span class="num text-fg font-semibold">{{ "%.3f"|format(it.cash_dividend) }} 元</span>
+                      {% else %}
+                        <span class="num text-muted">待公告</span>
+                      {% endif %}
                       {% if it.yield_pct %}
                         <span class="num text-muted">殖利率 {{ "%.2f"|format(it.yield_pct) }}%</span>
                       {% endif %}

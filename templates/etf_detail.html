@@ -173,8 +173,14 @@
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-5">
       <div class="bg-bg-soft border border-border rounded-lg p-4">
         <div class="text-xs text-muted mb-1.5">配息金額</div>
-        <div class="text-2xl sm:text-3xl font-bold num text-fg">{{ "%.4f"|format(na.cash_dividend) }}</div>
-        <div class="text-xs text-muted mt-1">元 / 股</div>
+        {# NULL = 待公告(TWSE 預告未公告金額);format(None) 會 raise TypeError #}
+        {% if na.cash_dividend is not none %}
+          <div class="text-2xl sm:text-3xl font-bold num text-fg">{{ "%.4f"|format(na.cash_dividend) }}</div>
+          <div class="text-xs text-muted mt-1">元 / 股</div>
+        {% else %}
+          <div class="text-2xl sm:text-3xl font-bold num text-muted">待公告</div>
+          <div class="text-xs text-muted mt-1">發行商尚未公告金額</div>
+        {% endif %}
       </div>
       <div class="bg-bg-soft border border-border rounded-lg p-4">
         <div class="text-xs text-muted mb-1.5">除息日</div>
