@@ -6,9 +6,9 @@
 <style>
   /* ETF chip(picker)*/
   .h-chip {
-    display: inline-flex; align-items: center; gap: 0.4rem;
-    padding: 0.3rem 0.65rem; border-radius: 0.4rem;
-    font-size: 0.9rem;
+    display: inline-flex; align-items: center; gap: 0.45rem;
+    padding: 0.4rem 0.75rem; border-radius: 0.45rem;
+    font-size: 1rem;
     background: rgb(var(--c-accent) / 0.13);
     border: 1px solid rgb(var(--c-accent) / 0.45);
     color: rgb(var(--c-accent));
@@ -47,6 +47,19 @@
     color: rgb(245 158 11);
     font-weight: 600;
   }
+  .conc-warn-tag {
+    display: inline-block;
+    margin-left: 0.4rem;
+    padding: 1px 6px;
+    border-radius: 0.25rem;
+    background: rgb(245 158 11 / 0.15);
+    border: 1px solid rgb(245 158 11 / 0.4);
+    color: rgb(252 211 77);
+    font-size: 0.72rem;
+    font-weight: 500;
+    vertical-align: 1px;
+    white-space: nowrap;
+  }
 
   /* 變動方向色 */
   .dir-buy { color: rgb(239 68 68); font-weight: 600; }
@@ -65,12 +78,18 @@
 
 {% block content %}
 
-<section class="mb-8">
-  <h1 class="text-2xl sm:text-3xl font-semibold mb-2">
+<section class="mb-6 relative">
+  <div class="text-xs text-muted tracking-widest mb-2">
+    <a href="/" class="hover:text-accent">首頁</a>
+    <span class="mx-1">/</span>
+    <span>持股分析</span>
+  </div>
+
+  <h1 class="text-2xl sm:text-3xl font-bold mb-2 tracking-tight leading-tight">
     <span class="hero-text">ETF 持股分析</span>
   </h1>
-  <p class="text-base text-muted">
-    最多比較 3 支 ETF · 看十大持股、買賣超變動、共同押注標的。
+  <p class="text-sm sm:text-base text-muted">
+    最多比較 3 支 ETF · 看十大持股、買賣超變動、共同押注標的
   </p>
 </section>
 
@@ -80,8 +99,8 @@
 
   {# === ETF picker(上限 3 支)=== #}
   <div class="mb-2 flex items-center justify-between">
-    <label class="text-sm text-muted">追蹤的 ETF(最多 3 支)</label>
-    <span class="text-xs text-muted num" x-text="`已選 ${codes.length} / 3`"></span>
+    <label class="text-base text-fg font-medium">追蹤的 ETF(最多 3 支)</label>
+    <span class="text-sm text-muted num" x-text="`已選 ${codes.length} / 3`"></span>
   </div>
 
   <div class="picker-shell bg-bg-soft border border-border rounded-md p-2 transition mb-5"
@@ -139,10 +158,11 @@
   </div>
 
   {# === 載入狀態 / 引導 === #}
-  <div x-show="codes.length === 0" class="text-center py-10 text-muted">
-    請輸入 1~3 支 ETF 代號開始分析
+  <div x-show="codes.length === 0" class="text-center py-10">
+    <div class="text-base sm:text-lg text-fg/85">請輸入 ETF 代號開始分析</div>
+    <div class="text-sm text-muted mt-1">在上方輸入框打代號(例:0050、0056)</div>
   </div>
-  <div x-show="codes.length > 0 && data_loading" class="text-center py-6 text-muted">
+  <div x-show="codes.length > 0 && data_loading" class="text-center py-8 text-base text-muted">
     載入持股資料中…
   </div>
 
@@ -152,7 +172,8 @@
       <span class="w-1 h-7 bg-accent rounded-full inline-block align-middle mr-2" style="box-shadow: 0 0 8px var(--c-accent-glow);"></span>
       十大個股持股
     </h2>
-    <div id="holdings-chart" class="w-full h-96 sm:h-[28rem]"></div>
+    <div id="holdings-chart" class="w-full"
+         :style="`height: ${Math.max(360, 80 + Math.min(holdings.length, 3) * 110)}px`"></div>
   </div>
 
   {# === 區塊 2:個股集中度 === #}
@@ -183,18 +204,18 @@
                 <span x-show="h.holdings[0]" class="ml-2 font-bold"
                       :class="h.holdings[0] && h.holdings[0].weight > 30 ? 'conc-warn' : 'text-up'">
                   <span x-text="h.holdings[0] ? h.holdings[0].weight.toFixed(2) : ''"></span>%
-                  <span x-show="h.holdings[0] && h.holdings[0].weight > 30">⚠</span>
                 </span>
+                <span x-show="h.holdings[0] && h.holdings[0].weight > 30" class="conc-warn-tag">高度集中</span>
               </td>
               <td class="py-3 px-3 text-right font-bold"
                   :class="topNWeight(h, 5) > 50 ? 'conc-warn' : 'text-fg'">
                 <span x-text="topNWeight(h, 5).toFixed(2)"></span>%
-                <span x-show="topNWeight(h, 5) > 50">⚠</span>
+                <span x-show="topNWeight(h, 5) > 50" class="conc-warn-tag">過半</span>
               </td>
               <td class="py-3 px-3 text-right font-bold"
                   :class="topNWeight(h, 10) > 70 ? 'conc-warn' : 'text-fg'">
                 <span x-text="topNWeight(h, 10).toFixed(2)"></span>%
-                <span x-show="topNWeight(h, 10) > 70">⚠</span>
+                <span x-show="topNWeight(h, 10) > 70" class="conc-warn-tag">逾七成</span>
               </td>
             </tr>
           </template>
@@ -202,7 +223,7 @@
       </table>
     </div>
     <div class="text-xs text-muted mt-2">
-      註:⚠ 為事實標示(第 1 大 > 30% / Top5 > 50% / Top10 > 70%),不構成投資建議
+      註:橘色警示為事實標示(第 1 大 &gt; 30% / Top5 &gt; 50% / Top10 &gt; 70%),不構成投資建議
     </div>
   </div>
 
@@ -213,47 +234,56 @@
       持股變動
     </h2>
     <template x-for="ch in changes" :key="ch.code">
-      <div class="bg-bg-soft border border-border rounded-lg p-4 mb-3">
-        <div class="text-base font-semibold mb-1">
-          <span class="font-mono text-accent" x-text="ch.code"></span>
-          <span class="ml-2" x-text="ch.name"></span>
-          <span class="ml-3 text-sm text-muted num" x-text="ch.previous_date + ' → ' + ch.latest_date"></span>
+      <div class="bg-bg-soft border border-border rounded-lg p-5 mb-4">
+        <div class="text-base sm:text-lg font-semibold mb-1 flex items-baseline gap-2 flex-wrap">
+          <span class="font-mono text-accent text-lg" x-text="ch.code"></span>
+          <span x-text="ch.name"></span>
+          <span class="text-sm text-muted num" x-text="ch.previous_date + ' → ' + ch.latest_date"></span>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-3">
           <div>
-            <div class="text-sm dir-buy mb-2">📈 買超 Top <span x-text="Math.min(ch.buy.length, 10)"></span></div>
-            <ul class="space-y-1 text-sm num">
+            <div class="text-base mb-2 flex items-baseline gap-1">
+              <span class="dir-buy">買超</span>
+              <span class="text-muted text-sm">Top <span x-text="Math.min(ch.buy.length, 10)"></span></span>
+            </div>
+            <ul class="space-y-1.5 text-base num">
               <template x-for="b in ch.buy.slice(0, 10)" :key="b.stock_code">
-                <li class="flex justify-between">
-                  <span><span class="font-mono" x-text="b.stock_code"></span> <span x-text="b.stock_name"></span></span>
-                  <span class="dir-buy" x-text="'+' + b.shares_diff.toLocaleString()"></span>
+                <li class="flex justify-between gap-2">
+                  <span class="truncate"><span class="font-mono" x-text="b.stock_code"></span> <span x-text="b.stock_name"></span></span>
+                  <span class="dir-buy whitespace-nowrap" x-text="'+' + b.shares_diff.toLocaleString()"></span>
                 </li>
               </template>
-              <li x-show="ch.buy.length === 0" class="text-muted">無</li>
+              <li x-show="ch.buy.length === 0" class="text-muted">—</li>
             </ul>
           </div>
           <div>
-            <div class="text-sm dir-sell mb-2">📉 賣超 Top <span x-text="Math.min(ch.sell.length, 10)"></span></div>
-            <ul class="space-y-1 text-sm num">
+            <div class="text-base mb-2 flex items-baseline gap-1">
+              <span class="dir-sell">賣超</span>
+              <span class="text-muted text-sm">Top <span x-text="Math.min(ch.sell.length, 10)"></span></span>
+            </div>
+            <ul class="space-y-1.5 text-base num">
               <template x-for="s in ch.sell.slice(0, 10)" :key="s.stock_code">
-                <li class="flex justify-between">
-                  <span><span class="font-mono" x-text="s.stock_code"></span> <span x-text="s.stock_name"></span></span>
-                  <span class="dir-sell" x-text="s.shares_diff.toLocaleString()"></span>
+                <li class="flex justify-between gap-2">
+                  <span class="truncate"><span class="font-mono" x-text="s.stock_code"></span> <span x-text="s.stock_name"></span></span>
+                  <span class="dir-sell whitespace-nowrap" x-text="s.shares_diff.toLocaleString()"></span>
                 </li>
               </template>
-              <li x-show="ch.sell.length === 0" class="text-muted">無</li>
+              <li x-show="ch.sell.length === 0" class="text-muted">—</li>
             </ul>
           </div>
           <div>
-            <div class="text-sm dir-new mb-2">🆕 新增 <span x-text="ch.new.length"></span></div>
-            <ul class="space-y-1 text-sm num">
+            <div class="text-base mb-2 flex items-baseline gap-1">
+              <span class="dir-new">新增</span>
+              <span class="text-muted text-sm">共 <span x-text="ch.new.length"></span> 支</span>
+            </div>
+            <ul class="space-y-1.5 text-base num">
               <template x-for="n in ch.new.slice(0, 10)" :key="n.stock_code">
-                <li class="flex justify-between">
-                  <span><span class="font-mono" x-text="n.stock_code"></span> <span x-text="n.stock_name"></span></span>
-                  <span class="dir-new" x-text="'+' + n.shares_diff.toLocaleString()"></span>
+                <li class="flex justify-between gap-2">
+                  <span class="truncate"><span class="font-mono" x-text="n.stock_code"></span> <span x-text="n.stock_name"></span></span>
+                  <span class="dir-new whitespace-nowrap" x-text="'+' + n.shares_diff.toLocaleString()"></span>
                 </li>
               </template>
-              <li x-show="ch.new.length === 0" class="text-muted">無</li>
+              <li x-show="ch.new.length === 0" class="text-muted">—</li>
             </ul>
           </div>
         </div>
@@ -475,6 +505,9 @@ function holdingsPicker(opts) {
       }
       const palette = ['#3b82f6', '#a78bfa', '#f59e0b'];
 
+      // 中文字體 fallback 鏈 — canvas 不繼承 CSS,要明確指定不然「聯」「日」這類 CJK 變 box
+      const cjkFont = '"Noto Sans TC", "Microsoft JhengHei", "PingFang TC", ui-sans-serif, sans-serif';
+
       const series = this.holdings.map((h, i) => ({
         name: `${h.code} ${h.name}`,
         type: 'bar',
@@ -485,46 +518,82 @@ function holdingsPicker(opts) {
         itemStyle: { color: palette[i % palette.length] },
         animationDuration: 800,
         animationEasing: 'cubicOut',
+        barCategoryGap: '40%',
         label: {
           show: true,
           position: 'right',
           formatter: '{c}%',
-          fontSize: 11,
+          fontSize: 13,
+          fontWeight: 600,
+          fontFamily: cjkFont,
           color: cssVar('--c-fg'),
         },
       }));
 
+      // xAxis max headroom — 給最右邊 bar 的 data label 留位置(否則 62% 那條的 label 會切掉)
+      const maxW = Math.max(...sortedStocks.map(s => s.weight), 1);
+      const xMax = Math.ceil(maxW * 1.18);
+
       this.chart.setOption({
         backgroundColor: 'transparent',
-        grid: { left: 140, right: 60, top: 40, bottom: 30 },
+        grid: { left: 165, right: 80, top: 50, bottom: 40, containLabel: false },
         legend: {
-          textStyle: { color: cssVar('--c-fg'), fontSize: 13 },
-          top: 5,
+          textStyle: { color: cssVar('--c-fg'), fontSize: 14, fontFamily: cjkFont },
+          top: 8,
+          itemGap: 18,
         },
         tooltip: {
           trigger: 'axis',
           axisPointer: { type: 'shadow' },
           backgroundColor: cssVar('--c-bg-soft'),
           borderColor: cssVar('--c-border'),
-          textStyle: { color: cssVar('--c-fg') },
+          textStyle: { color: cssVar('--c-fg'), fontSize: 13, fontFamily: cjkFont },
           formatter: function (params) {
             return params.map(p => `${p.marker} ${p.seriesName}<br/>${p.name}: <b>${p.value}%</b>`).join('<br/>');
           },
         },
         xAxis: {
           type: 'value',
+          max: xMax,
+          splitNumber: 5,
           axisLine: { show: false },
-          axisLabel: { color: cssVar('--c-muted'), formatter: '{value}%' },
+          axisLabel: {
+            color: cssVar('--c-muted'),
+            formatter: '{value}%',
+            fontSize: 12,
+            hideOverlap: true,
+          },
           splitLine: { lineStyle: { color: cssVar('--c-border'), type: 'dashed', opacity: 0.4 } },
         },
         yAxis: {
           type: 'category',
           data: yLabels,
           axisLine: { lineStyle: { color: cssVar('--c-border') } },
-          axisLabel: { color: cssVar('--c-fg'), fontSize: 12 },
+          axisTick: { show: false },
+          axisLabel: {
+            color: cssVar('--c-fg'),
+            fontSize: 13,
+            fontWeight: 500,
+            fontFamily: cjkFont,
+            overflow: 'none',
+            margin: 12,
+          },
         },
         series: series,
       }, true);
+
+      // 修正 1:Alpine x-show / display:none → block 期間 ECharts 可能讀到 width=0,
+      // 用 requestAnimationFrame 等瀏覽器 layout flush 完再 resize,確保比例對。
+      requestAnimationFrame(() => {
+        if (this.chart) this.chart.resize();
+      });
+      // 視窗 resize 也跟著 chart resize(用 flag 防重複註冊)
+      if (!this._chartResizeHooked) {
+        window.addEventListener('resize', () => {
+          if (this.chart) this.chart.resize();
+        });
+        this._chartResizeHooked = true;
+      }
     },
   };
 }
