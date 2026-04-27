@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+
+{% block title %}{% if etf_filter %}{{ etf_filter }} 相關新聞{% else %}快訊 · 新聞牆{% endif %} — {{ brand_full }}{% endblock %}
+
+{% block head %}
+<style>
+  .news-tab {
+    font-size: 0.9rem;
+    padding: 0.45rem 1rem;
+    border-radius: 9999px;
+    border: 1px solid rgb(var(--c-border));
+    background: rgb(var(--c-bg-soft));
+    color: rgb(var(--c-muted));
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .news-tab:hover {
+    color: rgb(var(--c-fg));
+    border-color: rgb(var(--c-accent) / 0.4);
+  }
+  .news-tab.is-active {
+    background: rgb(var(--c-accent) / 0.15);
+    border-color: rgb(var(--c-accent) / 0.6);
+    color: rgb(var(--c-accent));
+  }
+  .news-tab .count {
+    font-size: 0.7rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 9999px;
+    background: rgb(var(--c-card));
+    color: rgb(var(--c-muted));
+  }
+  .news-tab.is-active .count {
+    background: rgb(var(--c-accent) / 0.25);
+    color: rgb(var(--c-accent));
+  }
+
+  /* 快訊每則卡 */
+  .news-row {
+    padding: 1rem 0.85rem;
+    border-bottom: 1px solid rgb(var(--c-border) / 0.4);
+    transition: background 0.12s ease;
+    display: block;
+  }
+  .news-row:hover {
+    background: rgb(var(--c-card-hover) / 0.5);
+  }
+  .news-row:last-child { border-bottom: none; }
+
+  .news-time-pill {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    font-size: 0.78rem;
+    color: rgb(var(--c-muted));
+  }
+  .news-time-pill.is-fresh { color: rgb(239 68 68); font-weight: 600; }   /* 紅 — 6h 內 */
+  .news-time-pill .live-dot { width: 0.4rem; height: 0.4rem; }
+
+  .news-source-tag {
+    font-size: 0.7rem;
+    padding: 0.1rem 0.55rem;
+    border-radius: 9999px;
+    background: rgb(var(--c-bg-soft));
+    border: 1px solid rgb(var(--c-border));
+    color: rgb(var(--c-muted));
+  }
+  .news-etf-tag {
+    font-size: 0.78rem;
+    font-family: ui-monospace, monospace;
+    color: rgb(var(--c-accent));
+    padding: 0.05rem 0.45rem;
+    border-radius: 0.3rem;
+    background: rgb(var(--c-accent) / 0.08);
+    border: 1px solid rgb(var(--c-accent) / 0.25);
+    transition: background 0.12s ease;
+  }
+  .news-etf-tag:hover { background: rgb(var(--c-accent) / 0.18); }
+
+  .news-title {
+    font-size: 1.05rem;
+    line-height: 1.45;
+    color: rgb(var(--c-fg));
+    margin-top: 0.4rem;
+    transition: color 0.15s ease;
+  }
+  .news-row:hover .news-title { color: rgb(var(--c-accent)); }
+
+  /* 「最新」一抹紅縱線 — 給最近 24h 內的新聞 */
+  .news-row.is-today {
+    position: relative;
+  }
+  .news-row.is-today::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 1rem; bottom: 1rem;
+    width: 3px;
+    background: rgb(239 68 68);
+    border-radius: 2px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<section class="mb-6">
+  <div class="flex items-center gap-2 text-xs text-muted tracking-widest mb-3">
+    <span class="live-dot"></span>
+    <span>NEWS · 每日 14:30 自動更新</span>
+  </div>
+
+  <h1 class="text-2xl sm:text-3xl font-semibold mb-2">
+    <span class="hero-text">{% if etf_filter %}{{ etf_filter }} 快訊{% else %}快訊牆{% endif %}</span>
+  </h1>
+
+  {% if etf_filter %}
+    <p class="text-base text-muted">
+      只看與 <span class="font-mono text-accent">{{ etf_filter }}</span> 相關的新聞 ·
+      <a href="/news" class="text-accent hover:underline">看全部</a>
+    </p>
+  {% else %}
+    <p class="text-base text-muted">主流 ETF(主動式 + 市值型 + 高股息)即時新聞,最新先看。</p>
+  {% endif %}
+</section>
+
+{# === 期間 tab === #}
+{% set base_qs = '?etf=' + etf_filter + '&' if etf_filter else '?' %}
+<section class="mb-6 flex items-center gap-2 flex-wrap">
+  <a href="{{ base_qs }}days=7"
+     class="news-tab {% if days_filter == '7' %}is-active{% endif %}">
+    近 7 天 <span class="count num">{{ counts['7'] }}</span>
+  </a>
+  <a href="{{ base_qs }}days=30"
+     class="news-tab {% if days_filter == '30' %}is-active{% endif %}">
+    近 30 天 <span class="count num">{{ counts['30'] }}</span>
+  </a>
+  <a href="{{ base_qs }}days=all"
+     class="news-tab {% if days_filter == 'all' %}is-active{% endif %}">
+    全部 <span class="count num">{{ counts['all'] }}</span>
+  </a>
+  <span class="ml-auto text-xs text-muted num">第 {{ page }} 頁 · 共 {{ total }} 則</span>
+</section>
+
+{% if items %}
+<section class="relative section-card rounded-xl p-3 sm:p-5 mb-7">
+  <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
+  <div class="card-content">
+    {% for n in items %}
+      {# Jinja2 macro 算相對時間(從伺服器的 UTC ISO 字串) #}
+      {% set pub_date = n.published_at[:10] if n.published_at else '' %}
+      {% set is_today = pub_date == today_iso %}
+      <a href="{{ n.url }}" target="_blank" rel="noopener noreferrer"
+         class="news-row group {% if is_today %}is-today{% endif %}"
+         data-published="{{ n.published_at or '' }}">
+        <div class="flex items-center gap-2 flex-wrap">
+          {# 時間 pill — JS 改寫成相對時間;失敗 fallback 顯示日期 #}
+          <span class="news-time-pill" data-time-pill>
+            <span class="live-dot" style="display:none;"></span>
+            <span data-time-text>{{ pub_date or '—' }}</span>
+          </span>
+          {% if n.source %}
+            <span class="news-source-tag">{{ n.source }}</span>
+          {% endif %}
+          {% for tag in n.etf_tags[:5] %}
+            <a href="/etf/{{ tag }}" class="news-etf-tag" onclick="event.stopPropagation()">{{ tag }}</a>
+          {% endfor %}
+        </div>
+        <div class="news-title">{{ n.title }}</div>
+      </a>
+    {% endfor %}
+  </div>
+  <div class="card-watermark">ETF Watch</div>
+</section>
+
+{# === Pagination === #}
+<nav class="flex items-center justify-center gap-3 mb-8">
+  {% if page > 1 %}
+    <a href="?{% if etf_filter %}etf={{ etf_filter }}&{% endif %}days={{ days_filter }}&page={{ page - 1 }}"
+       class="px-4 py-2 rounded-md border border-border text-sm hover:border-accent transition">← 上一頁</a>
+  {% endif %}
+  <span class="text-sm text-muted">第 {{ page }} 頁</span>
+  {% if has_next %}
+    <a href="?{% if etf_filter %}etf={{ etf_filter }}&{% endif %}days={{ days_filter }}&page={{ page + 1 }}"
+       class="px-4 py-2 rounded-md border border-border text-sm hover:border-accent transition">下一頁 →</a>
+  {% endif %}
+</nav>
+
+{% else %}
+
+<section class="text-center py-16 text-muted">
+  {% if etf_filter %}
+    {{ etf_filter }} 在這個期間沒有相關新聞。
+    <div class="mt-3"><a href="/news?days={{ days_filter }}" class="text-accent hover:underline">看全部新聞</a></div>
+  {% else %}
+    {% if days_filter != 'all' %}
+      近 {{ days_filter }} 天暫無新聞。<a href="/news?days=all" class="text-accent hover:underline">看全部</a>
+    {% else %}
+      新聞同步中,請稍後再回來看看。
+    {% endif %}
+    <div class="mt-3 text-sm">每天 14:30 自動更新最新新聞。</div>
+  {% endif %}
+</section>
+
+{% endif %}
+
+<div class="text-xs text-muted text-center mt-12 mb-6 max-w-2xl mx-auto leading-relaxed px-4">
+  資料來源:台灣證券交易所 / 各大新聞媒體 · 連結為原始發布頁面
+</div>
+
+<script>
+  // 把每則新聞的時間 pill 改寫成相對時間(剛剛 / N 小時前 / 昨天 / N 天前)
+  // 6 小時內顯紅 + 跳動點,凸顯快訊感
+  (function () {
+    function relTime(iso) {
+      if (!iso) return { text: '—', fresh: false };
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return { text: iso.slice(0, 10), fresh: false };
+      var now = new Date();
+      var diffMin = Math.floor((now - d) / 60000);
+      if (diffMin < 1)  return { text: '剛剛',          fresh: true };
+      if (diffMin < 60) return { text: diffMin + ' 分鐘前', fresh: true };
+      var diffHr = Math.floor(diffMin / 60);
+      if (diffHr < 6)   return { text: diffHr + ' 小時前', fresh: true };
+      if (diffHr < 24)  return { text: diffHr + ' 小時前', fresh: false };
+      var diffDay = Math.floor(diffHr / 24);
+      if (diffDay === 1) return { text: '昨天',           fresh: false };
+      if (diffDay < 7)   return { text: diffDay + ' 天前', fresh: false };
+      // 超過 1 週 → 直接顯日期
+      return { text: iso.slice(0, 10), fresh: false };
+    }
+
+    document.querySelectorAll('.news-row').forEach(function (row) {
+      var pub = row.getAttribute('data-published');
+      if (!pub) return;
+      var info = relTime(pub);
+      var pill = row.querySelector('[data-time-pill]');
+      var text = row.querySelector('[data-time-text]');
+      var dot  = pill ? pill.querySelector('.live-dot') : null;
+      if (text) text.textContent = info.text;
+      if (info.fresh && pill) {
+        pill.classList.add('is-fresh');
+        if (dot) dot.style.display = 'inline-block';
+      }
+    });
+  })();
+</script>
+
+{% endblock %}

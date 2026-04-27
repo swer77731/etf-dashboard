@@ -13,7 +13,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from app.config import settings
-from app.services import dividend_sync, etf_universe, kbar_sync
+from app.services import dividend_sync, etf_universe, kbar_sync, news_sync
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,8 @@ def daily_sync_job() -> None:
         logger.info("[daily_sync] kbar: %s", k_stats)
         d_stats = dividend_sync.sync_all()
         logger.info("[daily_sync] dividend: %s", d_stats)
+        n_stats = news_sync.sync_recent()
+        logger.info("[daily_sync] news: %s", n_stats)
     except Exception:
         logger.exception("[daily_sync] failed")
     finally:

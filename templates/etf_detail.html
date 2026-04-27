@@ -192,7 +192,46 @@
   <div class="card-watermark">ETF Watch</div>
 </section>
 
-{# === 5. 即將推出 === #}
+{# === 5. 相關新聞 === #}
+{% if related_news %}
+<section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7 pb-12">
+  <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
+
+  <div class="card-content">
+    <header class="mb-5 flex items-baseline justify-between gap-4 flex-wrap">
+      <div class="flex items-center gap-3">
+        <div class="w-1 h-7 bg-accent rounded-full" style="box-shadow: 0 0 8px var(--c-accent-glow);"></div>
+        <div>
+          <h2 class="text-xl sm:text-2xl font-semibold">相關新聞</h2>
+          <div class="text-sm text-muted mt-1">最近 10 則 · 點看全文</div>
+        </div>
+      </div>
+      <a href="/news?etf={{ etf.code }}" class="text-sm text-accent hover:underline">看更多 →</a>
+    </header>
+
+    <ul class="divide-y divide-border/40">
+      {% for n in related_news %}
+      <li class="py-3 first:pt-0 last:pb-0">
+        <a href="{{ n.url }}" target="_blank" rel="noopener noreferrer"
+           class="block hover:bg-bg-soft/50 -mx-2 px-2 py-2 rounded-md transition group">
+          <div class="flex items-baseline gap-3 flex-wrap mb-1">
+            <span class="text-xs text-muted num">{{ n.published_at[:10] if n.published_at else "—" }}</span>
+            {% if n.source %}
+              <span class="text-xs text-muted">{{ n.source }}</span>
+            {% endif %}
+          </div>
+          <div class="text-base text-fg leading-snug group-hover:text-accent transition">{{ n.title }}</div>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="card-watermark">ETF Watch</div>
+</section>
+{% endif %}
+
+{# === 6. 即將推出 === #}
 <section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7 pb-12 opacity-70">
   <div class="card-content">
     <header class="mb-3 flex items-center gap-3">

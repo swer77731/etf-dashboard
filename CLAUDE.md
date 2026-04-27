@@ -137,6 +137,56 @@ session 死掉、context 滿、對話被壓縮都不要緊,
 
 ## 🚨 硬性紅線(這些不能動)
 
+### ⭐ 0. 資料主權鐵律(Data Sovereignty)— 最高優先級(2026-04-27 鎖定 by user)
+
+> 「外網是租來的,DB 是自己的。我們不依賴任何單一外部服務存活。客戶體驗永遠優先於資料即時性。」
+
+ETF 觀察室所有資料來源都是外網(FinMind / TWSE / 各發行商),
+外網不可控,我們的網站**必須具備「外網斷了還能跑」的抗風險能力**。
+
+#### 三層防禦(任何新功能都遵守)
+
+**第一層 — 資料抓取(`app/services/*_sync.py`)**
+- 所有抓資料的 service 統一放 `app/services/*_sync.py`
+- **只在 APScheduler 排程任務中執行**
+- 失敗有 retry / 有 fallback / 有 log
+- 抓到後**立刻寫進本地 DB**,不留 in-memory
+
+**第二層 — 本地 DB(SQLite + ORM)**
+- 所有 ETF / K 棒 / 配息 / 新聞 / 持股都進 DB
+- 每天 14:30 自動更新,**失敗不影響舊資料**
+- DB 是資料主權核心,定期 backup
+
+**第三層 — 使用者頁面(`templates/`)**
+- **100% 只讀本地 DB**
+- 完全不打外網
+- 即使 FinMind 倒閉,網站照跑
+- 即使排程當機,客戶看到的是「最後一次成功的資料」
+
+#### 未來功能延伸(同樣架構)
+
+任何新資料源都遵守這個架構:
+- 持股資料 → `etf_holding` table + `holding_sync.py`
+- 經理人資料 → `manager_info` table + `manager_sync.py`
+- 投信買賣超 → `institution_flow` table + `flow_sync.py`
+- 新聞 → `news` table + `news_sync.py`(已完成 ✅)
+
+#### 監控
+
+- 加 `/api/data-freshness` 端點,顯示每個資料表的最後更新時間
+- 若某個資料源 > 24 小時沒更新,後台警示
+
+#### Code review 紅線(違反 = bug)
+
+- ❌ 任何 `templates/*.html` 對應的 router 出現 `httpx` / `requests` / `urllib` 對外呼叫
+- ❌ 任何 `/api/*` 公開端點打外網
+- ❌ 任何 service 在 request 期間打外網
+- ✅ 對外抓取**只能**在 `services/*_sync.py` + APScheduler / `/admin/*` 後台手動觸發
+
+> ℹ️ 此鐵律之下的「使用者頁面 100% 讀本地 DB」(原 2026-04-26 鎖定)是其落地細則,不衝突。
+
+---
+
 ### 開發順序(2026-04-26 全面更新 / 8 Steps)
 
 ```
@@ -970,10 +1020,35 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
   - [x] 快速期間連結:當日 / YTD / 1Y / 3Y / 5Y
   - [x] 找不到代號 / 資料不足提示
   - [x] sidebar 主導航啟用「績效比較」
-- [ ] Step 4:新聞牆
-- [ ] Step 5:Telegram 推播
-- [ ] Step 6:會員系統
-- [ ] Step 7:訂閱金流
+- [x] Step 4:新聞牆 ✅ 2026-04-26
+  - [x] FinMind `TaiwanStockNews` dataset(每 ETF 單日查,寫入 `news` table)
+  - [x] `news_sync.sync_recent()` 主流 3 類(主動 21 + 市值 9 + 高股息 25)= 55 ETF × 2 日
+  - [x] URL 去重(同批 dict 去重 + 跨 batch existing query)
+  - [x] etf_tags JSON 自動疊加(同篇文章被多 ETF 命中時不重複)
+  - [x] `/news` 列表頁 + pagination(30 則一頁)
+  - [x] `/news?etf=0050` 單 ETF 過濾(`func.instr` JSON 子字串查詢)
+  - [x] ETF 詳情頁加「相關新聞」區塊(最近 10 則 + 看更多連結)
+  - [x] sidebar 主導航啟用「新聞」+ active 高亮
+  - [x] 排程加進 daily_sync_job 14:30(ETF universe → K 棒 → 配息 → 新聞)
+- [x] UX 批量改造 ✅ 2026-04-27
+  - [x] **資料主權鐵律**寫進 CLAUDE.md「核心紀律」最高優先級(三層防禦 + 監控)
+  - [x] `/api/etf/search?q=...` ETF autocomplete API(prefix 配對優先,排除 index 類別)
+  - [x] **Compare 頁 ETF chip 選擇器**:Alpine.js + 鍵盤導航(↑↓ Enter Backspace ✕)+ 上限 6 支
+  - [x] **Compare 頁日期輸入**:支援 `2025-01-01` / `2025/01/01` / `20250101` 三格式 + 日曆 picker(`showPicker()`)
+  - [x] **快速期間 chip**:YTD / 1y / 3y / 5y,active 狀態自動偵測
+  - [x] **累積報酬圖 legend affordance**:dashed banner「點 ETF 名稱可勾選 / 取消」+ 全部顯示/隱藏按鈕 + ECharts selector(全部/反向選)
+  - [x] **News 改快訊風格**:近 7 天預設 + 期間 tab(7/30/全部)+ 各 tab 顯示則數
+  - [x] **News 相對時間**:JS 即時計算「剛剛 / N 分鐘前 / N 小時前 / 昨天 / N 天前」,6h 內紅色 + 跳動點
+  - [x] **News 當日新聞紅縱線**:左側 3px 紅 bar 標示「今天的快訊」
+  - [x] **Sidebar 主導航字體放大**:0.9rem → 1rem + padding 加大 + icon 1.15rem,主導航 label 加重字
+- [ ] Phase 1A: `dividend_metrics.py` 共用 helper(殖利率 / 頻率推測 / 即將除息)
+- [ ] Phase 1B: 首頁第 4 區「下週配息公布欄」(月配 / 季配 / 半年年配 三組)
+- [ ] Phase 1C: ETF 詳情頁「下次配息預告 + 即時殖利率」卡
+- [ ] Phase 2A: 首頁瘦身(縮 hero / Top 5 / 6 類別卡 2x3 / 新聞 5 則)
+- [ ] Phase 2B: 各類別獨立排行頁 `/ranking/{category}`(完整 Top 10~30 + 多期間)
+- [ ] Phase 3:  `/dividend-calendar` 月曆 + 列表雙模式
+- [ ] Step 2.5 Phase 3:十大持股 + 產業分布(需爬蟲,獨立工程)
+- [ ] Step 6:會員系統(Step 5 TG 推播延後 / 訂閱金流 user 思考中)
 
 ---
 
@@ -1065,6 +1140,17 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
 - 舊寫法 `TemplateResponse("name.html", {"request": request, ...})` 會 deprecation warning
 - 新寫法 `TemplateResponse(request, "name.html", {...})` — request 變第一個位置參數
 - 教訓:之後寫 router 一律用新簽名
+
+### 2026-04-27 / UX / uvicorn `--reload` 沒掛 = 改完 server 不認新 endpoint
+- 症狀:加了 `/api/etf/search` 後 curl 401 Not Found,以為 router 沒接好,結果是 server 沒 reload
+- 確認:`Get-CimInstance Win32_Process` 看到 cmdline 是 `python -m uvicorn ... --log-level error`,**沒帶 `--reload`**
+- 解法:port-based kill (`Get-NetTCPConnection -LocalPort 8000 | Stop-Process`) → `python run.py` 重啟(run.py 帶 `reload=settings.debug`,debug=True)
+- 教訓:**dev 一律用 `python run.py` 起**,別用 `python -m uvicorn` 直跑(會漏 reload),省得改完不認
+
+### 2026-04-27 / UX / Bash 引號內 PowerShell `$_` 被當 shell 變數展開
+- 症狀:`powershell -Command "... | Where-Object { $_.State -eq 'Listen' }"` → bash 把 `$_.State` 當成變數展開成 `extglob.State`
+- 解法:**用 single quote 包整個 -Command**(`powershell -Command 'Where-Object { $_.State -eq ... }'`)或**用 -ExpandProperty 取代 $_**
+- 教訓:Windows + bash + powershell 三層引號,$_ 千萬別暴露在 bash 雙引號內
 
 ---
 
@@ -1332,3 +1418,4 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
 > 每次任務完成自動往下加一行,**最新的在最下面**。
 
 2026-04-26 09:30 | Step 1 骨架 | ✅ | FastAPI + SQLAlchemy 2.0 + SQLite + AsyncIOScheduler + 暗色首頁全部就緒,/api/health 與 heartbeat 皆驗證通過
+2026-04-27 08:00 | Step 4 News + UX 批量改造 | ✅ | 資料主權鐵律入 CLAUDE.md;ETF chip-autocomplete + 多格式日期 + 圖表 legend hint;新聞快訊化(7d 預設 + 相對時間 + 紅縱線);sidebar 字體放大;新增 Phase 1-3 規劃(配息公布欄 / 首頁瘦身 / 配息日曆)

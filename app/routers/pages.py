@@ -12,7 +12,7 @@ from datetime import date, datetime, timedelta
 from fastapi import HTTPException
 
 from app.config import PROJECT_ROOT, settings
-from app.services import etf_metrics, performance, ranking
+from app.services import etf_metrics, news_sync, performance, ranking
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +141,22 @@ async def compare(
     result = performance.compare_etfs(code_list, start_date, end_date)
     # 把 dataclass(slots=True 沒 __dict__)轉成 plain dict 給 template 與 ECharts JSON 用
     stats_dicts = [asdict(s) for s in result["stats"]]
+
+    # 合成 chip 顯示用的 codes_list — found 用完整資訊,not_found/insufficient 仍保留代號讓 user 看見
+    stats_by_code = {s["code"]: s for s in stats_dicts}
+    codes_list = []
+    for c in code_list:
+        if c in stats_by_code:
+            s = stats_by_code[c]
+            codes_list.append({
+                "code": c,
+                "name": s["name"],
+                "category": s["category"],
+                "category_label": s["category_label"],
+            })
+        else:
+            codes_list.append({"code": c, "name": "", "category": "", "category_label": ""})
+
     return templates.TemplateResponse(
         request, "compare.html",
         {
@@ -151,9 +167,55 @@ async def compare(
             },
             "form": {
                 "codes": ",".join(code_list),
+                "codes_list": codes_list,
                 "start": start_date.isoformat(),
                 "end": end_date.isoformat(),
             },
+        },
+    )
+
+
+_NEWS_DAYS_CHOICES = {"7": 7, "30": 30, "all": None}
+
+
+@router.get("/news", response_class=HTMLResponse)
+async def news(
+    request: Request,
+    etf: str | None = None,
+    page: int = 1,
+    days: str = "7",   # 7 / 30 / all,預設近 7 天(快訊)
+) -> HTMLResponse:
+    """新聞牆 — 100% 讀本地 news table。可選 ?etf=0050 過濾單一 ETF, ?days=7|30|all 切換期間。"""
+    page = max(1, page)
+    page_size = 30
+    offset = (page - 1) * page_size
+
+    days_int = _NEWS_DAYS_CHOICES.get(days, 7)
+    items = news_sync.list_recent_news(
+        etf_code=etf, limit=page_size, offset=offset, days=days_int,
+    )
+    total = news_sync.count_news(etf_code=etf, days=days_int)
+
+    # 7 天 / 30 天 / 全部 三個 tab 各自的總數,UI 顯示用
+    counts = {
+        "7":   news_sync.count_news(etf_code=etf, days=7),
+        "30":  news_sync.count_news(etf_code=etf, days=30),
+        "all": news_sync.count_news(etf_code=etf, days=None),
+    }
+
+    return templates.TemplateResponse(
+        request, "news.html",
+        {
+            **_common_ctx(),
+            "items": items,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "has_next": offset + page_size < total,
+            "etf_filter": etf.upper() if etf else None,
+            "days_filter": days if days in _NEWS_DAYS_CHOICES else "7",
+            "counts": counts,
+            "today_iso": date.today().isoformat(),
         },
     )
 
@@ -164,9 +226,10 @@ async def etf_detail(request: Request, code: str) -> HTMLResponse:
     detail = etf_metrics.get_etf_detail(code)
     if not detail:
         raise HTTPException(status_code=404, detail=f"找不到 ETF: {code}")
+    related_news = news_sync.list_recent_news(etf_code=code.upper(), limit=10)
     return templates.TemplateResponse(
         request, "etf_detail.html",
-        {**_common_ctx(), "etf": detail},
+        {**_common_ctx(), "etf": detail, "related_news": related_news},
     )
 
 
