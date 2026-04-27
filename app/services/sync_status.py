@@ -1,16 +1,22 @@
-"""sync_status 表的 helper(Phase 1B-2 Step 2)。
+"""sync_status 表的 helper(Phase 1B-2 Step 2 + 紀律 #20 升級)。
 
 提供一行 call 的 `record_sync_attempt()`,讓任何 _sync.py / persist() 結束後
-記錄成敗 + 筆數。
+記錄成敗 + 筆數 + 缺漏項目。
 
 落地紀律:
 - 失敗時 `last_success_at` **絕對不變**(舊資料仍可用、UI 知道幾天沒新)
 - 成功時 `last_error` 清回 None(避免幽靈警告)
 - `last_attempt_at` 不論成敗都更新
 - source 為 PK,每來源一筆;不存 attempt history(留給 log 系統)
+
+紀律 #20(2026-04-27 by user):
+- `missing` 參數 → 持久化進 missing_count + missing_items(JSON)
+- 成功且 missing 為空 → `retry_count = 0`(reset)
+- 失敗 → `retry_count` 不在這層處理(由排程層 retry escalation)
 """
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime
 from typing import Optional
@@ -24,6 +30,8 @@ logger = logging.getLogger(__name__)
 
 # 訊息上限(避免 stack trace 太長爆 DB)
 _ERROR_MAX_LEN = 1900
+# missing_items JSON 字串上限(避免 1000+ 缺漏 identifier 爆 DB)
+_MISSING_JSON_MAX_LEN = 8000
 
 
 def record_sync_attempt(
@@ -31,14 +39,17 @@ def record_sync_attempt(
     success: bool,
     rows: int = 0,
     error: Optional[str] = None,
+    missing: Optional[list[str]] = None,
 ) -> SyncStatus:
-    """記錄一次同步嘗試。
+    """記錄一次同步嘗試(紀律 #20 升級版)。
 
     Args:
-        source: 資料源代號(eg. 'twse_announce')
+        source: 資料源代號(eg. 'twse_announce', 'holdings_yuanta')
         success: 是否成功
         rows: 此次寫入筆數(失敗通常 0)
         error: 失敗訊息(success=True 時應傳 None)
+        missing: 缺漏的 identifier 清單(例:['0050', '00981A'])
+                 紀律 #20 — 預期應抓但未抓到的項目,寫進 missing_count + missing_items
 
     Returns:
         更新後的 SyncStatus row(已 detach,可安全在 session 外讀取)。
@@ -47,6 +58,17 @@ def record_sync_attempt(
     err_msg: Optional[str] = None
     if not success:
         err_msg = (error or "unknown error")[:_ERROR_MAX_LEN]
+
+    miss_list = list(missing or [])
+    miss_count = len(miss_list)
+    miss_json = json.dumps(miss_list, ensure_ascii=False)
+    if len(miss_json) > _MISSING_JSON_MAX_LEN:
+        # 太長就截斷,只留前 N 個 + 標記
+        truncated = miss_list[: max(1, _MISSING_JSON_MAX_LEN // 20)]
+        miss_json = json.dumps(
+            truncated + [f"...(+{miss_count - len(truncated)} more)"],
+            ensure_ascii=False,
+        )
 
     with session_scope() as s:
         row = s.scalar(select(SyncStatus).where(SyncStatus.source == source))
@@ -57,20 +79,28 @@ def record_sync_attempt(
                 last_success_at=now if success else None,
                 last_error=None if success else err_msg,
                 rows_synced=rows,
+                retry_count=0,
+                missing_count=miss_count,
+                missing_items=miss_json,
             )
             s.add(row)
         else:
-            # 永遠更新 attempt + rows
+            # 永遠更新 attempt + rows + missing
             row.last_attempt_at = now
             row.rows_synced = rows
+            row.missing_count = miss_count
+            row.missing_items = miss_json
             if success:
                 row.last_success_at = now
                 row.last_error = None
+                # 成功 + 無缺漏 → retry 計數歸零(紀律 #20)
+                if miss_count == 0:
+                    row.retry_count = 0
             else:
-                # 紀律:失敗不動 last_success_at
+                # 紀律 #16 #20 延續:失敗不動 last_success_at
                 row.last_error = err_msg
+                # retry_count 不在這層加(由排程 retry escalation 自己加)
 
-        # commit 後 expunge 給 caller 用
         s.flush()
         s.expunge(row)
     return row
@@ -148,7 +178,25 @@ if __name__ == "__main__":
     assert r.rows_synced == 12
     print("  [PASS]")
 
-    print("\n--- Test 4: get_sync_status / list_all_sync_status ---")
+    print("\n--- Test 4: missing 參數(紀律 #20)---")
+    r = record_sync_attempt(
+        "test_source", success=False, rows=8, error="2 etfs failed",
+        missing=["00939", "00984D"],
+    )
+    print(f"  missing_count={r.missing_count} missing_items={r.missing_items}")
+    assert r.missing_count == 2
+    assert "00939" in r.missing_items and "00984D" in r.missing_items
+    print("  [PASS] missing 持久化")
+
+    # 紀律 #20:成功 + 無缺漏 → retry_count = 0
+    r = record_sync_attempt("test_source", success=True, rows=10, missing=[])
+    print(f"  after success retry_count={r.retry_count} missing_count={r.missing_count}")
+    assert r.retry_count == 0
+    assert r.missing_count == 0
+    assert r.missing_items == "[]"
+    print("  [PASS] retry_count reset")
+
+    print("\n--- Test 5: get_sync_status / list_all_sync_status ---")
     one = get_sync_status("test_source")
     assert one is not None
     print(f"  get_sync_status('test_source') = {one}")

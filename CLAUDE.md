@@ -102,6 +102,76 @@ session 死掉、context 滿、對話被壓縮都不要緊,
 進度區塊裡的失敗也要明確標示 ❌,不要用模糊用詞掩蓋。
 **失敗策略也是教材**,留著供下次參考。
 
+### 20. 資料完整性鐵律 ⭐(2026-04-27 鎖定 by user — 鐵律)
+
+> 「該更新的資料必須確認真的更新了。沒更新到的必須回頭重抓。不准把『跑過』當成『跑完』。」— user 原話
+
+#### 核心原則
+- 該更新的資料 → **必須確認真的更新了**
+- 沒更新到的 → **必須回頭重抓**
+- **不准**把「跑過」當成「跑完」
+
+#### 實作要求(全 sync source 都要走)
+
+**1. 每次 sync 跑完必算【完整性指標】**
+- `expected`:應更新筆數(例:`etf_list.is_active` 數量)
+- `actual`:實際更新筆數(該批 sync 寫入 distinct identifier 數)
+- `missing`:expected - actual,清單形式
+
+**2. 缺漏 > 0 → 自動 retry**(實作於排程層)
+- 30 分鐘 → 1 小時 → 連續 3 次失敗 critical log + 通知 user
+- 用 APScheduler one-shot job 排程
+
+**3. sync_status 表完整紀錄**
+- `last_success_at` / `last_attempt_at` / `last_error`
+- `retry_count`(連續失敗次數,成功後歸零)
+- `missing_count`(最後一次缺漏數)
+- `missing_items`(JSON list of missing identifiers,例:`["00939", "00984D"]`)
+
+**4. 不准 silent fail**
+- try / except 必須 log
+- 不要吞錯誤
+- 失敗訊息走 `_redact()`(紀律 #18)
+
+#### 應抓筆數判斷分兩類
+
+**A. ETF-by-ETF sync**(K 棒 / 配息 / 持股)
+- expected = `etf_list.is_active = True` 筆數(相關類別)
+- actual = 該 sync 寫入 distinct etf_id 數
+- missing = expected - actual
+
+**B. 批次全量 sync**(news / etf_universe 本身)
+- 用「sync 函式有沒有 raise exception」判斷
+- 無 exception + sync_status 寫成功 = OK
+
+#### `record_sync_attempt()` 規範
+```python
+record_sync_attempt(
+    source="holdings_yuanta",
+    success=False,
+    rows=42,
+    error="...",
+    missing=["0050", "00981A"],   # 紀律 #20 — 缺漏 identifier 清單
+)
+```
+- 寫入 `missing_count = len(missing)` + `missing_items = json.dumps(missing)`
+- 失敗時 `last_success_at` **不變**(紀律延續)
+- 成功且 missing 為空 → `retry_count = 0`(reset)
+- 失敗 → `retry_count` 不在這層加(由排程層做 escalation)
+
+#### 監控頁(待實作)
+- `/admin/sync_status` 列出全部 source 的 last_success_at / 缺漏 / retry 次數
+- 缺漏 > 0 或 retry_count >= 3 → 紅色警示
+
+#### 既有 sync 改造路線(週末工作)
+- `dividend_sync` / `news_sync` / `etf_universe` / `kbar_sync` / `dividend_announce_sync`
+- 全部加 missing 偵測 + 改用 `record_sync_attempt(missing=...)`
+- 一個 source 一個 commit,逐步上線
+
+跟紀律 #11 / #14 / #15 / #16 / #17 / #18 / #19 一起鎖,**再犯記點**。
+
+---
+
 ### 19. 設計核心 ⭐(2026-04-27 鎖定 by user — 設計憲法)
 
 > 「清晰、簡單、無腦、大一點點。網站給散戶看的不是『功能多寡』,是『不用想就會用』。」— user 原話
