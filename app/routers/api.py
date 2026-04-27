@@ -70,37 +70,59 @@ async def quota() -> dict:
     }
 
 
+# CMoney 揭露 ETF Top 10 持股,完整 batch 應該 10 筆。Sync 偶爾被截
+# 半路(收盤前未公告完整、CMoney rate-limit、timeout)→ 寫進 5 筆就 commit。
+# API 應該避開不完整 batch,讓前端永遠看到完整圖景。
+HOLDINGS_TARGET_ROWS = 10
+
+
 @router.get("/etf/{code}/holdings")
 async def get_etf_holdings(
     code: str,
     session: Session = Depends(get_session),
 ) -> dict:
-    """ETF 持股 — 取最新 batch(latest updated_at)的 Top 10。
+    """ETF 持股 — 取「最新有 ≥ 10 筆」的 batch(自動跳過不完整 batch)。
 
     100% 讀本地 holdings table(資料主權鐵律)。
+    若連一個完整 batch 都沒有,降級回傳最新批次 + is_partial=True。
     """
     code = code.upper()
     etf = session.scalar(select(ETF).where(ETF.code == code))
     if not etf:
         raise HTTPException(404, f"ETF not found: {code}")
 
-    # 找最新 batch 時間
-    latest_batch = session.scalar(
+    # Step 1:找「最新有 ≥ 10 筆」的 batch
+    complete_batch = session.scalar(
+        select(Holding.updated_at)
+        .where(Holding.etf_id == etf.id)
+        .group_by(Holding.updated_at)
+        .having(func.count(Holding.id) >= HOLDINGS_TARGET_ROWS)
+        .order_by(Holding.updated_at.desc())
+        .limit(1)
+    )
+
+    # Step 2:沒完整 batch → fallback 最新 batch(避免空畫面)
+    chosen_batch = complete_batch or session.scalar(
         select(func.max(Holding.updated_at)).where(Holding.etf_id == etf.id)
     )
-    if latest_batch is None:
-        return {"code": code, "name": etf.name, "updated_at": None, "holdings": []}
+    if chosen_batch is None:
+        return {
+            "code": code, "name": etf.name,
+            "updated_at": None, "holdings": [], "is_partial": False,
+        }
 
+    # Step 3:拿選中 batch 的 rows
     rows = session.scalars(
         select(Holding)
         .where(Holding.etf_id == etf.id)
-        .where(Holding.updated_at == latest_batch)
+        .where(Holding.updated_at == chosen_batch)
         .order_by(Holding.rank.asc())
     ).all()
     return {
         "code": code,
         "name": etf.name,
-        "updated_at": latest_batch.isoformat() if latest_batch else None,
+        "updated_at": chosen_batch.isoformat(),
+        "is_partial": len(rows) < HOLDINGS_TARGET_ROWS,
         "holdings": [{
             "rank": r.rank,
             "stock_code": r.stock_code,
