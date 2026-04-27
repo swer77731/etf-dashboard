@@ -148,13 +148,16 @@ def get_etf_detail(code: str, today: date | None = None) -> dict | None:
         ]
 
         # 同期間 TAIEX(用 raw close)
+        # 對齊邏輯:< 1 年的 ETF,TAIEX 也截到 ETF 起點 → 兩條線同起點 = 100,
+        # 視覺對齊不會出現「TAIEX 滿格 + ETF 只佔右半邊」的怪畫面。
+        taiex_start = trend_rows[0][0] if trend_rows else one_year_ago
         taiex = session.scalar(select(ETF).where(ETF.code == TAIEX_CODE))
         taiex_series: list[dict] = []
         if taiex:
             t_rows = session.execute(
                 select(DailyKBar.date, DailyKBar.close)
                 .where(DailyKBar.etf_id == taiex.id)
-                .where(DailyKBar.date >= one_year_ago)
+                .where(DailyKBar.date >= taiex_start)
                 .order_by(DailyKBar.date.asc())
             ).all()
             taiex_series = [
