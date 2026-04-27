@@ -249,6 +249,37 @@ def get_upcoming_dividends(days: int = 14, today: date | None = None,
     }
 
 
+def get_dividends_in_range(start: date, end: date) -> list[dict]:
+    """區間內(含端點)所有 active 非 index ETF 的配息事件,給 /dividend-calendar 用。
+
+    依 ex_date 升冪。NULL cash_dividend 也帶進(代表「已公告日期但金額未定」)。
+    """
+    out: list[dict] = []
+    with session_scope() as s:
+        rows = s.execute(
+            select(Dividend, ETF)
+            .join(ETF, Dividend.etf_id == ETF.id)
+            .where(ETF.is_active.is_(True))
+            .where(ETF.category != "index")
+            .where(Dividend.ex_date >= start)
+            .where(Dividend.ex_date <= end)
+            .where((Dividend.cash_dividend > 0) | Dividend.cash_dividend.is_(None))
+            .order_by(Dividend.ex_date.asc(), ETF.code.asc())
+        ).all()
+
+        for d, etf in rows:
+            out.append({
+                "code": etf.code,
+                "name": etf.name,
+                "category": etf.category,
+                "ex_date": d.ex_date.isoformat(),
+                "payment_date": d.payment_date.isoformat() if d.payment_date else None,
+                "cash_dividend": d.cash_dividend,
+                "announce_date": d.announce_date.isoformat() if d.announce_date else None,
+            })
+    return out
+
+
 @dataclass(slots=True)
 class YieldRange:
     days: int

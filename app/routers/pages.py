@@ -242,6 +242,103 @@ async def news(
     )
 
 
+def _parse_ym(ym: str | None, today: date) -> tuple[int, int]:
+    """ym = "YYYY-MM",fallback 當前月。"""
+    if ym:
+        try:
+            y, m = ym.split("-", 1)
+            yi, mi = int(y), int(m)
+            if 1 <= mi <= 12 and 1900 <= yi <= 2999:
+                return yi, mi
+        except (ValueError, TypeError):
+            pass
+    return today.year, today.month
+
+
+def _month_range(year: int, month: int) -> tuple[date, date, int, int]:
+    """傳回 (first_day, last_day, prev_y, prev_m, next_y, next_m) 的前 4 個。
+
+    為了同時拿到鄰月導覽,call site 可依需要再算。
+    """
+    import calendar
+    first = date(year, month, 1)
+    last_day_num = calendar.monthrange(year, month)[1]
+    last = date(year, month, last_day_num)
+    return first, last, year, month
+
+
+@router.get("/dividend-calendar", response_class=HTMLResponse)
+async def dividend_calendar(
+    request: Request,
+    ym: str | None = None,
+    mode: str = "cal",
+) -> HTMLResponse:
+    """配息日曆 — 月曆 / 列表雙模式(Phase 3)。
+
+    URL: /dividend-calendar?ym=2026-04&mode=cal
+    mode: cal(月曆) / list(列表)
+    """
+    import calendar as _cal
+    today = date.today()
+    year, month = _parse_ym(ym, today)
+    first, last, _, _ = _month_range(year, month)
+
+    # 鄰月導覽
+    prev_y, prev_m = (year - 1, 12) if month == 1 else (year, month - 1)
+    next_y, next_m = (year + 1, 1) if month == 12 else (year, month + 1)
+
+    # 本月所有配息事件
+    try:
+        events = dividend_metrics.get_dividends_in_range(first, last)
+    except Exception:
+        logger.exception("[dividend_calendar] failed ym=%s-%s", year, month)
+        events = []
+
+    # 按日期分組(月曆 + 列表共用)
+    events_by_day: dict[str, list] = {}
+    for e in events:
+        events_by_day.setdefault(e["ex_date"], []).append(e)
+
+    # 月曆網格 — 6 列 x 7 欄(週一起算,週日為一週終點符合台灣習慣)
+    # 我們用週日為 col 0(更符合台灣月曆習慣)
+    cal = _cal.Calendar(firstweekday=6)   # 6 = Sunday
+    weeks: list[list[dict | None]] = []
+    for week in cal.monthdatescalendar(year, month):
+        row: list[dict | None] = []
+        for day in week:
+            if day.month != month:
+                row.append(None)   # 鄰月空格
+                continue
+            iso = day.isoformat()
+            row.append({
+                "iso": iso,
+                "day": day.day,
+                "is_today": (day == today),
+                "weekday": day.weekday(),   # 0=Mon..6=Sun
+                "events": events_by_day.get(iso, []),
+            })
+        weeks.append(row)
+
+    return templates.TemplateResponse(
+        request, "dividend_calendar.html",
+        {
+            **_common_ctx(),
+            "year": year,
+            "month": month,
+            "mode": mode if mode in ("cal", "list") else "cal",
+            "weeks": weeks,
+            "events": events,
+            "events_by_day": events_by_day,
+            "total_events": len(events),
+            "prev_ym": f"{prev_y:04d}-{prev_m:02d}",
+            "next_ym": f"{next_y:04d}-{next_m:02d}",
+            "today_ym": f"{today.year:04d}-{today.month:02d}",
+            "today_iso": today.isoformat(),
+            "is_current_month": (year == today.year and month == today.month),
+        },
+    )
+
+
 _RANKING_KIND_LABEL: dict[str, dict] = {
     "top":          {"label": "近月最火 ETF", "subtitle": "不分類別,看誰最近表現最強"},
     "active":       {"label": "主動式 ETF", "subtitle": "基金經理人選股,可彈性調整持股"},

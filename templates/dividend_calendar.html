@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+
+{% block title %}配息日曆 — {{ brand_full }}{% endblock %}
+
+{% block head %}
+<style>
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .cal-cell {
+    background: rgb(var(--c-bg-soft));
+    border: 1px solid rgb(var(--c-border));
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.5rem 0.6rem;
+    min-height: 5.5rem;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .cal-cell.is-empty {
+    background: transparent;
+    border-color: transparent;
+  }
+  .cal-cell.is-today {
+    border: 1.5px solid rgb(var(--c-accent));
+    box-shadow: 0 0 0 1px rgb(var(--c-accent) / 0.2);
+  }
+  .cal-cell.has-events {
+    background: rgb(var(--c-card));
+  }
+  .cal-day-num {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: rgb(var(--c-fg));
+    margin-bottom: 0.35rem;
+  }
+  .cal-day-num.is-sunday { color: rgb(239 68 68); }   /* 紅色週日,台灣習慣 */
+  .cal-day-num.is-saturday { color: rgb(96 165 250); }
+  .cal-event-pill {
+    display: block;
+    font-size: 0.72rem;
+    line-height: 1.2;
+    padding: 2px 5px;
+    border-radius: 0.25rem;
+    background: rgb(var(--c-accent) / 0.12);
+    border: 1px solid rgb(var(--c-accent) / 0.3);
+    color: rgb(var(--c-accent));
+    margin-bottom: 2px;
+    font-family: ui-monospace, monospace;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .cal-event-pill:hover {
+    background: rgb(var(--c-accent) / 0.25);
+  }
+  .cal-events-more {
+    font-size: 0.7rem;
+    color: rgb(var(--c-muted));
+    margin-top: auto;
+  }
+  .cal-weekday-head {
+    font-size: 0.85rem;
+    color: rgb(var(--c-muted));
+    text-align: center;
+    padding: 0.5rem 0;
+    font-weight: 500;
+  }
+  .cal-weekday-head.is-sunday { color: rgb(239 68 68); }
+  .cal-weekday-head.is-saturday { color: rgb(96 165 250); }
+
+  /* 列表模式 */
+  .list-day-header {
+    background: rgb(var(--c-bg-soft));
+    border-left: 3px solid rgb(var(--c-accent));
+    padding: 0.5rem 0.85rem;
+    border-radius: 0.25rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    margin-top: 1rem;
+  }
+  .list-day-header:first-child { margin-top: 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# === Hero === #}
+<section class="mb-6 relative">
+  <div class="text-xs text-muted tracking-widest mb-2">
+    <a href="/" class="hover:text-accent">首頁</a>
+    <span class="mx-1">/</span>
+    <span>配息日曆</span>
+  </div>
+
+  <h1 class="text-2xl sm:text-3xl font-bold mb-2 tracking-tight leading-tight">
+    <span class="hero-text">配息日曆</span>
+  </h1>
+  <p class="text-sm sm:text-base text-muted">
+    全市場 ETF 即將除息日期一覽 · 資料來源:台灣證券交易所 / 公開公告
+  </p>
+</section>
+
+{# === 月份導覽 + 模式切換 === #}
+<section class="mb-6 flex flex-wrap items-center gap-3 justify-between">
+  {# 月份切換 #}
+  <div class="flex items-center gap-2">
+    <a href="/dividend-calendar?ym={{ prev_ym }}&mode={{ mode }}"
+       class="px-3 py-2 rounded-md bg-bg-soft border border-border hover:border-accent/50 text-sm">
+      ‹ {{ prev_ym }}
+    </a>
+    <div class="px-4 py-2 rounded-md bg-card border border-border text-base sm:text-lg font-semibold num">
+      {{ "%04d"|format(year) }} 年 {{ month }} 月
+    </div>
+    <a href="/dividend-calendar?ym={{ next_ym }}&mode={{ mode }}"
+       class="px-3 py-2 rounded-md bg-bg-soft border border-border hover:border-accent/50 text-sm">
+      {{ next_ym }} ›
+    </a>
+    {% if not is_current_month %}
+    <a href="/dividend-calendar?ym={{ today_ym }}&mode={{ mode }}"
+       class="px-3 py-2 rounded-md text-sm text-accent hover:underline">回到本月</a>
+    {% endif %}
+  </div>
+
+  {# 模式切換 #}
+  <div class="flex gap-2">
+    <a href="/dividend-calendar?ym={{ '%04d-%02d'|format(year, month) }}&mode=cal"
+       class="px-4 py-2 rounded-md text-sm sm:text-base border transition
+              {% if mode == 'cal' %}bg-accent text-white border-accent font-semibold
+              {% else %}bg-bg-soft text-fg border-border hover:border-accent/50{% endif %}">
+      月曆
+    </a>
+    <a href="/dividend-calendar?ym={{ '%04d-%02d'|format(year, month) }}&mode=list"
+       class="px-4 py-2 rounded-md text-sm sm:text-base border transition
+              {% if mode == 'list' %}bg-accent text-white border-accent font-semibold
+              {% else %}bg-bg-soft text-fg border-border hover:border-accent/50{% endif %}">
+      列表
+    </a>
+  </div>
+</section>
+
+{# === 統計摘要 === #}
+<section class="mb-6">
+  <div class="text-sm sm:text-base text-muted">
+    本月共 <span class="text-accent font-semibold num">{{ total_events }}</span> 筆除息事件
+    {% if total_events == 0 %}
+      · <span class="text-muted/80">未來資料目前由公開公告補充,如尚未公告則顯示空白</span>
+    {% endif %}
+  </div>
+</section>
+
+{# === 月曆模式 === #}
+{% if mode == "cal" %}
+<section class="relative overflow-hidden section-card rounded-xl p-4 sm:p-5 mb-7">
+  <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
+
+  <div class="card-content">
+    {# 週一頭 — 週日為 col 0 #}
+    <div class="cal-grid mb-2">
+      {% for w in ["週日", "週一", "週二", "週三", "週四", "週五", "週六"] %}
+      <div class="cal-weekday-head
+        {% if loop.index0 == 0 %}is-sunday{% elif loop.index0 == 6 %}is-saturday{% endif %}">
+        {{ w }}
+      </div>
+      {% endfor %}
+    </div>
+
+    {# 月曆主體 #}
+    {% for week in weeks %}
+    <div class="cal-grid mb-1">
+      {% for d in week %}
+        {% if d is none %}
+          <div class="cal-cell is-empty"></div>
+        {% else %}
+          <div class="cal-cell {% if d.is_today %}is-today{% endif %} {% if d.events %}has-events{% endif %}">
+            <div class="cal-day-num
+              {% if loop.index0 == 0 %}is-sunday{% elif loop.index0 == 6 %}is-saturday{% endif %}">
+              {{ d.day }}
+              {% if d.is_today %}<span class="text-xs text-accent">·今</span>{% endif %}
+            </div>
+            {% for ev in d.events[:3] %}
+              <a href="/etf/{{ ev.code }}" class="cal-event-pill" title="{{ ev.name }}{% if ev.cash_dividend %} · {{ ev.cash_dividend }} 元{% endif %}">
+                {{ ev.code }}
+              </a>
+            {% endfor %}
+            {% if d.events|length > 3 %}
+              <div class="cal-events-more">+{{ d.events|length - 3 }} 支</div>
+            {% endif %}
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  <div class="card-watermark">ETF Watch</div>
+</section>
+
+{% else %}
+{# === 列表模式 === #}
+<section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7">
+  <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
+  <div class="card-content">
+    {% if events %}
+      {# 用 events_by_day,按日期升冪 — 但 events_by_day dict 有可能不保序,直接用 events list 順序輸出 #}
+      {% set ns = namespace(last_day="") %}
+      {% for ev in events %}
+        {% if ev.ex_date != ns.last_day %}
+          {% if not loop.first %}</ul>{% endif %}
+          <div class="list-day-header text-base sm:text-lg num">
+            {{ ev.ex_date }}
+            <span class="ml-2 text-sm text-muted font-normal">
+              ({{ events_by_day[ev.ex_date]|length }} 支)
+            </span>
+            {% if ev.ex_date == today_iso %}
+            <span class="ml-2 text-xs text-accent font-normal">· 今天</span>
+            {% endif %}
+          </div>
+          <ul class="divide-y divide-border/40">
+          {% set ns.last_day = ev.ex_date %}
+        {% endif %}
+
+          <li class="py-3 flex items-center gap-3 num">
+            <a href="/etf/{{ ev.code }}" class="flex-1 min-w-0 hover:underline group">
+              <div class="flex items-baseline gap-3">
+                <span class="font-mono text-base sm:text-lg text-accent">{{ ev.code }}</span>
+                <span class="text-sm sm:text-base text-fg/90 truncate">{{ ev.name }}</span>
+              </div>
+            </a>
+            <div class="text-right whitespace-nowrap">
+              {% if ev.cash_dividend %}
+                <div class="text-base sm:text-lg font-semibold text-up">
+                  {{ "%.4f"|format(ev.cash_dividend) }} 元
+                </div>
+              {% else %}
+                <div class="text-sm text-muted italic">金額未公告</div>
+              {% endif %}
+              {% if ev.payment_date %}
+                <div class="text-xs text-muted">入帳 {{ ev.payment_date }}</div>
+              {% endif %}
+            </div>
+          </li>
+
+        {% if loop.last %}</ul>{% endif %}
+      {% endfor %}
+    {% else %}
+      <div class="text-sm sm:text-base text-muted py-12 text-center">
+        本月尚無已公告的除息事件。
+      </div>
+    {% endif %}
+  </div>
+  <div class="card-watermark">ETF Watch</div>
+</section>
+{% endif %}
+
+<section class="text-xs text-muted text-center mt-12 mb-6 max-w-2xl mx-auto leading-relaxed px-4">
+  資料來源:台灣證券交易所 / 公開公告 · 未來除息日依 ETF 發行商最新公告為準
+</section>
+
+{% endblock %}
