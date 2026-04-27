@@ -4,7 +4,9 @@
 URL: https://www.twse.com.tw/exchangeReport/TWT48U?response=json&strDate=...&endDate=...
 
 【目前範圍】
-本 Step 只做 fetch + parse + 過期過濾,**不接 DB、不接 scheduler、不碰 sync_status**。
+- fetch_twse: 抓 + parse + 過期過濾(不接 DB)
+- persist:   etf_list 過濾 + UPSERT dividend table + sync_status 紀錄
+
 獨立可跑:`python -m app.services.dividend_announce_sync`
 
 【落地紀律】
@@ -16,10 +18,12 @@ URL: https://www.twse.com.tw/exchangeReport/TWT48U?response=json&strDate=...&end
 - announce_date / payment_date TWSE 沒給,**留給後續 dividend_sync(FinMind)補**
 - 純股票股利("權")→ skip(我們關心 cash)
 
-【UPSERT 規則(實作 persist 時必須遵守)】
-歷史 sync 已有的非 NULL 欄位(例如 fiscal_year=2024)
-**不能被新進的 NULL 蓋掉**。
-未來寫 persist() 時,只更新明確有值的欄位,NULL 不覆寫。
+【UPSERT 鐵律(已實作於 persist)】
+- cash_dividend = None **不寫入該欄**(保留既有值,避免歷史值被未公告值蓋掉)
+- announce_date / payment_date / fiscal_year **永遠以非 NULL 為優先**(同上)
+- 個股 / REIT / 不在 etf_list 的代號 → skip 不寫入(REIT 已在 fetch 層擋,
+  個股在 persist 層用 etf_list lookup 擋)
+- 實作:`COALESCE(excluded.col, dividend.col)` — 新值非 NULL 才覆蓋
 """
 from __future__ import annotations
 
@@ -29,6 +33,13 @@ from datetime import date, timedelta
 from typing import Any
 
 import httpx
+from sqlalchemy import func, select
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+
+from app.database import session_scope
+from app.models.dividend import Dividend
+from app.models.etf import ETF
+from app.services.sync_status import record_sync_attempt
 
 logger = logging.getLogger(__name__)
 
@@ -209,32 +220,131 @@ def fetch_twse(start: date, end: date,
     return out
 
 
+SYNC_SOURCE = "twse_dividend_announce"
+
+
+def persist(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """把 fetch_twse 結果寫入 dividend table。
+
+    - 對 etf_list 做 lookup,個股 / REIT / 不在清單的全 skip
+    - UPSERT(on_conflict_do_update),只更新 cash_dividend
+      (其他欄位 announce_date / payment_date / stock_dividend / fiscal_year
+       TWSE 預告沒給,不在 INSERT values 也不在 on_conflict set_,既有值保留)
+    - cash_dividend 走 COALESCE:新值非 NULL 才覆蓋,NULL 不蓋既有非 NULL
+    - 結尾呼叫 record_sync_attempt(SYNC_SOURCE, ...)
+
+    Returns:
+        {'kept': int, 'skipped_not_etf': int, 'errors': list[str]}
+    """
+    stats: dict[str, Any] = {"kept": 0, "skipped_not_etf": 0, "errors": []}
+
+    if not rows:
+        record_sync_attempt(SYNC_SOURCE, success=True, rows=0)
+        return stats
+
+    # 1. etf_list 過濾(個股 / 不在清單的 code 砍掉)
+    codes_in_rows = list({r["code"] for r in rows})
+    with session_scope() as s:
+        etf_map: dict[str, int] = dict(
+            s.execute(
+                select(ETF.code, ETF.id).where(ETF.code.in_(codes_in_rows))
+            ).all()
+        )
+
+    payload: list[dict[str, Any]] = []
+    for r in rows:
+        etf_id = etf_map.get(r["code"])
+        if etf_id is None:
+            stats["skipped_not_etf"] += 1
+            continue
+        payload.append({
+            "etf_id": etf_id,
+            "ex_date": r["ex_date"],
+            "cash_dividend": r["cash_dividend"],   # 可能是 None(待公告)
+        })
+
+    # 2. UPSERT — COALESCE 保護既有非 NULL
+    if payload:
+        try:
+            with session_scope() as s:
+                for chunk_start in range(0, len(payload), 200):
+                    chunk = payload[chunk_start:chunk_start + 200]
+                    stmt = sqlite_insert(Dividend).values(chunk)
+                    stmt = stmt.on_conflict_do_update(
+                        index_elements=["etf_id", "ex_date"],
+                        set_={
+                            # 鐵律:新值 NULL 時不蓋掉既有值
+                            "cash_dividend": func.coalesce(
+                                stmt.excluded.cash_dividend,
+                                Dividend.cash_dividend,
+                            ),
+                        },
+                    )
+                    s.execute(stmt)
+            stats["kept"] = len(payload)
+        except Exception as e:
+            logger.exception("[persist] UPSERT failed")
+            stats["errors"].append(f"{type(e).__name__}: {e}")
+
+    # 3. sync_status 紀錄
+    success = not stats["errors"]
+    record_sync_attempt(
+        SYNC_SOURCE,
+        success=success,
+        rows=stats["kept"],
+        error="; ".join(stats["errors"]) if stats["errors"] else None,
+    )
+
+    logger.info(
+        "[persist] kept=%d skipped_not_etf=%d errors=%d",
+        stats["kept"], stats["skipped_not_etf"], len(stats["errors"]),
+    )
+    return stats
+
+
 if __name__ == "__main__":
-    """獨立執行驗證 — 印出前 X 筆 raw + filtered 結果。"""
+    """獨立執行:fetch + persist + 驗收。
+
+    驗收範圍(紀律 #14:不加碼):
+    - dividend table 有 6 支 ETF 的未來除息日
+    - sync_status 有 'twse_dividend_announce' 一筆,rows_synced=6
+    """
     logging.basicConfig(
         level=logging.INFO,
         format="%(levelname)-7s | %(name)s | %(message)s",
     )
 
+    from app.models.sync_status import SyncStatus
+
     today = date.today()
     end = today + timedelta(days=120)
 
-    print(f"\n=== TWSE TWT48U Fetch ===")
-    print(f"窗口:{today}  →  {end}\n")
+    print(f"\n=== fetch_twse({today} ~ {end}) ===")
+    rows = fetch_twse(today, end, today=today)
+    print(f"fetched {len(rows)} rows")
 
-    try:
-        rows = fetch_twse(today, end, today=today)
-    except Exception as e:
-        print(f"❌ FAILED: {type(e).__name__}: {e}")
-        raise
+    print(f"\n=== persist ===")
+    stats = persist(rows)
+    print(f"stats: {stats}")
 
-    print(f"\n=== 解析結果({len(rows)} 筆 ex_date >= today)===\n")
-    print(f"{'代號':<8} {'除息日':<12} {'現金股利':<12} 名稱")
-    print("-" * 60)
-    for r in sorted(rows, key=lambda x: (x["ex_date"], x["code"])):
-        cash_s = f"{r['cash_dividend']:.4f}" if r["cash_dividend"] is not None else "待公告"
-        print(f"{r['code']:<8} {str(r['ex_date']):<12} {cash_s:<12} {r['name_from_source']}")
+    # 驗收 1:dividend table 未來除息日的 ETF 筆數
+    print(f"\n=== verify ===")
+    with session_scope() as s:
+        future = s.execute(
+            select(Dividend.ex_date, ETF.code, Dividend.cash_dividend)
+            .join(ETF, Dividend.etf_id == ETF.id)
+            .where(Dividend.ex_date >= today)
+            .order_by(Dividend.ex_date.asc(), ETF.code.asc())
+        ).all()
+        print(f"dividend rows with ex_date >= today: {len(future)}")
+        for ex, code, cash in future:
+            cash_s = f"{cash:.4f}" if cash is not None else "NULL"
+            print(f"  {ex}  {code:<8} cash={cash_s}")
 
-    # 統計
-    has_cash = sum(1 for r in rows if r["cash_dividend"] is not None)
-    print(f"\n統計:已公告金額 {has_cash} / 待公告 {len(rows) - has_cash}")
+        # 驗收 2:sync_status 有紀錄
+        ss = s.scalar(select(SyncStatus).where(SyncStatus.source == SYNC_SOURCE))
+        if ss:
+            print(f"\nsync_status: source={ss.source} success_at={ss.last_success_at} "
+                  f"rows={ss.rows_synced} error={ss.last_error!r}")
+        else:
+            print("\nsync_status: NOT FOUND (FAIL)")
