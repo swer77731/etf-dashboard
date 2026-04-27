@@ -102,6 +102,33 @@ session 死掉、context 滿、對話被壓縮都不要緊,
 進度區塊裡的失敗也要明確標示 ❌,不要用模糊用詞掩蓋。
 **失敗策略也是教材**,留著供下次參考。
 
+### 11. 前端 bug 先驗證是不是 cache(2026-04-27 鎖定 by user — 鐵律)
+
+> 「避免今天那種『code 是對的、user 看不到 → 一直改 code → 改完 user 還是看不到』的死循環。」— user 原話
+
+#### 規則
+**修任何前端 bug 之前,user 必須先用無痕視窗(Incognito / InPrivate)測一次:**
+- **無痕視窗能重現** → 真的是 code bug,進入 debug → 修 code
+- **無痕視窗不能重現** → 是 cache 問題,清 cache 即可,**不要改 code**
+
+#### 為什麼
+2026-04-27 / Phase 1B-2 啟動時,user 報「compare 頁 autocomplete 打字下拉不出現」。
+我花 1 小時繞後端 API、code_only param、server reload、kill stale process 都沒用,
+最後 user 用無痕視窗測 → 正常。是瀏覽器 cache 問題,**不是 code bug**。
+這 1 小時改的 code 都是錯的方向(雖然修的東西本身有用,但跟原始症狀無關)。
+
+#### 落地檢查清單(回報 user 之前)
+- [ ] user 報前端 bug → 第一句話問「你有無痕視窗測過嗎?」
+- [ ] 沒有 → 請 user 先用無痕視窗試一次再回報
+- [ ] 無痕也壞 → 才開始讀 code 修
+- [ ] 無痕 OK → 告知 user 是瀏覽器 cache,Ctrl+F5 / 清 site data 解決
+
+#### 例外
+- user 自己已經明確說「我用無痕測過了還是壞」→ 跳過此檢查
+- 後端 bug 跟 user code 改動無關 → 跳過(後端不會被瀏覽器 cache 影響)
+
+---
+
 ### 9. 雙重確認 + 自主除錯(2026-04-26 鎖定 by user)
 
 > 「任何東西請一定要重複雙重確認...自己要有懂得除錯的能力,要有解決事情的能力」— user 原話
