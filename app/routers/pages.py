@@ -234,6 +234,36 @@ async def news(
     )
 
 
+@router.get("/holdings", response_class=HTMLResponse)
+async def holdings_page(request: Request, codes: str = "") -> HTMLResponse:
+    """ETF 持股分析頁 — Alpine.js + AJAX,前端打 /api/etf/{code}/holdings。
+
+    URL ?codes=0050,0056 → 預先勾選那些 ETF。
+    上限 3 支(plan 鎖定)。
+    """
+    initial_codes: list[dict] = []
+    code_list = [c.strip().upper() for c in codes.split(",") if c.strip()][:3]
+    if code_list:
+        from app.models.etf import ETF
+        from app.database import session_scope
+        from sqlalchemy import select
+        with session_scope() as s:
+            etfs = s.scalars(select(ETF).where(ETF.code.in_(code_list))).all()
+            etf_map = {e.code: e for e in etfs}
+        for c in code_list:
+            e = etf_map.get(c)
+            initial_codes.append({
+                "code": c,
+                "name": e.name if e else "",
+                "category": e.category if e else "",
+            })
+
+    return templates.TemplateResponse(
+        request, "holdings.html",
+        {**_common_ctx(), "initial_codes": initial_codes},
+    )
+
+
 @router.get("/etf/{code}", response_class=HTMLResponse)
 async def etf_detail(request: Request, code: str) -> HTMLResponse:
     """ETF 詳情頁 — 100% 讀本地 DB,不打外部 API。"""

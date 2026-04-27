@@ -1,0 +1,532 @@
+{% extends "base.html" %}
+
+{% block title %}ETF 持股分析 — {{ brand_full }}{% endblock %}
+
+{% block head %}
+<style>
+  /* ETF chip(picker)*/
+  .h-chip {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 0.3rem 0.65rem; border-radius: 0.4rem;
+    font-size: 0.9rem;
+    background: rgb(var(--c-accent) / 0.13);
+    border: 1px solid rgb(var(--c-accent) / 0.45);
+    color: rgb(var(--c-accent));
+  }
+  .h-chip-x {
+    width: 1.15rem; height: 1.15rem;
+    border-radius: 9999px;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background 0.15s ease;
+  }
+  .h-chip-x:hover { background: rgb(var(--c-accent) / 0.35); }
+
+  .picker-shell { position: relative; }
+  .picker-suggest {
+    position: absolute; top: 100%; left: 0; right: 0;
+    margin-top: 0.5rem;
+    background: rgb(var(--c-card));
+    border: 1px solid rgb(var(--c-border));
+    border-radius: 0.5rem;
+    box-shadow: 0 12px 40px -8px rgba(0,0,0,0.45);
+    max-height: 18rem; overflow-y: auto;
+    z-index: 30;
+  }
+  .picker-row {
+    width: 100%; text-align: left;
+    padding: 0.6rem 0.85rem;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 0.75rem;
+    transition: background 0.1s ease;
+  }
+  .picker-row:hover, .picker-row.is-active { background: rgb(var(--c-accent) / 0.1); }
+  .picker-row:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* 集中度 警示 */
+  .conc-warn {
+    color: rgb(245 158 11);
+    font-weight: 600;
+  }
+
+  /* 變動方向色 */
+  .dir-buy { color: rgb(239 68 68); font-weight: 600; }
+  .dir-sell { color: rgb(16 185 129); font-weight: 600; }
+  .dir-new { color: rgb(var(--c-accent)); font-weight: 600; }
+
+  /* 共同持股 */
+  .common-stock {
+    background: rgb(var(--c-accent) / 0.06);
+    border: 1px solid rgb(var(--c-accent) / 0.25);
+    border-radius: 0.4rem;
+    padding: 0.5rem 0.75rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<section class="mb-8">
+  <h1 class="text-2xl sm:text-3xl font-semibold mb-2">
+    <span class="hero-text">ETF 持股分析</span>
+  </h1>
+  <p class="text-base text-muted">
+    最多比較 3 支 ETF · 看十大持股、買賣超變動、共同押注標的。
+  </p>
+</section>
+
+<section class="relative section-card rounded-xl p-5 sm:p-7 mb-7"
+         x-data='holdingsPicker({initialCodes: {{ initial_codes | tojson }}})'
+         x-init="init()">
+
+  {# === ETF picker(上限 3 支)=== #}
+  <div class="mb-2 flex items-center justify-between">
+    <label class="text-sm text-muted">追蹤的 ETF(最多 3 支)</label>
+    <span class="text-xs text-muted num" x-text="`已選 ${codes.length} / 3`"></span>
+  </div>
+
+  <div class="picker-shell bg-bg-soft border border-border rounded-md p-2 transition mb-5"
+       @click.outside="open=false">
+    <div class="flex flex-wrap gap-1.5 items-center">
+      <template x-for="(c, i) in codes" :key="c.code">
+        <span class="h-chip">
+          <span class="font-mono font-semibold" x-text="c.code"></span>
+          <span class="text-fg/85 hidden sm:inline" x-text="c.name || ''" x-cloak></span>
+          <button type="button" @click.prevent="removeAt(i)" class="h-chip-x" :aria-label="'移除 '+c.code">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </span>
+      </template>
+      <input type="text"
+             x-model="query"
+             @focus="open=true; ensure()"
+             @input.debounce.180ms="fetch()"
+             @keydown.down.prevent="moveActive(1)"
+             @keydown.up.prevent="moveActive(-1)"
+             @keydown.enter.prevent="onEnter()"
+             @keydown.escape="open=false"
+             @keydown.backspace="onBackspace()"
+             :placeholder="codes.length === 0 ? '輸入 ETF 代號(例:0050)' : '繼續加入'"
+             :disabled="codes.length >= 3"
+             class="flex-1 min-w-[180px] bg-transparent px-1.5 py-1 text-base text-fg outline-none placeholder:text-muted/60 disabled:opacity-50">
+    </div>
+
+    <div x-show="open && (suggestions.length > 0 || loading || query)" x-cloak
+         x-transition.opacity.duration.150ms class="picker-suggest">
+      <div x-show="loading" class="px-3 py-3 text-sm text-muted">搜尋中…</div>
+      <ul x-show="!loading && suggestions.length > 0">
+        <template x-for="(s, idx) in suggestions" :key="s.code">
+          <li>
+            <button type="button" @click.prevent="addCode(s)"
+                    @mouseenter="activeIdx=idx"
+                    :class="activeIdx===idx ? 'is-active' : ''"
+                    :disabled="isSelected(s.code) || codes.length >= 3"
+                    class="picker-row">
+              <span class="flex items-baseline gap-2 min-w-0">
+                <span class="font-mono font-semibold text-fg" x-text="s.code"></span>
+                <span class="text-sm text-fg/85 truncate" x-text="s.name"></span>
+                <span x-show="isSelected(s.code)" class="text-[0.65rem] text-muted shrink-0">已選</span>
+              </span>
+              <span class="text-xs text-muted shrink-0" x-text="s.category_label || ''"></span>
+            </button>
+          </li>
+        </template>
+      </ul>
+      <div x-show="!loading && suggestions.length === 0 && query"
+           class="px-3 py-3 text-sm text-muted">找不到符合的 ETF</div>
+    </div>
+  </div>
+
+  {# === 載入狀態 / 引導 === #}
+  <div x-show="codes.length === 0" class="text-center py-10 text-muted">
+    請輸入 1~3 支 ETF 代號開始分析
+  </div>
+  <div x-show="codes.length > 0 && data_loading" class="text-center py-6 text-muted">
+    載入持股資料中…
+  </div>
+
+  {# === 區塊 1:Top 10 持股(多 ETF 並列 ECharts bar)=== #}
+  <div x-show="codes.length > 0 && !data_loading" x-cloak class="mb-7">
+    <h2 class="text-xl sm:text-2xl font-semibold mb-3">
+      <span class="w-1 h-7 bg-accent rounded-full inline-block align-middle mr-2" style="box-shadow: 0 0 8px var(--c-accent-glow);"></span>
+      十大個股持股
+    </h2>
+    <div id="holdings-chart" class="w-full h-96 sm:h-[28rem]"></div>
+  </div>
+
+  {# === 區塊 2:個股集中度 === #}
+  <div x-show="codes.length > 0 && !data_loading && holdings.length > 0" x-cloak class="mb-7">
+    <h2 class="text-xl sm:text-2xl font-semibold mb-3">
+      <span class="w-1 h-7 bg-accent rounded-full inline-block align-middle mr-2" style="box-shadow: 0 0 8px var(--c-accent-glow);"></span>
+      個股集中度
+    </h2>
+    <div class="overflow-x-auto -mx-4 sm:mx-0">
+      <table class="w-full text-base num min-w-[480px]">
+        <thead>
+          <tr class="text-left text-muted border-b border-border">
+            <th class="py-3 px-3 font-semibold">ETF</th>
+            <th class="py-3 px-3 font-semibold text-right">第 1 大持股</th>
+            <th class="py-3 px-3 font-semibold text-right">Top 5 占比</th>
+            <th class="py-3 px-3 font-semibold text-right">Top 10 占比</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="h in holdings" :key="h.code">
+            <tr class="border-b border-border/40">
+              <td class="py-3 px-3">
+                <span class="font-mono font-bold text-accent" x-text="h.code"></span>
+                <span class="ml-2" x-text="h.name"></span>
+              </td>
+              <td class="py-3 px-3 text-right">
+                <span x-text="h.holdings[0] ? h.holdings[0].stock_name : '—'"></span>
+                <span x-show="h.holdings[0]" class="ml-2 font-bold"
+                      :class="h.holdings[0] && h.holdings[0].weight > 30 ? 'conc-warn' : 'text-up'">
+                  <span x-text="h.holdings[0] ? h.holdings[0].weight.toFixed(2) : ''"></span>%
+                  <span x-show="h.holdings[0] && h.holdings[0].weight > 30">⚠</span>
+                </span>
+              </td>
+              <td class="py-3 px-3 text-right font-bold"
+                  :class="topNWeight(h, 5) > 50 ? 'conc-warn' : 'text-fg'">
+                <span x-text="topNWeight(h, 5).toFixed(2)"></span>%
+                <span x-show="topNWeight(h, 5) > 50">⚠</span>
+              </td>
+              <td class="py-3 px-3 text-right font-bold"
+                  :class="topNWeight(h, 10) > 70 ? 'conc-warn' : 'text-fg'">
+                <span x-text="topNWeight(h, 10).toFixed(2)"></span>%
+                <span x-show="topNWeight(h, 10) > 70">⚠</span>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+    <div class="text-xs text-muted mt-2">
+      註:⚠ 為事實標示(第 1 大 > 30% / Top5 > 50% / Top10 > 70%),不構成投資建議
+    </div>
+  </div>
+
+  {# === 區塊 3:持股變動(近 N 日)=== #}
+  <div x-show="codes.length > 0 && !data_loading && changes.length > 0" x-cloak class="mb-7">
+    <h2 class="text-xl sm:text-2xl font-semibold mb-3">
+      <span class="w-1 h-7 bg-accent rounded-full inline-block align-middle mr-2" style="box-shadow: 0 0 8px var(--c-accent-glow);"></span>
+      持股變動
+    </h2>
+    <template x-for="ch in changes" :key="ch.code">
+      <div class="bg-bg-soft border border-border rounded-lg p-4 mb-3">
+        <div class="text-base font-semibold mb-1">
+          <span class="font-mono text-accent" x-text="ch.code"></span>
+          <span class="ml-2" x-text="ch.name"></span>
+          <span class="ml-3 text-sm text-muted num" x-text="ch.previous_date + ' → ' + ch.latest_date"></span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+          <div>
+            <div class="text-sm dir-buy mb-2">📈 買超 Top <span x-text="Math.min(ch.buy.length, 10)"></span></div>
+            <ul class="space-y-1 text-sm num">
+              <template x-for="b in ch.buy.slice(0, 10)" :key="b.stock_code">
+                <li class="flex justify-between">
+                  <span><span class="font-mono" x-text="b.stock_code"></span> <span x-text="b.stock_name"></span></span>
+                  <span class="dir-buy" x-text="'+' + b.shares_diff.toLocaleString()"></span>
+                </li>
+              </template>
+              <li x-show="ch.buy.length === 0" class="text-muted">無</li>
+            </ul>
+          </div>
+          <div>
+            <div class="text-sm dir-sell mb-2">📉 賣超 Top <span x-text="Math.min(ch.sell.length, 10)"></span></div>
+            <ul class="space-y-1 text-sm num">
+              <template x-for="s in ch.sell.slice(0, 10)" :key="s.stock_code">
+                <li class="flex justify-between">
+                  <span><span class="font-mono" x-text="s.stock_code"></span> <span x-text="s.stock_name"></span></span>
+                  <span class="dir-sell" x-text="s.shares_diff.toLocaleString()"></span>
+                </li>
+              </template>
+              <li x-show="ch.sell.length === 0" class="text-muted">無</li>
+            </ul>
+          </div>
+          <div>
+            <div class="text-sm dir-new mb-2">🆕 新增 <span x-text="ch.new.length"></span></div>
+            <ul class="space-y-1 text-sm num">
+              <template x-for="n in ch.new.slice(0, 10)" :key="n.stock_code">
+                <li class="flex justify-between">
+                  <span><span class="font-mono" x-text="n.stock_code"></span> <span x-text="n.stock_name"></span></span>
+                  <span class="dir-new" x-text="'+' + n.shares_diff.toLocaleString()"></span>
+                </li>
+              </template>
+              <li x-show="ch.new.length === 0" class="text-muted">無</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  {# === 區塊 4:共同持股(2+ ETFs 才出現)=== #}
+  <div x-show="codes.length >= 2 && !data_loading && commonStocks().length > 0" x-cloak class="mb-7">
+    <h2 class="text-xl sm:text-2xl font-semibold mb-3">
+      <span class="w-1 h-7 bg-accent rounded-full inline-block align-middle mr-2" style="box-shadow: 0 0 8px var(--c-accent-glow);"></span>
+      共同持股(<span x-text="commonStocks().length"></span> 支)
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <template x-for="cs in commonStocks()" :key="cs.stock_code">
+        <div class="common-stock">
+          <div class="flex items-baseline justify-between">
+            <span><span class="font-mono font-bold text-accent" x-text="cs.stock_code"></span>
+              <span class="ml-2" x-text="cs.stock_name"></span></span>
+            <span class="text-sm text-muted" x-text="cs.etfs.length + ' ETF 共持'"></span>
+          </div>
+          <div class="text-sm text-muted mt-1 num">
+            <template x-for="(w, idx) in cs.weights" :key="idx">
+              <span><span class="font-mono" x-text="w.code"></span>
+                <span x-text="w.weight.toFixed(2)"></span>%
+                <span x-show="idx < cs.weights.length - 1"> · </span>
+              </span>
+            </template>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  {# === 區塊 5:基本資訊(每支 ETF 連到詳情頁)=== #}
+  <div x-show="codes.length > 0" x-cloak class="mt-7 pt-5 border-t border-border">
+    <details class="text-sm">
+      <summary class="cursor-pointer text-muted hover:text-fg">展開:基本資訊 / 跳去詳情頁</summary>
+      <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <template x-for="c in codes" :key="c.code">
+          <a :href="'/etf/' + c.code"
+             class="bg-bg-soft border border-border rounded-md p-3 hover:border-accent/50 transition">
+            <div class="font-mono font-bold text-accent" x-text="c.code"></div>
+            <div class="text-fg" x-text="c.name"></div>
+            <div class="text-xs text-muted mt-1">點擊看完整詳情 →</div>
+          </a>
+        </template>
+      </div>
+    </details>
+  </div>
+
+</section>
+
+{# === 底部警語(plan 鎖定 — 法律邊界護身符)=== #}
+<div class="text-xs text-muted text-center mt-12 mb-6 max-w-2xl mx-auto leading-relaxed px-4">
+  本頁僅呈現 ETF 公開揭露之持股資訊與計算數據,不構成投資建議。實際投資決策請自行評估或諮詢合格之投資顧問。
+  <br>持股資料來源:CMoney(每日更新)
+</div>
+
+<script>
+function holdingsPicker(opts) {
+  return {
+    codes: (opts.initialCodes || []).slice(0, 3),
+    query: '',
+    open: false,
+    loading: false,
+    suggestions: [],
+    activeIdx: -1,
+    cache: {},
+    holdings: [],     // [{code, name, holdings: [{rank, stock_code, stock_name, weight, sector}]}]
+    changes: [],      // [{code, name, latest_date, previous_date, buy: [...], sell: [...], new: [...]}]
+    data_loading: false,
+    chart: null,
+
+    init() {
+      if (this.codes.length > 0) this.loadAll();
+    },
+
+    // === picker ===
+    isSelected(code) { return this.codes.some(c => c.code === code); },
+    async ensure() { if (this.suggestions.length === 0) await this.fetch(); },
+    async fetch() {
+      const q = this.query.trim();
+      if (this.cache[q]) {
+        this.suggestions = this.cache[q];
+        this.activeIdx = this.suggestions.length > 0 ? 0 : -1;
+        return;
+      }
+      this.loading = true;
+      try {
+        const r = await window.fetch(`/api/etf/search?q=${encodeURIComponent(q)}&limit=20&code_only=1`);
+        const d = await r.json();
+        this.suggestions = d.items || [];
+        this.cache[q] = this.suggestions;
+        this.activeIdx = this.suggestions.length > 0 ? 0 : -1;
+      } catch (e) {
+        this.suggestions = [];
+      } finally {
+        this.loading = false;
+      }
+    },
+    moveActive(d) {
+      if (!this.suggestions.length) return;
+      const n = this.suggestions.length;
+      this.activeIdx = ((this.activeIdx + d) % n + n) % n;
+    },
+    onEnter() {
+      if (this.activeIdx >= 0 && this.suggestions[this.activeIdx]) {
+        this.addCode(this.suggestions[this.activeIdx]);
+      } else if (this.query.trim()) {
+        this.addCode({ code: this.query.trim().toUpperCase(), name: '' });
+      }
+    },
+    onBackspace() {
+      if (this.query === '' && this.codes.length > 0) {
+        this.codes.pop();
+        this.loadAll();
+      }
+    },
+    addCode(s) {
+      if (this.codes.length >= 3 || this.isSelected(s.code)) return;
+      this.codes.push({ code: s.code, name: s.name || '', category: s.category || '' });
+      this.query = '';
+      this.suggestions = [];
+      this.activeIdx = -1;
+      this.open = false;
+      this.loadAll();
+    },
+    removeAt(i) {
+      this.codes.splice(i, 1);
+      this.loadAll();
+    },
+
+    // === 載資料 ===
+    async loadAll() {
+      if (this.codes.length === 0) {
+        this.holdings = [];
+        this.changes = [];
+        this.disposeChart();
+        return;
+      }
+      this.data_loading = true;
+      try {
+        const codes = this.codes.map(c => c.code);
+        // 並行 fetch
+        const [hRes, cRes] = await Promise.all([
+          Promise.all(codes.map(c => window.fetch(`/api/etf/${c}/holdings`).then(r => r.json()))),
+          Promise.all(codes.map(c => window.fetch(`/api/etf/${c}/holdings_change`).then(r => r.json()))),
+        ]);
+        this.holdings = hRes.filter(h => h && h.holdings && h.holdings.length > 0);
+        this.changes = cRes.filter(c => c && (c.buy.length + c.sell.length + c.new.length > 0));
+      } catch (e) {
+        console.error('loadAll failed', e);
+      } finally {
+        this.data_loading = false;
+        this.$nextTick(() => this.renderChart());
+      }
+    },
+
+    // === 集中度 ===
+    topNWeight(h, n) {
+      return h.holdings.slice(0, n).reduce((s, x) => s + x.weight, 0);
+    },
+
+    // === 共同持股 ===
+    commonStocks() {
+      if (this.holdings.length < 2) return [];
+      const stockMap = {};   // stock_code → {stock_name, etfs: [{code, weight}]}
+      this.holdings.forEach(h => {
+        h.holdings.forEach(x => {
+          if (!stockMap[x.stock_code]) {
+            stockMap[x.stock_code] = { stock_code: x.stock_code, stock_name: x.stock_name, etfs: [], weights: [] };
+          }
+          stockMap[x.stock_code].etfs.push(h.code);
+          stockMap[x.stock_code].weights.push({ code: h.code, weight: x.weight });
+        });
+      });
+      return Object.values(stockMap)
+        .filter(s => s.etfs.length >= 2)
+        .sort((a, b) => b.etfs.length - a.etfs.length || b.weights[0].weight - a.weights[0].weight);
+    },
+
+    // === ECharts ===
+    disposeChart() {
+      if (this.chart) { this.chart.dispose(); this.chart = null; }
+    },
+    renderChart() {
+      const el = document.getElementById('holdings-chart');
+      if (!el || typeof echarts === 'undefined') return;
+      if (!this.chart) this.chart = echarts.init(el, null, { renderer: 'canvas' });
+      if (this.holdings.length === 0) {
+        this.chart.clear();
+        return;
+      }
+      // 收集所有出現過的 stock(union),取 union 中最大 union-Top 10
+      const stockSet = new Set();
+      this.holdings.forEach(h => h.holdings.forEach(x => stockSet.add(x.stock_code)));
+      // 對每支 ETF 構造 weight by stock,以最大持股 ETF 的 Top 10 為 y 軸基準
+      const allStocks = Array.from(stockSet);
+      // 排序:取所有 ETF 內權重最大值降序
+      const stockMaxWeight = {};
+      allStocks.forEach(sc => {
+        let max = 0, name = sc;
+        this.holdings.forEach(h => {
+          const m = h.holdings.find(x => x.stock_code === sc);
+          if (m && m.weight > max) { max = m.weight; name = m.stock_name; }
+        });
+        stockMaxWeight[sc] = { weight: max, name };
+      });
+      const sortedStocks = allStocks
+        .map(sc => ({ code: sc, ...stockMaxWeight[sc] }))
+        .sort((a, b) => b.weight - a.weight)
+        .slice(0, 10);
+      const yLabels = sortedStocks.map(s => `${s.code} ${s.name}`).reverse(); // ECharts 倒序 = 上面是大的
+
+      function cssVar(n) {
+        const v = getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+        return v ? `rgb(${v})` : '#3b82f6';
+      }
+      const palette = ['#3b82f6', '#a78bfa', '#f59e0b'];
+
+      const series = this.holdings.map((h, i) => ({
+        name: `${h.code} ${h.name}`,
+        type: 'bar',
+        data: sortedStocks.slice().reverse().map(s => {
+          const m = h.holdings.find(x => x.stock_code === s.code);
+          return m ? +m.weight.toFixed(2) : 0;
+        }),
+        itemStyle: { color: palette[i % palette.length] },
+        animationDuration: 800,
+        animationEasing: 'cubicOut',
+        label: {
+          show: true,
+          position: 'right',
+          formatter: '{c}%',
+          fontSize: 11,
+          color: cssVar('--c-fg'),
+        },
+      }));
+
+      this.chart.setOption({
+        backgroundColor: 'transparent',
+        grid: { left: 140, right: 60, top: 40, bottom: 30 },
+        legend: {
+          textStyle: { color: cssVar('--c-fg'), fontSize: 13 },
+          top: 5,
+        },
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'shadow' },
+          backgroundColor: cssVar('--c-bg-soft'),
+          borderColor: cssVar('--c-border'),
+          textStyle: { color: cssVar('--c-fg') },
+          formatter: function (params) {
+            return params.map(p => `${p.marker} ${p.seriesName}<br/>${p.name}: <b>${p.value}%</b>`).join('<br/>');
+          },
+        },
+        xAxis: {
+          type: 'value',
+          axisLine: { show: false },
+          axisLabel: { color: cssVar('--c-muted'), formatter: '{value}%' },
+          splitLine: { lineStyle: { color: cssVar('--c-border'), type: 'dashed', opacity: 0.4 } },
+        },
+        yAxis: {
+          type: 'category',
+          data: yLabels,
+          axisLine: { lineStyle: { color: cssVar('--c-border') } },
+          axisLabel: { color: cssVar('--c-fg'), fontSize: 12 },
+        },
+        series: series,
+      }, true);
+    },
+  };
+}
+</script>
+{% endblock %}
