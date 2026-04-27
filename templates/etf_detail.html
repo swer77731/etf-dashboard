@@ -509,6 +509,10 @@
           },
           itemStyle: { color: accent },
           data: etfNorm,
+          // 關掉 hover blur:ECharts 5 預設 emphasis.focus='self' 會把 hover 點之後的時段
+          // lineStyle.opacity 拉低,user 視覺以為「線消失」。tooltip 用 trigger:'axis'
+          // 仍會顯示,不需要 emphasis 視覺(紀律 #1 白癡都看得懂,不要多餘動畫)。
+          emphasis: { disabled: true },
           z: 3,
         },
         {
@@ -519,6 +523,7 @@
           lineStyle: { width: 1.5, color: muted, type: 'dashed' },
           itemStyle: { color: muted },
           data: taiexNorm,
+          emphasis: { disabled: true },
           z: 2,
         },
       ],
