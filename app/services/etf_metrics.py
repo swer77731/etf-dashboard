@@ -168,10 +168,13 @@ def get_etf_detail(code: str, today: date | None = None) -> dict | None:
             .where(Dividend.etf_id == etf.id)
             .order_by(Dividend.ex_date.desc())
         ).all()
+        # cash_dividend 可能 NULL(TWSE 預告寫的未來「待公告」row),float(None) 會炸
+        # 模板已不直接用 etf.dividends(改用 etf.history_summary),但 dividend_count_1y /
+        # dividend_sum_1y 還用,過濾掉 NULL 才能算近 1 年實際配息
         dividends = [
             {
                 "ex_date": d.isoformat(),
-                "cash": float(c),
+                "cash": float(c) if c is not None else None,
                 "payment_date": p.isoformat() if p else None,
                 "fiscal_year": fy,
             }
@@ -202,7 +205,8 @@ def get_etf_detail(code: str, today: date | None = None) -> dict | None:
     history_summary = _dm.get_history_summary(etf_id_for_div, years=5, today=today) if etf_id_for_div else None
 
     # 「下次配息預告」是否有資料 + 即時殖利率區間(用最新公告金額算過去 30 天區間)
-    if next_announced and next_announced.cash_dividend > 0:
+    # cash_dividend 可能 NULL(TWSE 預告「待公告」row),> 0 比較會炸 → is not None 守門
+    if next_announced and next_announced.cash_dividend is not None and next_announced.cash_dividend > 0:
         yield_range_30d = _dm.get_yield_range(etf_id_for_div, next_announced.cash_dividend, days=30)
     else:
         yield_range_30d = None
@@ -238,11 +242,16 @@ def get_etf_detail(code: str, today: date | None = None) -> dict | None:
         "trend_days": trend_days,
         "trend_is_full_year": trend_days >= 360,   # < 360 天就標「資料未滿 1 年」
         "dividends": dividends,
+        # 近 1 年配息次數 / 總額 — 只算「已公告金額」(NULL = 待公告,跳過)
         "dividend_count_1y": sum(
-            1 for d in dividends if d["ex_date"] >= (today - timedelta(days=365)).isoformat()
+            1 for d in dividends
+            if d["ex_date"] >= (today - timedelta(days=365)).isoformat()
+            and d["cash"] is not None
         ),
         "dividend_sum_1y": sum(
-            d["cash"] for d in dividends if d["ex_date"] >= (today - timedelta(days=365)).isoformat()
+            d["cash"] for d in dividends
+            if d["ex_date"] >= (today - timedelta(days=365)).isoformat()
+            and d["cash"] is not None
         ),
         # Phase 1C
         "next_announced": _next_announced_to_dict(next_announced),
