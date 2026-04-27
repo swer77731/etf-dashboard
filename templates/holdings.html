@@ -536,7 +536,9 @@ function holdingsPicker(opts) {
 
       this.chart.setOption({
         backgroundColor: 'transparent',
-        grid: { left: 165, right: 80, top: 50, bottom: 40, containLabel: false },
+        // containLabel: true → ECharts 自動為 yAxis label(中文股名)reserve 寬度,
+        // grid.left/right 變成「容器邊到 axis 標籤」的 padding,不再壓縮 label 寬度。
+        grid: { left: 12, right: 24, top: 50, bottom: 40, containLabel: true },
         legend: {
           textStyle: { color: cssVar('--c-fg'), fontSize: 14, fontFamily: cjkFont },
           top: 8,
