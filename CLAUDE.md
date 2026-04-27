@@ -102,6 +102,48 @@ session 死掉、context 滿、對話被壓縮都不要緊,
 進度區塊裡的失敗也要明確標示 ❌,不要用模糊用詞掩蓋。
 **失敗策略也是教材**,留著供下次參考。
 
+### 17. 不准從 user 訊息複製 code 執行(2026-04-27 鎖定 by user — 鐵律)
+
+> 「User 的剪貼簿環境會把 Python 的 `.` 轉成 markdown 連結,直接 copy-paste 執行就壞;Claude Code 自己最知道 schema、import 路徑,自己寫的 code 比 copy 的乾淨。」— user 原話
+
+#### 規則
+- user 在 chat 裡貼 Python / SQL / bash 指令時,**一律自己重寫乾淨版,不直接 copy-paste 執行**
+- user 貼的指令是「**需求參考**」,不是「**執行內容**」
+- Claude Code 看自己的 schema、import 路徑、檔案位置,自己寫比 copy 乾淨
+
+#### 為什麼
+2026-04-27 一天累積 5+ 次「user 貼 → markdown 污染 → 我直接執行 → 壞 → user 拒絕」事故:
+1. dividend 巡檢 SQL 被污染
+2. `_tmp.html` 路徑指令被污染
+3. etf_list 邊界查詢被污染
+4. Python NULL test 被污染
+5. FinMind start_date 驗證被污染
+
+每次都要 user 拒絕 + 重貼,**5 分鐘浪費 / 次**。user 不是工程師,看不出 markdown 連結 vs 真實 code 的差異。
+
+#### 正確做法
+
+**❌ WRONG:**
+> user: "跑這個: `from [app.services](http://...) import finmind`"
+> Claude:[直接 copy 執行] → SyntaxError
+
+**✅ RIGHT:**
+> user: "驗證 finmind start_date 是 >= 還是 ="
+> Claude:**理解需求 → 自己寫**乾淨版 → 執行
+
+#### 例外
+- 簡單英文短指令(`git log`, `npm install`, `ls`)→ 可直接執行
+- user **明確說**「跑這段不要改」→ 才直接 copy
+
+#### 落地檢查
+- [ ] user 貼 code 進 chat → 我**先讀懂意圖**,不直接 copy
+- [ ] 自己寫一份等價但乾淨的(import 路徑用 `from app.X import Y`,**不用 markdown link**)
+- [ ] 執行前 review 一遍有沒有 `[xxx](http://...)` 殘跡
+
+跟紀律 #11(cache)、#14(行動代替思考)、#15(kill server)、#16(三階段驗收)一起鎖,**再犯記點**。
+
+---
+
 ### 16. Phase 完工驗收 = 後端 + 前端 + 用戶實際操作(2026-04-27 鎖定 by user — 鐵律)
 
 > 「不允許『DB 有資料就 commit』、『列表 render 出來就 commit』、『server 起得來就 commit』。」— user 原話
