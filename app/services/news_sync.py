@@ -126,6 +126,10 @@ def _persist_news(rows: list[dict], etf_code: str) -> int:
                 if etf_code not in tags:
                     tags.append(etf_code)
                     existing.etf_tags = tags
+                # 補 NULL published_at(舊 row parser bug 留下的壞資料)
+                # 只在「現有為 NULL 且新值可解析」時補,有值不覆寫
+                if existing.published_at is None and pub_dt is not None:
+                    existing.published_at = pub_dt
                 continue
 
             session.add(News(

@@ -190,32 +190,34 @@ async def compare(
     )
 
 
-_NEWS_DAYS_CHOICES = {"7": 7, "30": 30, "all": None}
+# 「全部」改 365 天(原本 None = 全表),124 NULL row 自動排除
+_NEWS_DAYS_CHOICES = {"7": 7, "30": 30, "all": 365}
+
+# 前端 filter + pagination 上限,避免極端情境(例如 365 天有上萬筆)炸瀏覽器
+_NEWS_HARD_LIMIT = 5000
 
 
 @router.get("/news", response_class=HTMLResponse)
 async def news(
     request: Request,
     etf: str | None = None,
-    page: int = 1,
     days: str = "7",   # 7 / 30 / all,預設近 7 天(快訊)
 ) -> HTMLResponse:
-    """新聞牆 — 100% 讀本地 news table。可選 ?etf=0050 過濾單一 ETF, ?days=7|30|all 切換期間。"""
-    page = max(1, page)
-    page_size = 30
-    offset = (page - 1) * page_size
+    """新聞牆 — 100% 讀本地 news table。
 
+    路由不分頁:一次回該窗口全部 row,前端用 JS slice 模擬分頁 + 即時搜尋(操作整個 array)。
+    最多 5000 筆 hard cap 避免極端情境炸瀏覽器。
+    """
     days_int = _NEWS_DAYS_CHOICES.get(days, 7)
     items = news_sync.list_recent_news(
-        etf_code=etf, limit=page_size, offset=offset, days=days_int,
+        etf_code=etf, limit=_NEWS_HARD_LIMIT, offset=0, days=days_int,
     )
-    total = news_sync.count_news(etf_code=etf, days=days_int)
 
     # 7 天 / 30 天 / 全部 三個 tab 各自的總數,UI 顯示用
     counts = {
         "7":   news_sync.count_news(etf_code=etf, days=7),
         "30":  news_sync.count_news(etf_code=etf, days=30),
-        "all": news_sync.count_news(etf_code=etf, days=None),
+        "all": news_sync.count_news(etf_code=etf, days=_NEWS_DAYS_CHOICES["all"]),
     }
 
     return templates.TemplateResponse(
@@ -223,10 +225,7 @@ async def news(
         {
             **_common_ctx(),
             "items": items,
-            "total": total,
-            "page": page,
-            "page_size": page_size,
-            "has_next": offset + page_size < total,
+            "total": len(items),
             "etf_filter": etf.upper() if etf else None,
             "days_filter": days if days in _NEWS_DAYS_CHOICES else "7",
             "counts": counts,
