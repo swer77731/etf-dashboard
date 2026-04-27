@@ -35,8 +35,12 @@ class Dividend(Base):
     etf_id: Mapped[int] = mapped_column(ForeignKey("etf_list.id", ondelete="CASCADE"), nullable=False)
     ex_date: Mapped[Date] = mapped_column(SADate, nullable=False)
 
-    cash_dividend: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    stock_dividend: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    # NULL = 未公告 / 未知(TWSE 預告表「待公告」row)
+    # 0.0  = 真的配 0 元(罕見但理論可能,如下市清算)
+    # UI 對應:NULL → 「待公告」灰字 / 0.0 → 「0 元」
+    # Migration 001 (2026-04-27) 從 NOT NULL DEFAULT 0.0 改成 nullable no default
+    cash_dividend: Mapped[float | None] = mapped_column(Float, nullable=True)
+    stock_dividend: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     payment_date: Mapped[Date | None] = mapped_column(SADate, nullable=True)
     announce_date: Mapped[Date | None] = mapped_column(SADate, nullable=True)
