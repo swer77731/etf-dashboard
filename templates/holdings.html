@@ -111,12 +111,21 @@
   }
   .bar-fill {
     height: 100%;
-    width: 0;   /* 預設 0 → reactive width 變化時 transition 自然動畫(從 0 拉長到 X%)*/
     background: linear-gradient(90deg, rgb(var(--c-accent)), rgb(96 165 250));
     border-radius: 4px;
-    /* 0.55s cubic-bezier:user 紀律 #1「畫面流暢」+ 加 ETF 時等權重新分佈 */
+    /* 雙動畫機制:
+       - @keyframes bar-enter:新元素誕生時跑一次(隱式 to = inline style 當前 width)
+         → 處理「新加入 ETF 帶來的個股」從 0 拉長到目標寬度
+       - transition: width:既有元素的 :style 變化時觸發
+         → 處理「平均後權重變化」(例如 0050 加 00878 後台積電 62%→35%)平滑變化
+       兩者並存,animation 跑完才換 transition 接管。 */
+    animation: bar-enter 0.55s cubic-bezier(0.4, 0, 0.2, 1);
     transition: width 0.55s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 0 0 8px rgb(var(--c-accent) / 0.3);
+  }
+  @keyframes bar-enter {
+    from { width: 0; }
+    /* to:不寫,隱式採 inline style 的 width 值(s.avgWeight%) */
   }
   .bar-value {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
