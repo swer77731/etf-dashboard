@@ -2,7 +2,9 @@
 {# 用法:{{ etf_search(placeholder='搜尋 ETF...', size='sm' or 'md') }} #}
 
 {% macro etf_search(placeholder='搜尋 ETF(輸入代號或名稱)', size='md') %}
-<div x-data="globalEtfSearch()" x-init="init()" class="relative" @keydown.escape="open=false">
+<div x-data="globalEtfSearch()" x-init="init()" class="relative"
+     @keydown.escape="open=false"
+     @click.outside="open=false">
   <div class="relative">
     <div class="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -24,7 +26,6 @@
   </div>
 
   <div x-show="open && (suggestions.length > 0 || loading || (query && !loading))" x-cloak
-       @click.outside="open=false"
        x-transition.opacity.duration.150ms
        class="absolute left-0 right-0 mt-2 z-40 bg-card border border-border rounded-md shadow-2xl max-h-80 overflow-y-auto">
     <div x-show="loading" class="px-3 py-3 text-sm text-muted">搜尋中…</div>
