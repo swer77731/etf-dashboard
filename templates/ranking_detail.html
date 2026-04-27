@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}{{ kind_label }} 排行 — {{ brand_full }}{% endblock %}
+
+{% from "_partials/ranking_table.html" import ranking_table %}
+
+{% block content %}
+
+{# === Hero === #}
+<section class="mb-6 relative">
+  <div class="text-xs text-muted tracking-widest mb-2">
+    <a href="/" class="hover:text-accent">首頁</a>
+    <span class="mx-1">/</span>
+    <span>排行</span>
+  </div>
+
+  <h1 class="text-2xl sm:text-3xl font-bold mb-2 tracking-tight leading-tight">
+    <span class="hero-text">{{ kind_label }}</span>
+  </h1>
+  <p class="text-sm sm:text-base text-muted">{{ kind_subtitle }}</p>
+</section>
+
+{# === 期間 tab === #}
+<section class="mb-6">
+  <div class="flex flex-wrap gap-2">
+    {% for pk in periods %}
+    <a href="/ranking/{{ kind }}?p={{ pk }}"
+       class="px-4 py-2 rounded-md text-sm sm:text-base border transition
+              {% if pk == period %}
+                bg-accent text-white border-accent font-semibold
+              {% else %}
+                bg-bg-soft text-fg border-border hover:border-accent/50
+              {% endif %}">
+      {{ period_labels[pk] }}
+    </a>
+    {% endfor %}
+  </div>
+</section>
+
+{# === 主體:完整 Top 30 表格 === #}
+<section class="relative overflow-hidden section-card {% if is_leverage %}section-card-warn{% endif %} rounded-xl p-5 sm:p-7 mb-7 pb-12">
+  <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
+
+  <div class="card-content">
+    <header class="mb-5 flex items-baseline justify-between gap-4 flex-wrap">
+      <div class="flex items-center gap-3">
+        <div class="w-1 h-7 bg-accent rounded-full" style="box-shadow: 0 0 8px var(--c-accent-glow);"></div>
+        <div>
+          <h2 class="text-xl sm:text-2xl font-semibold">{{ period_labels[period] }} 完整排行</h2>
+          {% if data and data.row_count > 0 %}
+          <div class="text-sm text-muted mt-1 num">{{ data.period_start }} ~ {{ data.today }} · 共 {{ data.row_count }} 支</div>
+          {% endif %}
+        </div>
+      </div>
+    </header>
+
+    {% if is_leverage %}
+    <div class="mb-5 px-4 py-3 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-200/90 text-sm sm:text-base">
+      槓桿 / 反向型 ETF 適合短線操作。長期持有可能因每日結算複利效果(波動衰減)而虧損,新手請先熟悉產品結構再進場。
+    </div>
+    {% endif %}
+
+    {{ ranking_table(data, show_category=(kind == "top")) }}
+  </div>
+
+  <div class="card-watermark">ETF Watch</div>
+</section>
+
+<section class="text-xs text-muted text-center mt-12 mb-6 max-w-2xl mx-auto leading-relaxed px-4">
+  資料來源:台灣證券交易所 / 報酬以還原股價計算,如與券商略有差異以您券商為準
+</section>
+
+{% endblock %}

@@ -15,8 +15,18 @@
   {%- endif -%}
 {%- endmacro %}
 
+{# kind → /ranking/{kind} 對應(top_movers 用 top) #}
+{% set _RANKING_URL_KIND = {
+  "top_movers": "top",
+  "category":   None,
+  "leverage_pos": "leverage_pos",
+  "leverage_neg": "leverage_neg",
+} %}
+
 {% macro ranking_card(sec, descriptions) %}
 {% set is_leverage = (sec.kind in ("leverage_pos", "leverage_neg")) %}
+{# kind=category 用 sec.category;kind=top_movers 用 "top";其他直接 sec.kind #}
+{% set link_kind = sec.category if sec.kind == "category" else _RANKING_URL_KIND.get(sec.kind, sec.kind) %}
 <section class="relative overflow-hidden section-card {% if is_leverage %}section-card-warn{% endif %} rounded-xl p-5 sm:p-6 flex flex-col">
 
   {# 中央大字浮水印 #}
@@ -70,14 +80,18 @@
         {% endfor %}
       </ul>
 
-      {% if sec.data.period_start %}
-      <div class="text-xs text-muted mt-3 pt-3 border-t border-border/40 flex items-center justify-between">
+      <div class="text-xs text-muted mt-3 pt-3 border-t border-border/40 flex items-center justify-between gap-2">
+        {% if sec.data.period_start %}
         <span class="num">{{ sec.data.period_start }} ~ {{ sec.data.today }}</span>
-        {% if sec.data.row_count > 5 %}
-        <span class="text-muted/70">本期共 {{ sec.data.row_count }} 支</span>
+        {% else %}
+        <span></span>
+        {% endif %}
+        {% if link_kind %}
+        <a href="/ranking/{{ link_kind }}?p=3m" class="text-accent hover:underline whitespace-nowrap">
+          {% if sec.data.row_count > 5 %}查看完整 {{ sec.data.row_count }} 支{% else %}查看完整排行{% endif %} →
+        </a>
         {% endif %}
       </div>
-      {% endif %}
     {% endif %}
 
   </div>

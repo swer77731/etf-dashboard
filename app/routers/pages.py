@@ -242,6 +242,65 @@ async def news(
     )
 
 
+_RANKING_KIND_LABEL: dict[str, dict] = {
+    "top":          {"label": "近月最火 ETF", "subtitle": "不分類別,看誰最近表現最強"},
+    "active":       {"label": "主動式 ETF", "subtitle": "基金經理人選股,可彈性調整持股"},
+    "market":       {"label": "市值型 ETF", "subtitle": "買到台股市值最大的公司"},
+    "dividend":     {"label": "高股息 ETF", "subtitle": "主打配息,適合存股族"},
+    "theme":        {"label": "主題型 ETF", "subtitle": "鎖定特定產業(半導體 / AI / 5G 等),電腦按指數選股"},
+    "bond":         {"label": "債券型 ETF", "subtitle": "公債、公司債,波動較小"},
+    "leverage_pos": {"label": "槓桿型 ETF(高風險)", "subtitle": "短線操作工具,長期持有可能因波動衰減而虧損"},
+    "leverage_neg": {"label": "反向型 ETF(高風險)", "subtitle": "短線操作工具,長期持有可能因波動衰減而虧損"},
+}
+
+_RANKING_PERIODS = ("1m", "3m", "ytd", "1y", "3y")
+
+
+@router.get("/ranking/{kind}", response_class=HTMLResponse)
+async def ranking_detail(request: Request, kind: str, p: str = "3m") -> HTMLResponse:
+    """各類別獨立排行頁(Phase 2B)— 完整 Top 30 + 多期間 tab。
+
+    URL: /ranking/{kind}?p=3m
+    kind: top / active / market / dividend / theme / bond / leverage_pos / leverage_neg
+    p:    1m / 3m / ytd / 1y / 3y
+    """
+    if kind not in _RANKING_KIND_LABEL:
+        raise HTTPException(status_code=404, detail=f"unknown ranking kind: {kind}")
+    if p not in _RANKING_PERIODS:
+        p = "3m"
+
+    meta = _RANKING_KIND_LABEL[kind]
+    LIMIT = 30
+
+    try:
+        if kind == "top":
+            data = ranking.get_top_movers(p, limit=LIMIT)
+        elif kind == "leverage_pos":
+            data = ranking.get_leverage_ranking(p, "positive", limit=LIMIT)
+        elif kind == "leverage_neg":
+            data = ranking.get_leverage_ranking(p, "inverse", limit=LIMIT)
+        else:
+            data = ranking.get_ranking(kind, p, limit=LIMIT)
+    except Exception:
+        logger.exception("[ranking_detail] failed kind=%s p=%s", kind, p)
+        data = None
+
+    return templates.TemplateResponse(
+        request, "ranking_detail.html",
+        {
+            **_common_ctx(),
+            "kind": kind,
+            "kind_label": meta["label"],
+            "kind_subtitle": meta["subtitle"],
+            "period": p,
+            "periods": _RANKING_PERIODS,
+            "period_labels": ranking.PERIOD_LABELS,
+            "data": data,
+            "is_leverage": kind in ("leverage_pos", "leverage_neg"),
+        },
+    )
+
+
 @router.get("/holdings", response_class=HTMLResponse)
 async def holdings_page(request: Request, codes: str = "") -> HTMLResponse:
     """ETF 持股分析頁 — Alpine.js + AJAX,前端打 /api/etf/{code}/holdings。
