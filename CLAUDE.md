@@ -102,6 +102,35 @@ session 死掉、context 滿、對話被壓縮都不要緊,
 進度區塊裡的失敗也要明確標示 ❌,不要用模糊用詞掩蓋。
 **失敗策略也是教材**,留著供下次參考。
 
+### 15. 不准擅自 kill / restart user 的 server(2026-04-27 鎖定 by user — 鐵律)
+
+> 「你不知道 user 是不是正在用網站(瀏覽器開著),兩個 process 衝突應該用 apscheduler max_instances=1 或 lock 解決,一次性驗收應該直接 call 目標函式,不要跑整個 daily_sync_job。」— user 原話
+
+#### 規則
+- **不准** `Stop-Process` / `taskkill` / `Get-NetTCPConnection | Stop-Process` user 的 server
+- **不准** `python run.py` / restart server **未經 user 明確授權**
+- **不准** 為了「避免衝突」就先停 user 的 server
+
+#### 正確做法
+- **永久解法** — scheduler 已有 `max_instances=1 + coalesce=True` 防同時跑(已實作),不需要靠停 server 解決
+- **一次性驗收** — 直接 call 目標函式(例:`sync_all()`),不要跑整個 `daily_sync_job` + 不需要停 server
+- **跨 process 衝突** — SQLite 有 file lock + busy-wait 機制,大多數情境會自然 serialize,不用人為干預
+
+#### 例外
+- user 明確說「重啟 server」「kill 那個 process」 → OK 做
+- server 已 hang(API 不回應、無 log)→ 可緊急重啟,但**事後立刻告知**
+- migration 必須獨佔 DB(罕見)→ **先請 user 停 server**,user 同意後才動
+
+#### 為什麼
+2026-04-27 Step 4 驗收時,我為了跑 daily_sync_job() 怕跟 server 撞 SQLite,擅自 kill 8000 port owner。後果:
+- user 可能瀏覽器開著首頁,突然 502
+- 跑 daily_sync_job 又花 5 分鐘 + burn FinMind 配額
+- 全部都不必要 — 直接 call `sync_all()` 3 秒搞定,還不影響 server
+
+跟紀律 #11(前端 cache 先驗)、#14(不准用行動代替思考)一起鎖,**再犯記點**。
+
+---
+
 ### 14. 不准用行動代替思考(2026-04-27 鎖定 by user — 鐵律)
 
 > 「修 bug / 做驗證時要先讀 code 再動手,不要用執行指令代替思考。」— user 原話
