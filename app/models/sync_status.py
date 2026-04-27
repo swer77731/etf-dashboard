@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String
+from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -23,7 +23,8 @@ from app.database import Base
 class SyncStatus(Base):
     __tablename__ = "sync_status"
 
-    # 資料源代號(eg. 'twse_announce', 'dividend_finmind', 'kbar', 'news', 'etf_universe')
+    # 資料源代號(eg. 'twse_announce', 'dividend_finmind', 'kbar', 'news', 'etf_universe',
+    # 'holdings_yuanta', 'holdings_cathay' ...)
     source: Mapped[str] = mapped_column(String(64), primary_key=True)
 
     # 最後一次「嘗試」時間 — 不論成敗都更新
@@ -38,10 +39,19 @@ class SyncStatus(Base):
     # 最後一次同步寫入筆數 — 給監控用
     rows_synced: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
+    # === 紀律 #20 資料完整性鐵律(2026-04-27 migration 003 加)===
+    # retry escalation 計數(0 = 上次成功 / 1 = 已 retry 1 次 / >= 3 = 嚴重警告)
+    retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # 缺漏項目數(expected - actual)
+    missing_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # 缺漏清單(JSON list of identifiers,例:["00939", "00984D"])
+    missing_items: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+
     def __repr__(self) -> str:  # pragma: no cover
         return (
             f"<SyncStatus {self.source} "
             f"last_attempt={self.last_attempt_at} "
             f"last_success={self.last_success_at} "
-            f"err={'Y' if self.last_error else 'N'}>"
+            f"err={'Y' if self.last_error else 'N'} "
+            f"retry={self.retry_count} miss={self.missing_count}>"
         )
