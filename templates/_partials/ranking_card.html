@@ -1,0 +1,88 @@
+{# 排行榜「卡片」版 — Phase 2A 首頁瘦身用 #}
+{# 半寬 grid,Top 5,只給最關鍵欄位:代號 + 名稱 + 期間報酬 + vs 大盤 #}
+
+{% macro fmt_pct_card(v, signed=True) -%}
+  {%- if v is none -%}—{%- else -%}
+    {%- if signed and v > 0 -%}+{%- endif -%}{{ "%.2f"|format(v) }}%
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro pct_color_card(v) -%}
+  {%- if v is none -%}text-muted
+  {%- elif v > 0 -%}text-up
+  {%- elif v < 0 -%}text-down
+  {%- else -%}text-fg
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro ranking_card(sec, descriptions) %}
+{% set is_leverage = (sec.kind in ("leverage_pos", "leverage_neg")) %}
+<section class="relative overflow-hidden section-card {% if is_leverage %}section-card-warn{% endif %} rounded-xl p-5 sm:p-6 flex flex-col">
+
+  {# 中央大字浮水印 #}
+  <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
+
+  <div class="card-content flex-1 flex flex-col">
+
+    <header class="mb-4">
+      <div class="flex items-center gap-2 mb-1">
+        <div class="w-1 h-5 bg-accent rounded-full" style="box-shadow: 0 0 8px var(--c-accent-glow);"></div>
+        <h2 class="text-lg sm:text-xl font-semibold leading-tight">{{ sec.title }}</h2>
+      </div>
+      {% set desc_key = sec.kind if sec.kind in descriptions else (sec.category if sec.category in descriptions else None) %}
+      {% if sec.subtitle %}
+        <div class="text-sm text-muted ml-3">{{ sec.subtitle }}</div>
+      {% elif desc_key %}
+        <div class="text-sm text-muted ml-3">{{ descriptions[desc_key] }}</div>
+      {% endif %}
+    </header>
+
+    {% if is_leverage %}
+    <div class="mb-3 px-3 py-2 rounded bg-amber-500/10 border border-amber-500/30 text-amber-200/90 text-xs sm:text-sm leading-snug">
+      短線操作工具,長期持有可能因波動衰減虧損
+    </div>
+    {% endif %}
+
+    {% if sec.data is none or sec.data.row_count == 0 %}
+      <div class="text-sm text-muted py-6 text-center flex-1 flex items-center justify-center">
+        資料更新中,請稍候。
+      </div>
+    {% else %}
+      <ul class="flex-1 divide-y divide-border/40 num">
+        {% for r in sec.data.rows[:5] %}
+        <li class="py-2.5 flex items-center gap-3">
+          <span class="w-5 text-center text-sm text-muted">{{ loop.index }}</span>
+          <div class="flex-1 min-w-0">
+            <a href="/etf/{{ r.code }}" class="block">
+              <div class="text-base font-mono text-accent hover:underline">{{ r.code }}</div>
+              <div class="text-sm text-fg/80 truncate">{{ r.name }}</div>
+            </a>
+          </div>
+          <div class="text-right whitespace-nowrap">
+            <div class="text-base sm:text-lg font-semibold {{ pct_color_card(r.period_return_pct) }}">
+              {{ fmt_pct_card(r.period_return_pct) }}
+            </div>
+            <div class="text-xs {{ pct_color_card(r.vs_index_pct) }}">
+              vs 大盤 {{ fmt_pct_card(r.vs_index_pct) }}
+            </div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+
+      {% if sec.data.period_start %}
+      <div class="text-xs text-muted mt-3 pt-3 border-t border-border/40 flex items-center justify-between">
+        <span class="num">{{ sec.data.period_start }} ~ {{ sec.data.today }}</span>
+        {% if sec.data.row_count > 5 %}
+        <span class="text-muted/70">本期共 {{ sec.data.row_count }} 支</span>
+        {% endif %}
+      </div>
+      {% endif %}
+    {% endif %}
+
+  </div>
+
+  {# 右下角小字浮水印 #}
+  <div class="card-watermark">ETF Watch</div>
+</section>
+{% endmacro %}

@@ -57,13 +57,14 @@ def _common_ctx() -> dict:
 
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
-    """首頁 — 大盤概況 + 6 個排行榜 sections。"""
+    """首頁 — Phase 2A 瘦身版:hero / 市場概況 / 配息公布欄 / 6 類別卡 2x3 / 新聞 5 則。"""
     try:
         market = ranking.get_market_overview()
     except Exception:
         logger.exception("[index] market_overview failed")
         market = None
 
+    # Phase 2A: 6 類別卡 2x3,每張 Top 5
     sections = []
 
     try:
@@ -72,7 +73,7 @@ async def index(request: Request) -> HTMLResponse:
             "category": "top",
             "title": "近月最火 ETF",
             "subtitle": "不分類別,看誰最近表現最強",
-            "data": ranking.get_top_movers("1m", limit=10),
+            "data": ranking.get_top_movers("1m", limit=5),
         })
     except Exception:
         logger.exception("[index] top_movers failed")
@@ -84,35 +85,40 @@ async def index(request: Request) -> HTMLResponse:
                 "kind": "category",
                 "category": cat_code,
                 "title": f"{cat_label}(近 3 個月)",
-                "data": ranking.get_ranking(cat_code, "3m", limit=10),
+                "data": ranking.get_ranking(cat_code, "3m", limit=5),
             })
         except Exception:
             logger.exception("[index] category %s failed", cat_code)
             sections.append({"kind": "category", "category": cat_code, "title": cat_label, "data": None})
 
     for direction, kind, title in [
-        ("positive", "leverage_pos", "槓桿型 ETF(高風險)— 近 3 個月"),
-        ("inverse",  "leverage_neg", "反向型 ETF(高風險)— 近 3 個月"),
+        ("positive", "leverage_pos", "槓桿型(高風險)"),
+        ("inverse",  "leverage_neg", "反向型(高風險)"),
     ]:
         try:
             sections.append({
                 "kind": kind,
                 "category": kind,
                 "title": title,
-                "data": ranking.get_leverage_ranking("3m", direction, limit=10),
+                "data": ranking.get_leverage_ranking("3m", direction, limit=5),
             })
         except Exception:
             logger.exception("[index] leverage %s failed", direction)
             sections.append({"kind": kind, "category": kind, "title": title, "data": None})
 
     # Phase 1B 配息公布欄 — 未來 14 天「即將除息」
-    # (FinMind TaiwanStockDividend 不回未來,需 Phase 1B-2 TWSE 爬蟲補,
-    #  目前資料只到「已除息」,UI 顯示空狀態 + 友善文字)
     try:
         upcoming = dividend_metrics.get_upcoming_dividends(days=14, past_days=0)
     except Exception:
         logger.exception("[index] upcoming_dividends failed")
         upcoming = None
+
+    # Phase 2A 新聞 5 則(主流類別,近 30 天才有可能有東西)
+    try:
+        latest_news = news_sync.list_recent_news(limit=5, days=30)
+    except Exception:
+        logger.exception("[index] latest_news failed")
+        latest_news = []
 
     return templates.TemplateResponse(
         request, "index.html",
@@ -122,6 +128,8 @@ async def index(request: Request) -> HTMLResponse:
             "market": market,
             "upcoming_dividends": upcoming,
             "upcoming_group_labels": dividend_metrics.GROUP_LABELS,
+            "latest_news": latest_news,
+            "today_iso": date.today().isoformat(),
         },
     )
 

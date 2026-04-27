@@ -1,0 +1,58 @@
+{# 首頁底部新聞預覽 — 5 則 + 看更多連結 #}
+
+{% macro news_preview(items, today_iso) %}
+<section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7">
+  <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
+
+  <div class="card-content">
+    <header class="mb-5 flex items-baseline justify-between gap-4 flex-wrap">
+      <div class="flex items-center gap-3">
+        <div class="w-1 h-7 bg-accent rounded-full" style="box-shadow: 0 0 8px var(--c-accent-glow);"></div>
+        <div>
+          <h2 class="text-xl sm:text-2xl font-semibold">最新快訊</h2>
+          <div class="text-sm text-muted mt-1">主流 ETF 相關新聞,每天 14:30 自動更新</div>
+        </div>
+      </div>
+      <a href="/news" class="text-sm text-accent hover:underline">看全部新聞 →</a>
+    </header>
+
+    {% if items %}
+    <ul class="divide-y divide-border/40">
+      {% for n in items %}
+      <li class="py-3 sm:py-3.5">
+        <a href="{{ n.url }}" target="_blank" rel="noopener nofollow"
+           class="block group">
+          <div class="flex items-baseline gap-3">
+            {% if n.published_at and n.published_at[:10] == today_iso %}
+              <span class="w-1 self-stretch bg-up rounded-full" style="min-height:1rem"></span>
+            {% endif %}
+            <div class="flex-1 min-w-0">
+              <div class="text-base sm:text-lg text-fg leading-snug group-hover:text-accent transition">
+                {{ n.title }}
+              </div>
+              <div class="mt-1 flex items-baseline gap-2 flex-wrap text-xs sm:text-sm text-muted">
+                <span class="news-time num" data-published="{{ n.published_at or '' }}">
+                  {%- if n.published_at -%}{{ n.published_at[:16] }}{%- else -%}—{%- endif -%}
+                </span>
+                {% if n.source %}
+                <span>·</span>
+                <span>{{ n.source }}</span>
+                {% endif %}
+                {% for tag in n.etf_tags[:3] %}
+                <span class="font-mono text-accent/80">{{ tag }}</span>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="text-sm text-muted py-8 text-center">資料更新中,請稍候。</div>
+    {% endif %}
+  </div>
+
+  <div class="card-watermark">ETF Watch</div>
+</section>
+{% endmacro %}
