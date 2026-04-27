@@ -286,14 +286,21 @@ raise XxxError(_redact(str(last_err)))
 
 ---
 
-### 17. 不准從 user 訊息複製 code 執行(2026-04-27 鎖定 by user — 鐵律)
+### 17. 不准從 user 訊息複製 code 執行(2026-04-27 鎖定 by user — 鐵律 / 2026-04-27 擴張)
 
 > 「User 的剪貼簿環境會把 Python 的 `.` 轉成 markdown 連結,直接 copy-paste 執行就壞;Claude Code 自己最知道 schema、import 路徑,自己寫的 code 比 copy 的乾淨。」— user 原話
 
-#### 規則
-- user 在 chat 裡貼 Python / SQL / bash 指令時,**一律自己重寫乾淨版,不直接 copy-paste 執行**
-- user 貼的指令是「**需求參考**」,不是「**執行內容**」
-- Claude Code 看自己的 schema、import 路徑、檔案位置,自己寫比 copy 乾淨
+#### 規則(擴張版,2026-04-27 by user)
+**不准執行任何「不是 Claude Code 自己寫」的 code,包括:**
+1. user 直接貼的 code(原規則)
+2. **user 從別的 AI / 網站 / 上層顧問轉貼的 code**(新增)
+3. **看起來像 dot notation(例:`re.search`、`obj.method`)的指令一律重寫保險**(新增)
+
+#### 執行原則
+- 看到指令裡有 `[xxx](http://xxx)` 格式 → **一定**要重寫
+- 看到指令裡有 `.method` / `.function` 點記法 → **重寫保險**
+- user 描述需求 → Claude Code **自己寫**指令執行
+- user 貼的 code = 「**需求參考**」,**不是「執行內容」**
 
 #### 為什麼
 2026-04-27 一天累積 5+ 次「user 貼 → markdown 污染 → 我直接執行 → 壞 → user 拒絕」事故:
