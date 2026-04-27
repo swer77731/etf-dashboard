@@ -138,7 +138,7 @@ def _parse_date(s: str | None, default: date) -> date:
 @router.get("/compare", response_class=HTMLResponse)
 async def compare(
     request: Request,
-    codes: str = "0050,0056,00878",
+    codes: str = "",
     start: str | None = None,
     end: str | None = None,
 ) -> HTMLResponse:

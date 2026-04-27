@@ -242,7 +242,7 @@
       <input type="hidden" name="codes" :value="codes.map(c => c.code).join(',')">
 
       <p class="text-xs text-muted mt-2">
-        提示:輸入代號數字(005 → 0050/0051/...) · 點 ✕ 移除 · ↑↓ 選建議 · Enter 加入 · Backspace 刪除最後一支(上限 6)
+        輸入代號數字 例:0050、00878
       </p>
     </div>
 
@@ -342,7 +342,7 @@
   <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
 
   <div class="card-content">
-    <header class="mb-5 flex items-baseline justify-between gap-4 flex-wrap">
+    <header class="mb-3">
       <div class="flex items-center gap-3">
         <div class="w-1 h-7 bg-accent rounded-full" style="box-shadow: 0 0 8px var(--c-accent-glow);"></div>
         <div>
@@ -350,8 +350,12 @@
           <div class="text-sm text-muted mt-1">期初 = 100,後續為當日累積報酬指數</div>
         </div>
       </div>
-      <div class="text-xs sm:text-sm text-muted num">{{ result.start }} ~ {{ result.end }}</div>
     </header>
+
+    {# 期間日期 — 置中、放大、正色,清楚標明這張圖在比哪段 #}
+    <div class="text-center mb-4">
+      <span class="num text-lg sm:text-xl font-semibold text-fg">{{ result.start }} ~ {{ result.end }}</span>
+    </div>
 
     {# Legend 勾選提示 banner — 明顯告訴 user 上方 ETF 名稱可點擊切換 #}
     <div class="mb-3 flex items-center gap-3 flex-wrap">
