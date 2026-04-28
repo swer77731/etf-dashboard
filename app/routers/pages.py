@@ -398,6 +398,14 @@ async def ranking_detail(request: Request, kind: str, p: str = "3m") -> HTMLResp
     )
 
 
+@router.get("/visual-preview", response_class=HTMLResponse)
+async def visual_preview_page(request: Request) -> HTMLResponse:
+    """臨時視覺風格預覽頁(A/B/C 三選一,選完即廢)。"""
+    return templates.TemplateResponse(
+        request, "visual_preview.html", _common_ctx(),
+    )
+
+
 @router.get("/monthly-income", response_class=HTMLResponse)
 async def monthly_income_page(request: Request) -> HTMLResponse:
     """月月配試算器頁面 — 100% 前端 + AJAX 打 /api/monthly-income/analyze。"""
