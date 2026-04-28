@@ -3,6 +3,9 @@
 {% block title %}月月配試算器 — {{ brand_full }}{% endblock %}
 
 {% block head %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700;800;900&family=Noto+Serif+TC:wght@600;700;900&display=swap" rel="stylesheet">
 <style>
   /* === ETF chip(picker)=== */
   .mi-chip {
@@ -238,10 +241,186 @@
     line-height: 1;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
+
+
+  /* ============================================================
+     試水溫雙色系 — B 暗(深紅夜場) / C 亮(奶油橄欖綠)
+     用 page-scope CSS variable 重設,Tailwind utility 自動跟隨。
+     全站 base.html token 不動。
+     ============================================================ */
+
+  /* === 暗色模式:B 風格 深紅夜場 === */
+  :root[data-theme="dark"] .mi-page {
+    --c-bg:           26 14 14;       /* #1A0E0E */
+    --c-bg-soft:      42 24 24;       /* #2A1818 */
+    --c-card:         42 24 24;       /* #2A1818 */
+    --c-card-hover:   58 32 32;
+    --c-border:       58 32 32;       /* #3A2020 */
+    --c-fg:           229 213 213;    /* #E5D5D5 */
+    --c-muted:        184 152 152;    /* #B89898 */
+    --c-accent:       255 77 92;      /* #FF4D5C */
+    --c-accent-glow:  rgba(255, 77, 92, 0.4);
+  }
+
+  /* === 亮色模式:C 風格 奶油橄欖綠 === */
+  :root[data-theme="light"] .mi-page {
+    --c-bg:           250 248 243;    /* #FAF8F3 */
+    --c-bg-soft:      255 255 255;    /* #FFFFFF */
+    --c-card:         255 255 255;    /* #FFFFFF */
+    --c-card-hover:   244 240 230;
+    --c-border:       224 220 208;    /* #E0DCD0 */
+    --c-fg:           26 26 26;       /* #1A1A1A */
+    --c-muted:        90 90 90;       /* #5A5A5A */
+    --c-accent:       107 127 58;     /* #6B7F3A */
+    --c-accent-glow:  rgba(107, 127, 58, 0.35);
+  }
+
+  /* === Page wrapper:確保整片區域套主題色 === */
+  .mi-page {
+    background: rgb(var(--c-bg));
+    color: rgb(var(--c-fg));
+    margin: -1.5rem -1rem;
+    padding: 1.5rem 1rem;
+    border-radius: 0.75rem;
+    transition: background 0.3s ease, color 0.3s ease;
+  }
+  @media (min-width: 640px) {
+    .mi-page { margin: -2.5rem -1.5rem; padding: 2.5rem 1.5rem; }
+  }
+
+  /* === Hero h1 漸層字 — 兩主題各自 === */
+  :root[data-theme="dark"] .mi-page h1 .hero-text {
+    background: linear-gradient(135deg, #FF4D5C 0%, #FF8088 60%, #FFB0B6 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    font-family: 'Noto Serif TC', serif;
+    font-weight: 700;
+  }
+  :root[data-theme="light"] .mi-page h1 .hero-text {
+    background: linear-gradient(135deg, #6B7F3A 0%, #3B4D1F 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    font-family: 'Noto Sans TC', sans-serif;
+    font-weight: 800;
+  }
+
+  /* === h2 / h3 字體切換 === */
+  :root[data-theme="dark"] .mi-page h2,
+  :root[data-theme="dark"] .mi-page h3 {
+    font-family: 'Noto Serif TC', serif;
+    font-weight: 700;
+  }
+  :root[data-theme="light"] .mi-page h2,
+  :root[data-theme="light"] .mi-page h3 {
+    font-family: 'Noto Sans TC', sans-serif;
+    font-weight: 800;
+  }
+
+  /* === 警語 banner === */
+  :root[data-theme="dark"] .mi-page .mi-warning-banner {
+    background: rgb(255 77 92 / 0.12);
+    border-color: rgb(255 77 92 / 0.5);
+    color: rgb(255 200 200);
+  }
+  :root[data-theme="dark"] .mi-page .mi-warning-banner svg { color: rgb(255 77 92); }
+  :root[data-theme="dark"] .mi-page .mi-warning-banner strong { color: rgb(255 130 138); }
+
+  :root[data-theme="light"] .mi-page .mi-warning-banner {
+    background: rgb(200 16 46 / 0.06);
+    border-color: rgb(200 16 46 / 0.45);
+    color: rgb(139 20 20);
+  }
+  :root[data-theme="light"] .mi-page .mi-warning-banner svg { color: rgb(200 16 46); }
+  :root[data-theme="light"] .mi-page .mi-warning-banner strong { color: rgb(200 16 46); }
+
+  /* === Coverage banner === */
+  :root[data-theme="dark"] .mi-page .cov-fully {
+    background: rgb(255 77 92 / 0.1);
+    border-color: rgb(255 77 92 / 0.45);
+    color: rgb(255 200 200);
+  }
+  :root[data-theme="dark"] .mi-page .cov-partial {
+    background: rgb(245 158 11 / 0.12);
+    border-color: rgb(245 158 11 / 0.4);
+    color: rgb(252 211 77);
+  }
+  :root[data-theme="light"] .mi-page .cov-fully {
+    background: rgb(107 127 58 / 0.12);
+    border-color: rgb(107 127 58 / 0.5);
+    color: rgb(59 77 31);
+  }
+  :root[data-theme="light"] .mi-page .cov-partial {
+    background: rgb(244 213 141 / 0.4);
+    border-color: rgb(184 134 11 / 0.5);
+    color: rgb(107 90 31);
+  }
+
+  /* === month-cell.is-uncovered:亮模式用台灣紅虛線 === */
+  :root[data-theme="light"] .mi-page .month-cell.is-uncovered {
+    border-color: rgb(200 16 46 / 0.35);
+  }
+  :root[data-theme="light"] .mi-page .month-cell-uncovered-tag {
+    color: rgb(200 16 46);
+  }
+
+  /* === pattern badges === */
+  :root[data-theme="light"] .mi-page .pattern-monthly {
+    background: rgb(107 127 58 / 0.18); color: rgb(59 77 31);
+    border-color: rgb(107 127 58 / 0.5);
+  }
+  :root[data-theme="light"] .mi-page .pattern-quarterly {
+    background: rgb(244 213 141 / 0.5); color: rgb(107 90 31);
+    border-color: rgb(184 134 11 / 0.45);
+  }
+  :root[data-theme="light"] .mi-page .pattern-semi {
+    background: rgb(168 85 247 / 0.12); color: rgb(107 33 168);
+    border-color: rgb(168 85 247 / 0.4);
+  }
+  :root[data-theme="light"] .mi-page .pattern-annual {
+    background: rgb(245 158 11 / 0.18); color: rgb(146 64 14);
+    border-color: rgb(245 158 11 / 0.45);
+  }
+
+  /* === summary-yield 大字 === */
+  :root[data-theme="dark"] .mi-page .summary-yield { color: rgb(255 107 122); }
+  :root[data-theme="light"] .mi-page .summary-yield { color: rgb(59 77 31); }
+
+  /* === Modal === */
+  :root[data-theme="dark"] .mi-page .mi-modal { border-color: rgb(255 77 92 / 0.5); }
+  :root[data-theme="dark"] .mi-page .mi-modal-icon { color: rgb(255 77 92); }
+  :root[data-theme="dark"] .mi-page .mi-modal-body strong { color: rgb(255 130 138); }
+  :root[data-theme="dark"] .mi-page .mi-modal-final { color: rgb(255 130 138); }
+
+  :root[data-theme="light"] .mi-page .mi-modal { border-color: rgb(107 127 58 / 0.5); }
+  :root[data-theme="light"] .mi-page .mi-modal-icon { color: rgb(200 16 46); }
+  :root[data-theme="light"] .mi-page .mi-modal-body strong { color: rgb(200 16 46); }
+  :root[data-theme="light"] .mi-page .mi-modal-final { color: rgb(200 16 46); }
+
+  /* === month-dot is-on === */
+  :root[data-theme="light"] .mi-page .month-dot.is-on {
+    background: rgb(107 127 58);
+    box-shadow: 0 0 6px rgba(107, 127, 58, 0.4);
+  }
+  :root[data-theme="dark"] .mi-page .month-dot.is-on {
+    background: rgb(255 77 92);
+    box-shadow: 0 0 6px rgba(255, 77, 92, 0.4);
+  }
+
+  /* === month-etf-pill 亮模式深綠 === */
+  :root[data-theme="light"] .mi-page .month-etf-pill {
+    background: rgb(107 127 58 / 0.18);
+    color: rgb(59 77 31);
+    font-weight: 600;
+  }
 </style>
 {% endblock %}
 
 {% block content %}
+<div class="mi-page">
 
 {# === Hero 區 === #}
 <section class="mb-6 relative">
@@ -489,6 +668,8 @@
 <section class="text-xs text-muted text-center mt-12 mb-6 max-w-2xl mx-auto leading-relaxed px-4">
   本頁僅呈現 ETF 公開配息資料推估。任何投資判斷請自行評估或諮詢合格之投資顧問。
 </section>
+
+</div>{# end .mi-page #}
 
 <script>
 function monthlyIncomePicker() {
