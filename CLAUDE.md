@@ -1467,7 +1467,10 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
   - CMoney API(`DtNo=59449513` + `action=getdtnodata` + `FilterNo=0`)
   - 10 交易日 batches → distinct etf_id 計 missing
   - `/api/etf/{code}/holdings` + `/holdings_change`、`/test_holdings` debug、scheduler 整合
-  - `/holdings` 前端頁:Alpine 自動完成 + ECharts 橫向 bar + 集中度警示 + 變動 + 共同持股
+  - `/holdings` 前端頁:Alpine chip picker + 集中度 + 變動(張數 / 1000)+ 共同持股
+  - **持股 chart 重做(2026-04-27 晚)**:ECharts 並排 N bar 連環踩坑(canvas init 寬度 + Alpine x-show race + 中文 font fallback + axisLabel truncation)→ 廢 ECharts、改 **純 div + CSS @keyframes bar-enter** + transition,合併 N 支 ETF **等權平均**(平均單股權重 / N)
+  - **API 退化偵測**:選「最新有 ≥ 10 筆」batch,跳過殘缺批次 + `is_partial` flag
+  - **Sync 紀律 #20 per-ETF 退化偵測**:該 ETF 過去 max ≥ 10 才啟動,current < past_max × 0.8 視為退化批 skip;海外/期貨型(過去 max < 10)寬容,所有 row 都寫
 - [x] Phase 2A: 首頁瘦身(縮 hero / Top 5 / 6 類別卡 2x3 / 新聞 5 則)✅ 2026-04-27
 - [x] Phase 2B: 各類別獨立排行頁 `/ranking/{kind}`(Top 30 + 多期間 tab)✅ 2026-04-27
 - [x] Phase 3:  `/dividend-calendar` 月曆 + 列表雙模式 ✅ 2026-04-27
@@ -1587,6 +1590,34 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
 - 解法:UI 改顯示「未來 only」+ 空狀態 graceful;同時開 Phase 1B-2 task 寫 TWSE 公告爬蟲補未來資料
 - 教訓:資料源能力先 prove(打 API 看真實回傳),再寫 UI;假設「設 end_date 就有未來」=錯
 
+### 2026-04-27 / Holdings chart / ECharts 並排 N bar 連環踩四坑(教訓:該換就換)
+- 症狀:`/holdings` 多 ETF 並排 ECharts horizontal bar 一個下午沒修好
+  - 坑 1:62.09% bar 的 data label 被 chart 右邊界切掉(`xAxis.max` 沒留 headroom)
+  - 坑 2:y 軸中文股名「聯」「日」glyph 變 box(canvas 不繼承 CSS,缺 `axisLabel.fontFamily`)
+  - 坑 3:axisLabel 被截剩單字「電/電/科/海/控」(`containLabel: false` + `grid.left: 165` 組合下 ECharts 給 label 微小寬度 + 從右對齊 trim)
+  - 坑 4:Chart canvas 初始化寬度=0(Alpine x-show display:none → '' 切換時序 + `el.offsetWidth` 提前讀取),`requestAnimationFrame(chart.resize)` 救不回來,bar 整個只佔容器 1/3 寬
+  - 坑 5:X 軸 tick 顯示「60% / 10%」反序(plot area 太窄 + `hideOverlap: true` 在窄空間挑出反序 label)
+- 教訓:**ECharts canvas + Alpine reactive + 中文字體 + 動態容器寬度**這四個變數一起出現時,踩坑成本遠超寫純 CSS。最後**廢 ECharts 改純 div + `transition: width` + `@keyframes bar-enter`**,所有問題消失,動畫還更順
+- 規則:**chart 不需要互動式 tooltip / zoom 時,優先 CSS bar list,不開 ECharts**
+
+### 2026-04-27 / ECharts gradient color format / `'rgb(R G B)' + '33'` canvas 不認
+- 症狀:`/etf/0050` chart console 噴 2870 次 `Failed to execute 'addColorStop' on 'CanvasGradient': The value provided ('rgb(59 130 246)33') could not be parsed as a color`,連帶 line 看似消失
+- root cause:`cssVar('--c-accent')` 取 CSS variable triplet `"59 130 246"` 包成 `"rgb(59 130 246)"`(CSS L4 空格語法,瀏覽器 CSS 認但 canvas API 不認),然後 `+ '33'` 拼接想假裝 alpha hex,出來變 `"rgb(59 130 246)33"` 完全不合法
+- 修法:加 `cssVarRgba(name, alpha)` helper 解析 triplet → `"rgba(R, G, B, a)"`,colorStops 改用此 helper
+- 教訓:**CSS color L4 空格語法 ≠ canvas color API**;Tailwind 的 `rgb(var(--c) / <alpha-value>)` 模式只在 CSS 內 work,JS 取出來想拼 alpha 一律用 `rgba()` 逗號版
+
+### 2026-04-27 / ECharts emphasis 預設 / hover 把同 series 後段拉淡 user 以為「線消失」
+- 症狀:hover detail chart 線時,user 視覺感覺 ETF 線不見了
+- root cause:ECharts 5 預設 `emphasis.focus: 'self'`,hover 觸發 series 進 emphasis state,連帶把同 series **非 hover 區段** lineStyle.opacity 拉低(blur 機制)。tooltip `trigger: 'axis'` 顯示沒問題,但視覺看起來線變透明 = 消失
+- 修法:每個 series 加 `emphasis: { disabled: true }`。tooltip 仍然觸發,但不再有 hover 視覺變化
+- 紀律 #1:tooltip 已經顯示資訊了,emphasis 動畫多此一舉,**不要多餘 hover 互動**
+
+### 2026-04-27 / Alpine `@click.outside` / 掛在 dropdown 上會被 input 點擊瞬間關閉
+- 症狀:sidebar autocomplete 點 input 框後 dropdown「閃一下就消失」
+- root cause:macro 把 `@click.outside="open=false"` 掛在 dropdown 元素本身(不是包住 input + dropdown 的 x-data root)。點 input 觸發 `@focus="open=true"`,**同一次 click 冒泡** Alpine 看到「click target = input 不在 dropdown 內」→ outside 觸發 → `open=false` 立刻覆蓋
+- 修法:`@click.outside` 移到 x-data 最外層 div(包住 input + dropdown 那層),click input 不再算 outside
+- 規則:**`@click.outside` 永遠掛在元件最外層**,不是內層 popup
+
 ### 2026-04-27 / Phase 1 / Windows 上 stale uvicorn worker 殘留
 - 症狀:改了 dividend_metrics.py 加 past_days 參數 + pages.py 呼叫,首頁卻持續顯示舊行為
 - 探勘:`Get-Process python` 看到 5 個 python.exe,其中一個 PID 從更早 session 遺留(08:25)還在 listen 8000
@@ -1598,6 +1629,41 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
 # 🎯 重要決策歷程
 
 (每個重要技術決定的「為什麼」)
+
+### 2026-04-27 / Holdings chart 從 ECharts 改純 div + CSS bar list
+- 考量:ECharts 並排 N bar 在 Alpine 動態容器下踩 5 個坑都還沒清完(canvas 寬度初始化 / 中文 fallback / axisLabel 截字 / xAxis tick 反序 / hover blur),debug 成本遠超功能價值。對應的純 CSS 實作只要 `transition: width` + `@keyframes bar-enter`,200 行縮成 ~80 行
+- 決定:**廢 ECharts**,持股 chart 用 `<ul>` + `.bar-row` (label / track / fill / value) + Alpine `x-for`
+- 額外效益:
+  - 中文字體自動繼承 Tailwind / Noto Sans TC,沒 canvas font fallback 問題
+  - `@keyframes bar-enter { from { width: 0 } }` 處理新進元素(隱式 to = inline width),`transition: width` 處理既有元素更新,兩個機制並存不衝突
+  - 沒 canvas init 寬度坑,容器 reflow 自動 reflow
+  - 沒 ECharts setOption merge / replaceMerge 心智負擔
+- 換來的代價:
+  - 沒原生 tooltip / zoom / 點擊互動 — 但持股 chart 不需要,排行已是「最重押 Top 10」結論
+  - 仍保留 ECharts 在 detail chart(走勢圖)、compare chart(累積報酬)— 那邊**互動價值大過 debug 成本**
+- 規則:**有 zoom / tooltip / 軸互動需求才開 ECharts;純展示型 bar 一律 CSS**
+
+### 2026-04-27 / 持股合併採等權平均(N 支 ETF)而非加總
+- 考量:
+  - 加總:2 支 ETF 都重押台積電 → 合計 70+62=132% 破 100%,X 軸要 0~150%,視覺崩
+  - 平均:對應「我各放一半錢買 0050+00878,實際曝險到台積電」散戶心智模型
+- 決定:`combined_weight = sum(etf.weight[stock] for etf in selected) / N`
+- 副標文案配合:
+  - 1 支 ETF:「這支 ETF 占比最多的個股」
+  - 2-3 支:「你選的 ETF 平均下來,占比最多的個股」
+  - 不用「等權平均」「合併曝險」這類專業詞(紀律 #1)
+
+### 2026-04-27 / 紀律 #20 完整性偵測 / per-ETF 寬容門檻而非絕對閾值
+- 原 plan(粗暴):batch < 10 rows → 視為退化,skip 不寫
+- 235 ETF profile 顯示**錯**:海外型(00642U / 00647L 等)/ 槓桿反向(00631L 等)/ 期貨型 ETF 過去 max 永遠 1-2 rows(本來就只持 1 個 swap),粗暴版會把這類 ETF 全部 batch 都判退化 → 進 missing → 永遠 retry → 永遠失敗
+- 修正版:**該 ETF 過去 max ≥ 10 才啟動偵測**(`HOLDINGS_TARGET_PER_BATCH = 10`),threshold = past_max × 0.8。海外型 threshold = 0(寬容,所有 row 都寫);0050/00878 等 threshold = 8(攔截從 10 退化到 5)
+- 規則:**紀律 #20 完整性偵測必須 per-source、per-entity 客製化閾值**,不能套絕對數字
+
+### 2026-04-27 / Detail chart TAIEX「永遠畫」改 toggle 預設關
+- 原:trend chart 永遠 2 條線(ETF 實線 + TAIEX 虛線)
+- 痛點:80% 散戶只想看「我這支 ETF 漲多少」,大盤對比是進階需求
+- 決定:預設只一條 ETF 線,右上角 toggle switch「疊加大盤對比」用戶主動開
+- 紀律 #1「白癡都看得懂」:預設介面只給核心資訊,進階需求收進開關
 
 ### 為什麼選這個技術棧
 - **FastAPI**:async 友善、自動產 OpenAPI doc、Pydantic 整合好
@@ -1862,3 +1928,5 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
 2026-04-27 08:00 | Step 4 News + UX 批量改造 | ✅ | 資料主權鐵律入 CLAUDE.md;ETF chip-autocomplete + 多格式日期 + 圖表 legend hint;新聞快訊化(7d 預設 + 相對時間 + 紅縱線);sidebar 字體放大;新增 Phase 1-3 規劃(配息公布欄 / 首頁瘦身 / 配息日曆)
 2026-04-27 09:00 | Phase 1 配息公布欄 + 詳情頁殖利率卡 + 全站搜尋 | ✅ | dividend_metrics 共用 helper、首頁「即將配息」三組(空狀態 graceful)、詳情頁「最近一次配息」+ 5 年細項 + 年度小計、全站 ETF 搜尋 sidebar 上方、走勢圖 < 1 年顯示「上市至今」+ 警示;發現 FinMind 不回未來 ex_date → 待 Phase 1B-2 TWSE 爬蟲補
 2026-04-27 16:00 | Phase 2A / 2B / 3 / 4 一輪做完 | ✅ | 首頁 6 類別卡 2x3 + Top 5 + 新聞 5 則;`/ranking/{kind}` 各類別 Top 30 + 5 期間 tab;`/dividend-calendar` 月曆 + 列表雙模式 + 紅色週日;`/contact` + `/changelog` 上線 + sidebar 底部小字導覽。所有頁面採紀律 #19 字級基準,新增 helper `dividend_metrics.get_dividends_in_range` + partial `ranking_card.html` / `news_preview.html`
+2026-04-27 18:00 | Holdings chart 重做 + 多 bug 連環修 | ✅ | 廢 ECharts 並排 N bar(canvas 初始化寬度 / 中文 fallback / axisLabel 截字 / hideOverlap 排序錯亂等踩不完)→ 改純 div + CSS `@keyframes bar-enter` + 等權平均合併;ECharts gradient `'rgb(R G B)' + '33'` canvas 不認 → 加 `cssVarRgba(name, alpha)` helper;detail chart hover 視覺消失 → `emphasis: { disabled: true }`;sidebar autocomplete `@click.outside` 從 dropdown 移到 x-data root(同 click 同時 open=true 又 outside=close);dividend calendar 加殖利率欄;0050 holdings 顯示 5 筆 → API 過濾退化 batch + sync 紀律 #20 per-ETF 寬容門檻
+2026-04-28 早上 | TAIEX toggle 對比大盤(預設關)| ✅ | detail chart header 右上加 CSS toggle switch + buildOption(showTaiex) + replaceMerge 'series' 動態切換;紀律 #1「白癡都看得懂」— 預設只一條線最直觀
