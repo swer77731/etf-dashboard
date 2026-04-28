@@ -553,9 +553,9 @@
       type: 'line',
       showSymbol: false,
       smooth: false,
-      // 線粗 2、更長 dash [14, 8](Bloomberg / 鉅亨風格虛線,不要密集灰條感)
-      // color: cssVar('--c-muted') 不透明,主題切換自動跟(暗=中灰、亮=深灰)
-      lineStyle: { width: 2, color: muted, type: [14, 8] },
+      // 風格:半透明實線(取代 dash 蟲狀),類似 Yahoo Finance / TradingView
+      // benchmark 線。乾淨、低調、明顯次要於 ETF 主線。
+      lineStyle: { width: 1.5, color: muted, opacity: 0.5 },
       itemStyle: { color: muted },
       data: taiexNorm,
       emphasis: { disabled: true },
