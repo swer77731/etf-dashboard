@@ -249,18 +249,7 @@
      全站 base.html token 不動。
      ============================================================ */
 
-  /* === 暗色模式:B 風格 深紅夜場 === */
-  :root[data-theme="dark"] .mi-page {
-    --c-bg:           26 14 14;       /* #1A0E0E */
-    --c-bg-soft:      42 24 24;       /* #2A1818 */
-    --c-card:         42 24 24;       /* #2A1818 */
-    --c-card-hover:   58 32 32;
-    --c-border:       58 32 32;       /* #3A2020 */
-    --c-fg:           229 213 213;    /* #E5D5D5 */
-    --c-muted:        184 152 152;    /* #B89898 */
-    --c-accent:       255 77 92;      /* #FF4D5C */
-    --c-accent-glow:  rgba(255, 77, 92, 0.4);
-  }
+  /* === 暗色模式:revert 用全站 base.html design token(藍版,不重設)=== */
 
   /* === 亮色模式:C 風格 奶油橄欖綠 === */
   :root[data-theme="light"] .mi-page {
@@ -288,16 +277,7 @@
     .mi-page { margin: -2.5rem -1.5rem; padding: 2.5rem 1.5rem; }
   }
 
-  /* === Hero h1 漸層字 — 兩主題各自 === */
-  :root[data-theme="dark"] .mi-page h1 .hero-text {
-    background: linear-gradient(135deg, #FF4D5C 0%, #FF8088 60%, #FFB0B6 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    color: transparent;
-    font-family: 'Noto Serif TC', serif;
-    font-weight: 700;
-  }
+  /* === Hero h1 漸層字(僅亮色 override,暗色用全站 .hero-text)=== */
   :root[data-theme="light"] .mi-page h1 .hero-text {
     background: linear-gradient(135deg, #6B7F3A 0%, #3B4D1F 100%);
     -webkit-background-clip: text;
@@ -308,27 +288,14 @@
     font-weight: 800;
   }
 
-  /* === h2 / h3 字體切換 === */
-  :root[data-theme="dark"] .mi-page h2,
-  :root[data-theme="dark"] .mi-page h3 {
-    font-family: 'Noto Serif TC', serif;
-    font-weight: 700;
-  }
+  /* === h2 / h3 字體切換(僅亮色)=== */
   :root[data-theme="light"] .mi-page h2,
   :root[data-theme="light"] .mi-page h3 {
     font-family: 'Noto Sans TC', sans-serif;
     font-weight: 800;
   }
 
-  /* === 警語 banner === */
-  :root[data-theme="dark"] .mi-page .mi-warning-banner {
-    background: rgb(255 77 92 / 0.12);
-    border-color: rgb(255 77 92 / 0.5);
-    color: rgb(255 200 200);
-  }
-  :root[data-theme="dark"] .mi-page .mi-warning-banner svg { color: rgb(255 77 92); }
-  :root[data-theme="dark"] .mi-page .mi-warning-banner strong { color: rgb(255 130 138); }
-
+  /* === 警語 banner(僅亮色 override,暗色用既有 .mi-warning-banner 紅)=== */
   :root[data-theme="light"] .mi-page .mi-warning-banner {
     background: rgb(200 16 46 / 0.06);
     border-color: rgb(200 16 46 / 0.45);
@@ -337,17 +304,7 @@
   :root[data-theme="light"] .mi-page .mi-warning-banner svg { color: rgb(200 16 46); }
   :root[data-theme="light"] .mi-page .mi-warning-banner strong { color: rgb(200 16 46); }
 
-  /* === Coverage banner === */
-  :root[data-theme="dark"] .mi-page .cov-fully {
-    background: rgb(255 77 92 / 0.1);
-    border-color: rgb(255 77 92 / 0.45);
-    color: rgb(255 200 200);
-  }
-  :root[data-theme="dark"] .mi-page .cov-partial {
-    background: rgb(245 158 11 / 0.12);
-    border-color: rgb(245 158 11 / 0.4);
-    color: rgb(252 211 77);
-  }
+  /* === Coverage banner(僅亮色)=== */
   :root[data-theme="light"] .mi-page .cov-fully {
     background: rgb(107 127 58 / 0.12);
     border-color: rgb(107 127 58 / 0.5);
@@ -385,29 +342,19 @@
     border-color: rgb(245 158 11 / 0.45);
   }
 
-  /* === summary-yield 大字 === */
-  :root[data-theme="dark"] .mi-page .summary-yield { color: rgb(255 107 122); }
+  /* === summary-yield 大字(僅亮色)=== */
   :root[data-theme="light"] .mi-page .summary-yield { color: rgb(59 77 31); }
 
-  /* === Modal === */
-  :root[data-theme="dark"] .mi-page .mi-modal { border-color: rgb(255 77 92 / 0.5); }
-  :root[data-theme="dark"] .mi-page .mi-modal-icon { color: rgb(255 77 92); }
-  :root[data-theme="dark"] .mi-page .mi-modal-body strong { color: rgb(255 130 138); }
-  :root[data-theme="dark"] .mi-page .mi-modal-final { color: rgb(255 130 138); }
-
+  /* === Modal(僅亮色)=== */
   :root[data-theme="light"] .mi-page .mi-modal { border-color: rgb(107 127 58 / 0.5); }
   :root[data-theme="light"] .mi-page .mi-modal-icon { color: rgb(200 16 46); }
   :root[data-theme="light"] .mi-page .mi-modal-body strong { color: rgb(200 16 46); }
   :root[data-theme="light"] .mi-page .mi-modal-final { color: rgb(200 16 46); }
 
-  /* === month-dot is-on === */
+  /* === month-dot is-on(僅亮色,暗色 fallback 用全站 --c-accent)=== */
   :root[data-theme="light"] .mi-page .month-dot.is-on {
     background: rgb(107 127 58);
     box-shadow: 0 0 6px rgba(107, 127, 58, 0.4);
-  }
-  :root[data-theme="dark"] .mi-page .month-dot.is-on {
-    background: rgb(255 77 92);
-    box-shadow: 0 0 6px rgba(255, 77, 92, 0.4);
   }
 
   /* === month-etf-pill 亮模式深綠 === */
