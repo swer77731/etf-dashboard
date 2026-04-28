@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from app.config import PROJECT_ROOT, settings
 from app.database import init_db
 from app.routers import api as api_router
+from app.routers import monthly_income as monthly_income_router
 from app.routers import pages as pages_router
 from app.scheduler import shutdown_scheduler, start_scheduler, startup_sync_if_needed
 
@@ -49,3 +50,4 @@ app.mount(
 
 app.include_router(pages_router.router)
 app.include_router(api_router.router)
+app.include_router(monthly_income_router.router)
