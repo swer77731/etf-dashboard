@@ -27,7 +27,7 @@ from datetime import date, datetime
 from typing import Any
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.database import session_scope
 from app.models.etf import ETF
@@ -58,6 +58,11 @@ USER_AGENT = (
 )
 
 SOURCE_TAG = "cmoney"
+
+# 紀律 #20 完整性閾值:該 ETF 過去 max rows-per-batch ≥ TARGET 才啟動退化偵測。
+# 海外型 / 期貨型 / 槓桿反向 ETF 本來就只持 1-2 個 swap,不該被誤判。
+HOLDINGS_TARGET_PER_BATCH = 10
+HOLDINGS_DEGRADE_RATIO = 0.8   # current < past_max × 0.8 → 視為退化批次,skip 不寫
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -187,23 +192,61 @@ def _compute_changes(by_day: dict[date, list[dict]]) -> list[dict]:
 # Persist
 # ──────────────────────────────────────────────────────────────────
 
-def _persist_snapshots(etf_id: int, by_day: dict[date, list[dict]]) -> int:
+def _query_past_max_rows(s, etf_id: int) -> int:
+    """該 ETF 過去最大 rows-per-batch(已 commit 在 holdings 表的)。
+
+    回 0 表示該 ETF 從未 sync 過(第一次 bootstrap)。
+    """
+    sub = (
+        select(func.count(Holding.id).label("cnt"))
+        .where(Holding.etf_id == etf_id)
+        .group_by(Holding.updated_at)
+        .subquery()
+    )
+    return s.scalar(select(func.max(sub.c.cnt))) or 0
+
+
+def _persist_snapshots(etf_id: int, by_day: dict[date, list[dict]]) -> tuple[int, list[date]]:
     """每個交易日寫一個 batch(updated_at = 該日 00:00:00)。
 
     UNIQUE(etf_id, stock_code, updated_at)保證重跑不重複。
+
+    紀律 #20 完整性:每日 batch 寫入前比對該 ETF 過去最大 rows-per-batch,
+    若 current < past_max × 0.8 視為退化批次,skip 不寫,記入 incomplete_days。
+    海外型 / 期貨型 ETF(過去 max < TARGET)不啟動偵測,所有 row 都寫。
+
+    回:(寫入筆數, 被 skip 的日期清單)
     """
     written = 0
+    incomplete_days: list[date] = []
     with session_scope() as s:
+        # 該 ETF 過去最大 rows-per-batch — 用來判斷退化
+        past_max = _query_past_max_rows(s, etf_id)
+        threshold = (
+            int(past_max * HOLDINGS_DEGRADE_RATIO)
+            if past_max >= HOLDINGS_TARGET_PER_BATCH
+            else 0
+        )
+
         for d, lst in by_day.items():
             batch_at = datetime.combine(d, datetime.min.time())
             # 該批已存在就跳過(idempotent)
-            existing_count = s.scalar(
+            existing = s.scalar(
                 select(Holding.id)
                 .where(Holding.etf_id == etf_id)
                 .where(Holding.updated_at == batch_at)
                 .limit(1)
             )
-            if existing_count:
+            if existing:
+                continue
+            # 紀律 #20:退化偵測(僅對「過去 max ≥ 10」的 ETF 啟動)
+            if threshold > 0 and len(lst) < threshold:
+                incomplete_days.append(d)
+                logger.warning(
+                    "[holdings] etf_id=%s skip degraded batch %s "
+                    "(only %d rows, past_max=%d, threshold=%d)",
+                    etf_id, d, len(lst), past_max, threshold,
+                )
                 continue
             for item in lst[:10]:  # Top 10 only(plan)
                 s.add(Holding(
@@ -217,7 +260,7 @@ def _persist_snapshots(etf_id: int, by_day: dict[date, list[dict]]) -> int:
                     source=SOURCE_TAG,
                 ))
                 written += 1
-    return written
+    return written, incomplete_days
 
 
 def _persist_changes(etf_id: int, changes: list[dict], batch_at: datetime) -> int:
@@ -261,6 +304,7 @@ def sync_etf_holdings_cmoney(codes: list[str]) -> dict[str, Any]:
     expected = list(codes)
     actual: list[str] = []
     errors: list[str] = []
+    degraded: list[str] = []   # 紀律 #20:該 ETF 全部 batch 都退化(0 完整批),歸 missing 排隊重試
     holdings_written = 0
     changes_written = 0
     batch_at = datetime.now()
@@ -283,14 +327,36 @@ def sync_etf_holdings_cmoney(codes: list[str]) -> dict[str, Any]:
             if not by_day:
                 errors.append(f"{code}: 0 valid snapshot rows")
                 continue
-            holdings_written += _persist_snapshots(etf_id, by_day)
-            changes = _compute_changes(by_day)
+            written, incomplete = _persist_snapshots(etf_id, by_day)
+            holdings_written += written
+
+            # 紀律 #20:該 ETF 所有日都被判退化 → 0 完整批可寫,歸 missing 排隊重試
+            complete_days = [d for d in by_day if d not in incomplete]
+            if not complete_days:
+                degraded.append(code)
+                errors.append(
+                    f"{code}: all {len(by_day)} batches degraded (skipped)"
+                )
+                logger.warning(
+                    "[holdings] %s ALL %d batches degraded — not counted as actual",
+                    code, len(by_day),
+                )
+                continue
+
+            # 變動只用「完整日」計算,避免把退化批的數字混進買賣超
+            changes = _compute_changes({d: by_day[d] for d in complete_days})
             changes_written += _persist_changes(etf_id, changes, batch_at)
             actual.append(code)
-            logger.info(
-                "[holdings] %s OK (snapshots=%d, changes=%d)",
-                code, len(by_day), len(changes),
-            )
+            if incomplete:
+                logger.info(
+                    "[holdings] %s OK with %d skipped degraded days: %s",
+                    code, len(incomplete), incomplete,
+                )
+            else:
+                logger.info(
+                    "[holdings] %s OK (snapshots=%d, changes=%d)",
+                    code, len(by_day), len(changes),
+                )
         except Exception as e:
             errors.append(f"{code}: {type(e).__name__}: {e}")
             logger.warning("[holdings] %s FAIL — %s", code, e)
@@ -312,13 +378,15 @@ def sync_etf_holdings_cmoney(codes: list[str]) -> dict[str, Any]:
         "expected_etfs": expected,
         "actual_etfs": actual,
         "missing_etfs": missing,
+        "degraded_etfs": degraded,   # 紀律 #20 退化詳情(missing 子集 + 異常原因)
         "holdings_written": holdings_written,
         "changes_written": changes_written,
         "errors": errors,
     }
     logger.info(
-        "[holdings] done: expected=%d actual=%d missing=%d holdings=%d changes=%d errors=%d",
-        len(expected), len(actual), len(missing),
+        "[holdings] done: expected=%d actual=%d missing=%d degraded=%d "
+        "holdings=%d changes=%d errors=%d",
+        len(expected), len(actual), len(missing), len(degraded),
         holdings_written, changes_written, len(errors),
     )
     return result
