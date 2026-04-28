@@ -247,11 +247,10 @@
   <div x-show="codes.length > 0 && !data_loading && holdings.length > 0" x-cloak class="mb-7">
     <h2 class="text-xl sm:text-2xl font-semibold mb-1">
       <span class="w-1 h-7 bg-accent rounded-full inline-block align-middle mr-2" style="box-shadow: 0 0 8px var(--c-accent-glow);"></span>
-      十大個股持股<span x-show="codes.length > 1" class="text-base text-muted font-normal ml-2">合併等權平均</span>
+      最重押的個股 Top 10
     </h2>
-    <div class="text-sm text-muted mb-4 ml-3" x-show="codes.length > 1">
-      依 <span x-text="codes.length"></span> 支 ETF 等權平均合併曝險,新增/移除 ETF 時 bar 會即時動畫重新分佈
-    </div>
+    <p class="text-sm sm:text-base text-muted mb-4 ml-3"
+       x-text="codes.length > 1 ? '你選的 ETF 平均下來,占比最多的個股' : '這支 ETF 占比最多的個股'"></p>
 
     <ul class="space-y-3 mt-4">
       <template x-for="s in combinedTopStocks()" :key="s.code">
