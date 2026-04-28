@@ -2,6 +2,60 @@
 
 {% block title %}{{ etf.code }} {{ etf.name }} — {{ brand_full }}{% endblock %}
 
+{% block head %}
+<style>
+  /* === 對比大盤 toggle switch === */
+  .taiex-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    cursor: pointer;
+    user-select: none;
+  }
+  .taiex-toggle-input {
+    position: absolute;
+    opacity: 0;
+    width: 0; height: 0;
+    pointer-events: none;
+  }
+  .taiex-toggle-track {
+    position: relative;
+    width: 38px; height: 20px;
+    background: rgb(var(--c-muted) / 0.4);
+    border-radius: 10px;
+    transition: background 0.25s ease;
+    flex-shrink: 0;
+  }
+  .taiex-toggle-thumb {
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 16px; height: 16px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  }
+  .taiex-toggle-input:checked + .taiex-toggle-track {
+    background: rgb(var(--c-accent));
+  }
+  .taiex-toggle-input:checked + .taiex-toggle-track .taiex-toggle-thumb {
+    transform: translateX(18px);
+  }
+  .taiex-toggle-label {
+    font-size: 0.875rem;
+    color: rgb(var(--c-muted));
+    transition: color 0.25s ease;
+  }
+  .taiex-toggle-input:checked ~ .taiex-toggle-label {
+    color: rgb(var(--c-accent));
+    font-weight: 500;
+  }
+  .taiex-toggle:focus-within .taiex-toggle-track {
+    box-shadow: 0 0 0 3px rgb(var(--c-accent) / 0.25);
+  }
+</style>
+{% endblock %}
+
 {% macro fmt_pct(v, signed=True) -%}
   {%- if v is none -%}—
   {%- else -%}
@@ -141,6 +195,14 @@
           {% endif %}
         </div>
       </div>
+
+      {# 對比大盤 toggle — 預設關 #}
+      <label class="taiex-toggle">
+        <input type="checkbox" id="taiex-toggle" class="taiex-toggle-input"
+               aria-label="疊加大盤對比">
+        <span class="taiex-toggle-track"><span class="taiex-toggle-thumb"></span></span>
+        <span class="taiex-toggle-label">疊加大盤對比</span>
+      </label>
     </header>
 
     <div id="trend-chart" class="w-full h-72 sm:h-96 relative z-10"></div>
@@ -460,74 +522,82 @@
 
     var chart = echarts.init(el, null, { renderer: 'canvas' });
 
-    chart.setOption({
-      backgroundColor: 'transparent',
-      grid: { left: 50, right: 20, top: 50, bottom: 40 },
-      tooltip: {
-        trigger: 'axis',
-        backgroundColor: bgSoft,
-        borderColor: border,
-        textStyle: { color: fg, fontSize: 13 },
-        axisPointer: { lineStyle: { color: muted } },
-      },
-      legend: {
-        data: [{{ etf.code | tojson }} + ' ' + {{ etf.name | tojson }}, '大盤(TAIEX)'],
-        textStyle: { color: muted, fontSize: 12 },
-        top: 8,
-      },
-      xAxis: {
-        type: 'time',
-        axisLine: { lineStyle: { color: border } },
-        axisLabel: { color: muted, fontSize: 11 },
-        splitLine: { show: false },
-      },
-      yAxis: {
-        type: 'value',
-        scale: true,
-        axisLine: { show: false },
-        axisLabel: {
-          color: muted, fontSize: 11,
-          formatter: function (v) { return v.toFixed(0); },
+    var etfName = {{ etf.code | tojson }} + ' ' + {{ etf.name | tojson }};
+
+    var etfSeries = {
+      name: etfName,
+      type: 'line',
+      showSymbol: false,
+      smooth: false,
+      lineStyle: { width: 2.5, color: accent },
+      areaStyle: {
+        color: {
+          type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [
+            { offset: 0, color: cssVarRgba('--c-accent', 0.2) },
+            { offset: 1, color: cssVarRgba('--c-accent', 0)   },
+          ],
         },
-        splitLine: { lineStyle: { color: border, type: 'dashed', opacity: 0.5 } },
       },
-      series: [
-        {
-          name: {{ etf.code | tojson }} + ' ' + {{ etf.name | tojson }},
-          type: 'line',
-          showSymbol: false,
-          smooth: false,
-          lineStyle: { width: 2.5, color: accent },
-          areaStyle: {
-            color: {
-              type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
-              colorStops: [
-                { offset: 0, color: cssVarRgba('--c-accent', 0.2) },
-                { offset: 1, color: cssVarRgba('--c-accent', 0)   },
-              ],
-            },
+      itemStyle: { color: accent },
+      data: etfNorm,
+      // 關掉 hover blur:ECharts 5 預設 emphasis.focus='self' 會把 hover 點之後的時段
+      // lineStyle.opacity 拉低,user 視覺以為「線消失」。tooltip 用 trigger:'axis'
+      // 仍會顯示,不需要 emphasis 視覺(紀律 #1 白癡都看得懂,不要多餘動畫)。
+      emphasis: { disabled: true },
+      z: 3,
+    };
+
+    var taiexSeries = {
+      name: '大盤(TAIEX)',
+      type: 'line',
+      showSymbol: false,
+      smooth: false,
+      lineStyle: { width: 1.5, color: muted, type: 'dashed' },
+      itemStyle: { color: muted },
+      data: taiexNorm,
+      emphasis: { disabled: true },
+      z: 2,
+    };
+
+    function buildOption(showTaiex) {
+      return {
+        backgroundColor: 'transparent',
+        grid: { left: 50, right: 20, top: 50, bottom: 40 },
+        tooltip: {
+          trigger: 'axis',
+          backgroundColor: bgSoft,
+          borderColor: border,
+          textStyle: { color: fg, fontSize: 13 },
+          axisPointer: { lineStyle: { color: muted } },
+        },
+        legend: {
+          data: showTaiex ? [etfName, '大盤(TAIEX)'] : [etfName],
+          textStyle: { color: muted, fontSize: 12 },
+          top: 8,
+        },
+        xAxis: {
+          type: 'time',
+          axisLine: { lineStyle: { color: border } },
+          axisLabel: { color: muted, fontSize: 11 },
+          splitLine: { show: false },
+        },
+        yAxis: {
+          type: 'value',
+          scale: true,
+          axisLine: { show: false },
+          axisLabel: {
+            color: muted, fontSize: 11,
+            formatter: function (v) { return v.toFixed(0); },
           },
-          itemStyle: { color: accent },
-          data: etfNorm,
-          // 關掉 hover blur:ECharts 5 預設 emphasis.focus='self' 會把 hover 點之後的時段
-          // lineStyle.opacity 拉低,user 視覺以為「線消失」。tooltip 用 trigger:'axis'
-          // 仍會顯示,不需要 emphasis 視覺(紀律 #1 白癡都看得懂,不要多餘動畫)。
-          emphasis: { disabled: true },
-          z: 3,
+          splitLine: { lineStyle: { color: border, type: 'dashed', opacity: 0.5 } },
         },
-        {
-          name: '大盤(TAIEX)',
-          type: 'line',
-          showSymbol: false,
-          smooth: false,
-          lineStyle: { width: 1.5, color: muted, type: 'dashed' },
-          itemStyle: { color: muted },
-          data: taiexNorm,
-          emphasis: { disabled: true },
-          z: 2,
-        },
-      ],
-    });
+        series: showTaiex ? [etfSeries, taiexSeries] : [etfSeries],
+      };
+    }
+
+    // 預設:不畫 TAIEX(toggle off)。replaceMerge 確保 series 切換時舊的不殘留。
+    chart.setOption(buildOption(false), { replaceMerge: 'series' });
 
     // 加 LOGO + 文字浮水印 (chart-watermark.js)
     if (typeof applyDefaultWatermark === 'function') {
@@ -536,6 +606,20 @@
         fontSize: 56,
         color: fg,
         logoSize: 64,
+      });
+    }
+
+    // 對比大盤 toggle:點擊 → 重新 setOption 帶 / 不帶 TAIEX series
+    var taiexToggle = document.getElementById('taiex-toggle');
+    if (taiexToggle) {
+      taiexToggle.addEventListener('change', function (e) {
+        chart.setOption(buildOption(e.target.checked), { replaceMerge: 'series' });
+        // setOption 會清掉 graphic(浮水印),要重補
+        if (typeof applyDefaultWatermark === 'function') {
+          applyDefaultWatermark(chart, {
+            opacity: 0.06, fontSize: 56, color: fg, logoSize: 64,
+          });
+        }
       });
     }
 
