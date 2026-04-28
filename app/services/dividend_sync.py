@@ -19,6 +19,9 @@ from app.models.dividend import Dividend
 from app.models.etf import ETF
 from app.services import finmind
 from app.services.etf_universe import list_active_etfs
+from app.services.sync_status import record_sync_attempt
+
+SYNC_SOURCE = "dividend_sync"
 
 logger = logging.getLogger(__name__)
 
@@ -121,10 +124,14 @@ def sync_one_etf(etf: ETF, end: date | None = None) -> dict:
 
 
 def sync_all(etfs: Iterable[ETF] | None = None, end: date | None = None) -> dict:
+    """紀律 #20:expected/actual/missing → record_sync_attempt 持久化。"""
     end = end or date.today()
     finmind.log_quota("before dividend sync_all")
 
     targets = list(etfs) if etfs is not None else list_active_etfs(include_index=False)
+    expected_codes = [e.code for e in targets]
+    actual_codes: list[str] = []
+    errors: list[str] = []
     logger.info("[dividend_sync] start: %d ETFs, target end=%s", len(targets), end)
 
     summary = {"total": len(targets), "ok": 0, "empty": 0, "error": 0, "rows_written": 0}
@@ -136,6 +143,7 @@ def sync_all(etfs: Iterable[ETF] | None = None, end: date | None = None) -> dict
                 summary["ok"] += 1
             else:
                 summary["empty"] += 1
+            actual_codes.append(etf.code)
             if i % 25 == 0 or i == len(targets):
                 q = finmind.check_quota()
                 logger.info(
@@ -145,8 +153,23 @@ def sync_all(etfs: Iterable[ETF] | None = None, end: date | None = None) -> dict
                 )
         except Exception as e:
             summary["error"] += 1
+            errors.append(f"{etf.code}: {type(e).__name__}: {str(e)[:80]}")
             logger.exception("[dividend_sync] failed on %s: %s", etf.code, e)
 
     finmind.log_quota("after dividend sync_all")
+
+    missing = [c for c in expected_codes if c not in actual_codes]
+    success = len(missing) == 0 and not errors
+    record_sync_attempt(
+        source=SYNC_SOURCE,
+        success=success,
+        rows=summary["rows_written"],
+        error="; ".join(errors)[:1900] if errors else None,
+        missing=missing,
+    )
+    summary["expected"] = len(expected_codes)
+    summary["actual"] = len(actual_codes)
+    summary["missing"] = missing
+
     logger.info("[dividend_sync] done: %s", summary)
     return summary
