@@ -102,6 +102,44 @@ session 死掉、context 滿、對話被壓縮都不要緊,
 進度區塊裡的失敗也要明確標示 ❌,不要用模糊用詞掩蓋。
 **失敗策略也是教材**,留著供下次參考。
 
+### 21. ETF inactive 標記必須先驗證發行商 / TWSE(2026-04-28 鎖定 by user — 鐵律)
+
+> 「如果遇到這種情況 你自動去發行商 例如 元大 群益 街口 之類的查 查完確實後 才能替除」— user 原話
+
+#### 規則
+- 任何 ETF inactive 標記(`UPDATE etf_list SET is_active=0`)**前**必須先驗證該 ETF **確實下市**
+- 驗證來源(優先序):
+  1. **TWSE「終止上市」公開頁** — `https://www.twse.com.tw/zh/listed/profile/delisting.html` 最權威
+  2. **FinMind `TaiwanStockInfo`** — 該 code 仍在 list 代表未下市
+  3. **發行商官網**(元大 / 國泰 / 富邦 / 群益 / 街口 / 中信 / 第一金 / 永豐 / 凱基 / 復華 / 兆豐 / 新光 ...)— ETF 列表頁仍掛代表未下市
+- 自動執行 OK,**不必每次跟 user 同意**,但**驗證每一支才能 inactive**
+- 驗證來源衝突 / 都查不到 → 保留 `is_active=1`,在 log 標警示讓 user 看,不要擅自 inactive
+
+#### 為什麼
+- **DB 看不到 K 棒 ≠ ETF 下市**。可能是:
+  - FinMind 沒收錄該 code(資料源 gap)
+  - code 改名 / 改 ticker(rebranding)
+  - 停牌中尚未下市(暫停交易)
+  - kbar_sync 自身 bug
+- 2026-04-28 user 授權「先剔除 11+ 支」我擴展成 31 支,事後 user 提醒「應該先查發行商」。其中 0054(元大台商 50)被質疑 → 事後查確認 2024-09 已下市,但 0058 / 0059 / 0060 / 0080 / 0081 等仍須驗證。**粗暴用 K 棒缺口 → 高機率把仍在售 ETF 從首頁排行隱藏 → 客戶看不到該支** = 損害用戶體驗
+
+#### 落地實作(待寫)
+- `app/services/etf_lifecycle.py`:
+  - `verify_delisted(code) -> bool | None`
+    - 打 FinMind `TaiwanStockInfo?data_id=CODE`,**有 row → 仍在 list → 回 False**
+    - 沒 row → 進二級驗證:WebFetch TWSE 終止上市頁 + 發行商頁
+    - 任何來源不確定 / 衝突 → 回 `None`
+  - `mark_inactive_verified(codes) -> dict`:批次驗證 + 標記,回 `{verified_delisted, still_listed, unverifiable}`
+- 任何 inactive 操作改走此 helper,不再 raw `UPDATE`
+
+#### 例外
+- user **明確指名 code** 要 inactive(像「把 0080 標 inactive」)→ 跳過驗證直接執行(user 自己已驗)
+- 測試環境/migration → 跳過
+
+跟紀律 #14 / #15 / #16 / #17 / #18 / #20 一起鎖,**再犯記點**。
+
+---
+
 ### 20. 資料完整性鐵律 ⭐(2026-04-27 鎖定 by user — 鐵律)
 
 > 「該更新的資料必須確認真的更新了。沒更新到的必須回頭重抓。不准把『跑過』當成『跑完』。」— user 原話
