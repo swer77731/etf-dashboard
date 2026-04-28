@@ -13,6 +13,9 @@ from sqlalchemy import select
 from app.database import session_scope
 from app.models.etf import ETF
 from app.services import etf_classifier, finmind
+from app.services.sync_status import record_sync_attempt
+
+SYNC_SOURCE = "etf_universe"
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -63,10 +66,24 @@ def _ensure_taiex(session: "Session") -> None:
 
 
 def sync_universe() -> dict:
-    """執行一次完整 ETF 主檔同步,回傳統計摘要。"""
+    """執行一次完整 ETF 主檔同步,回傳統計摘要。
+
+    紀律 #20:expected = FinMind 篩選後 ETF 數,actual = 實際 upsert 成功,
+    missing = upsert 失敗的 code → record_sync_attempt。fetch 整個爆例外
+    也會 record(success=False, error=...)。
+    """
     finmind.log_quota("before sync_universe")
 
-    rows = finmind.request("TaiwanStockInfo")
+    try:
+        rows = finmind.request("TaiwanStockInfo")
+    except Exception as e:
+        logger.exception("[universe] FinMind fetch failed")
+        record_sync_attempt(
+            source=SYNC_SOURCE, success=False, rows=0,
+            error=f"fetch: {type(e).__name__}: {str(e)[:200]}",
+        )
+        raise
+
     logger.info("[universe] FinMind returned %d rows", len(rows))
 
     # 過濾出 ETF(industry_category 中文「ETF」或「受益憑證」)
@@ -85,6 +102,10 @@ def sync_universe() -> dict:
 
     logger.info("[universe] filtered to %d unique ETFs", len(etfs))
 
+    expected_codes = [e[0] for e in etfs]
+    actual_codes: list[str] = []
+    errors: list[str] = []
+
     stats = {
         "total_in_feed": len(rows),
         "etf_count": len(etfs),
@@ -97,21 +118,41 @@ def sync_universe() -> dict:
         _ensure_taiex(session)
 
         for code, name, listed_date in etfs:
-            cat = etf_classifier.classify(code, name)
-            _, is_new = _upsert_etf(
-                session,
-                code=code,
-                name=name,
-                category=cat,
-                listed_date=listed_date,
-            )
-            stats["added" if is_new else "updated"] += 1
-            stats["by_category"][cat] = stats["by_category"].get(cat, 0) + 1
+            try:
+                cat = etf_classifier.classify(code, name)
+                _, is_new = _upsert_etf(
+                    session,
+                    code=code,
+                    name=name,
+                    category=cat,
+                    listed_date=listed_date,
+                )
+                stats["added" if is_new else "updated"] += 1
+                stats["by_category"][cat] = stats["by_category"].get(cat, 0) + 1
+                actual_codes.append(code)
+            except Exception as e:
+                errors.append(f"{code}: {type(e).__name__}: {str(e)[:80]}")
+                logger.exception("[universe] upsert failed on %s", code)
 
     finmind.log_quota("after sync_universe")
+
+    # 紀律 #20
+    missing = [c for c in expected_codes if c not in actual_codes]
+    success = len(missing) == 0 and not errors
+    record_sync_attempt(
+        source=SYNC_SOURCE,
+        success=success,
+        rows=stats["added"] + stats["updated"],
+        error="; ".join(errors)[:1900] if errors else None,
+        missing=missing,
+    )
+    stats["expected"] = len(expected_codes)
+    stats["actual"] = len(actual_codes)
+    stats["missing"] = missing
+
     logger.info(
-        "[universe] sync done: added=%d updated=%d by_category=%s",
-        stats["added"], stats["updated"], stats["by_category"],
+        "[universe] sync done: added=%d updated=%d missing=%d by_category=%s",
+        stats["added"], stats["updated"], len(missing), stats["by_category"],
     )
     return stats
 
