@@ -1,22 +1,36 @@
-"""APScheduler:每天 14:30 自動同步 ETF 清單 + K 棒。
+"""APScheduler — 排程拆分版(紀律 #20 監控)。
 
-啟動時也會在背景觸發一次「if-needed」的 sync(空 DB → 全 backfill,
-有資料 → 增量補今日)。不卡 web server 啟動。
+排程時間表(timezone Asia/Taipei):
+- 每 15 分鐘  : 新聞 sync(news_sync.sync_recent)
+- 每天 16:00 : K 棒 + 還原股價(kbar_sync.sync_all)
+- 每天 16:30 : CMoney 持股(holdings_sync.sync_etf_holdings_cmoney)
+- 每天 20:00 : TWSE 配息預告(dividend_announce_sync.sync_all)
+- 每天 23:00 : 健康度總檢查(health_check.daily_health_check)
+- 每週日 02:00: dividend 全量 sync(dividend_sync.sync_all)
+- 每週一 03:00: etf_universe 同步(etf_universe.sync_universe)
+
+每個 sync 內已落實紀律 #20(record_sync_attempt + missing 清單)。
+若 sync 跑完 missing 不為空,scheduler 會 5 分鐘後 one-shot retry 一次,
+仍 missing → 留待明天該 cron 再跑(不無限 retry)。
+
+健康度檢查 23:00 掃當天所有 sync_status,標出沒跑 / 失敗 / partial。
 """
 from __future__ import annotations
 
 import logging
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.date import DateTrigger
 
 from app.config import settings
 from app.services import (
     dividend_announce_sync,
     dividend_sync,
     etf_universe,
+    health_check,
     holdings_sync,
     kbar_sync,
     news_sync,
@@ -25,54 +39,178 @@ from app.services import (
 logger = logging.getLogger(__name__)
 
 _scheduler: AsyncIOScheduler | None = None
-_sync_in_progress = threading.Lock()
+_locks: dict[str, threading.Lock] = {
+    "kbar": threading.Lock(),
+    "dividend": threading.Lock(),
+    "universe": threading.Lock(),
+    "news": threading.Lock(),
+    "announce": threading.Lock(),
+    "holdings": threading.Lock(),
+    "health": threading.Lock(),
+}
+
+# 5 分鐘後 retry 用 — APScheduler 有 max_instances=1 + coalesce 防併發
+_RETRY_DELAY_MIN = 5
 
 
-def daily_sync_job() -> None:
-    """每天 14:30 執行:先掃 ETF 清單(新上市自動進),再同步全市場 K 棒。"""
-    if not _sync_in_progress.acquire(blocking=False):
-        logger.warning("[daily_sync] previous sync still running — skip this tick")
+# ─────────────────────────────────────────────────────────────
+# 個別 sync wrapper(都是 thread-safe lock-protected)
+# ─────────────────────────────────────────────────────────────
+
+def _try_lock(name: str) -> bool:
+    if not _locks[name].acquire(blocking=False):
+        logger.warning("[scheduler] %s sync still running — skip this tick", name)
+        return False
+    return True
+
+
+def _release(name: str) -> None:
+    try:
+        _locks[name].release()
+    except RuntimeError:
+        pass
+
+
+def _schedule_retry(name: str, fn) -> None:
+    """5 分鐘後 one-shot retry。"""
+    if _scheduler is None:
+        return
+    run_at = datetime.now() + timedelta(minutes=_RETRY_DELAY_MIN)
+    _scheduler.add_job(
+        fn,
+        trigger=DateTrigger(run_date=run_at, timezone=settings.scheduler_timezone),
+        id=f"retry_{name}_{run_at.strftime('%H%M%S')}",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    logger.info("[scheduler] scheduled retry for %s at %s", name, run_at)
+
+
+# ─────────────────────────────────────────────────────────────
+# Job 函式 — 每個包 lock + 紀律 #20 missing → 5min retry
+# ─────────────────────────────────────────────────────────────
+
+def kbar_job(_retry: bool = False) -> None:
+    if not _try_lock("kbar"):
         return
     try:
-        logger.info("[daily_sync] start @ %s", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        u_stats = etf_universe.sync_universe()
-        logger.info("[daily_sync] universe: %s", u_stats)
-        k_stats = kbar_sync.sync_all()
-        logger.info("[daily_sync] kbar: %s", k_stats)
-        d_stats = dividend_sync.sync_all()
-        logger.info("[daily_sync] dividend: %s", d_stats)
-        # TWSE 除權息預告 — 跟在 dividend_sync(FinMind 歷史)後面,
-        # 兩者寫同一張 dividend table:FinMind 已實現 + TWSE 未來公告 互補
-        a_stats = dividend_announce_sync.sync_all()
-        logger.info("[daily_sync] dividend_announce: %s", a_stats)
-        n_stats = news_sync.sync_recent()
-        logger.info("[daily_sync] news: %s", n_stats)
-        # 持股 + 持股變動(CMoney API)— 抓所有 active ETF
-        # 紀律 #20:expected/actual/missing/errors → record_sync_attempt 持久化
-        try:
-            from sqlalchemy import select
-            from app.database import session_scope
-            from app.models.etf import ETF
-            with session_scope() as s:
-                active_codes = list(s.scalars(
-                    select(ETF.code).where(ETF.is_active.is_(True))
-                    .where(ETF.category != "index")
-                ).all())
-            h_stats = holdings_sync.sync_etf_holdings_cmoney(active_codes)
-            logger.info("[daily_sync] holdings: %s",
-                        {k: (len(v) if isinstance(v, list) else v) for k, v in h_stats.items()})
-        except Exception:
-            logger.exception("[daily_sync] holdings failed")
+        logger.info("[kbar_job] start (retry=%s)", _retry)
+        stats = kbar_sync.sync_all()
+        logger.info("[kbar_job] %s", stats)
+        if not _retry and stats.get("missing"):
+            _schedule_retry("kbar", lambda: kbar_job(_retry=True))
     except Exception:
-        logger.exception("[daily_sync] failed")
+        logger.exception("[kbar_job] failed")
     finally:
-        _sync_in_progress.release()
+        _release("kbar")
 
+
+def dividend_job(_retry: bool = False) -> None:
+    if not _try_lock("dividend"):
+        return
+    try:
+        logger.info("[dividend_job] start (retry=%s)", _retry)
+        stats = dividend_sync.sync_all()
+        logger.info("[dividend_job] %s", stats)
+        if not _retry and stats.get("missing"):
+            _schedule_retry("dividend", lambda: dividend_job(_retry=True))
+    except Exception:
+        logger.exception("[dividend_job] failed")
+    finally:
+        _release("dividend")
+
+
+def universe_job(_retry: bool = False) -> None:
+    if not _try_lock("universe"):
+        return
+    try:
+        logger.info("[universe_job] start (retry=%s)", _retry)
+        stats = etf_universe.sync_universe()
+        logger.info("[universe_job] %s", stats)
+        if not _retry and stats.get("missing"):
+            _schedule_retry("universe", lambda: universe_job(_retry=True))
+    except Exception:
+        logger.exception("[universe_job] failed")
+    finally:
+        _release("universe")
+
+
+def news_job(_retry: bool = False) -> None:
+    if not _try_lock("news"):
+        return
+    try:
+        logger.info("[news_job] start (retry=%s)", _retry)
+        stats = news_sync.sync_recent()
+        logger.info("[news_job] %s", stats)
+        if not _retry and stats.get("missing"):
+            _schedule_retry("news", lambda: news_job(_retry=True))
+    except Exception:
+        logger.exception("[news_job] failed")
+    finally:
+        _release("news")
+
+
+def announce_job() -> None:
+    if not _try_lock("announce"):
+        return
+    try:
+        logger.info("[announce_job] start")
+        stats = dividend_announce_sync.sync_all()
+        logger.info("[announce_job] %s", stats)
+        # twse_announce 沒 per-ETF missing 概念(批次抓全部),不做 retry
+    except Exception:
+        logger.exception("[announce_job] failed")
+    finally:
+        _release("announce")
+
+
+def holdings_job(_retry: bool = False) -> None:
+    if not _try_lock("holdings"):
+        return
+    try:
+        logger.info("[holdings_job] start (retry=%s)", _retry)
+        from sqlalchemy import select
+        from app.database import session_scope
+        from app.models.etf import ETF
+        with session_scope() as s:
+            active_codes = list(s.scalars(
+                select(ETF.code).where(ETF.is_active.is_(True))
+                .where(ETF.category != "index")
+            ).all())
+        stats = holdings_sync.sync_etf_holdings_cmoney(active_codes)
+        logger.info("[holdings_job] %s",
+                    {k: (len(v) if isinstance(v, list) else v) for k, v in stats.items()})
+        if not _retry and stats.get("missing_etfs"):
+            _schedule_retry("holdings", lambda: holdings_job(_retry=True))
+    except Exception:
+        logger.exception("[holdings_job] failed")
+    finally:
+        _release("holdings")
+
+
+def health_job() -> None:
+    if not _try_lock("health"):
+        return
+    try:
+        logger.info("[health_job] start")
+        result = health_check.daily_health_check()
+        if not result["ok"]:
+            logger.warning("[health_job] NOT healthy: %s", result["summary"])
+    except Exception:
+        logger.exception("[health_job] failed")
+    finally:
+        _release("health")
+
+
+# ─────────────────────────────────────────────────────────────
+# Startup bootstrap — server 啟動時若 DB 空就跑全量
+# ─────────────────────────────────────────────────────────────
 
 def startup_sync_if_needed() -> None:
-    """啟動時跑一次:空 DB 或 ETF 清單空 → 全 backfill。
+    """啟動時跑一次:空 DB → 全 backfill;有資料 → 增量同步。
 
-    放在 background thread 跑,不卡 FastAPI startup。
+    放 background thread 跑,不卡 FastAPI startup。
     """
     def _run():
         try:
@@ -85,11 +223,19 @@ def startup_sync_if_needed() -> None:
 
             logger.info("[startup_sync] etf_list rows = %d", etf_count)
             if etf_count == 0:
-                logger.info("[startup_sync] empty DB detected — running full bootstrap")
-                daily_sync_job()
+                logger.info("[startup_sync] empty DB — running full bootstrap")
+                universe_job()
+                kbar_job()
+                dividend_job()
+                announce_job()
+                news_job()
+                holdings_job()
             else:
-                logger.info("[startup_sync] DB has data — running incremental sync")
-                daily_sync_job()
+                logger.info("[startup_sync] DB has data — running incremental")
+                kbar_job()
+                announce_job()
+                news_job()
+                holdings_job()
         except Exception:
             logger.exception("[startup_sync] failed")
 
@@ -97,34 +243,56 @@ def startup_sync_if_needed() -> None:
     t.start()
 
 
+# ─────────────────────────────────────────────────────────────
+# 排程設定
+# ─────────────────────────────────────────────────────────────
+
 def start_scheduler() -> AsyncIOScheduler:
     global _scheduler
     if _scheduler and _scheduler.running:
         return _scheduler
 
-    scheduler = AsyncIOScheduler(timezone=settings.scheduler_timezone)
+    tz = settings.scheduler_timezone
+    scheduler = AsyncIOScheduler(timezone=tz)
 
-    # 每天 14:30 (台北時間,設定檔可調) — 全市場同步
-    scheduler.add_job(
-        daily_sync_job,
-        trigger=CronTrigger(
-            hour=settings.daily_fetch_hour,
-            minute=settings.daily_fetch_minute,
-            timezone=settings.scheduler_timezone,
-        ),
-        id="daily_sync",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-    )
+    # 排程時間表(可調)
+    jobs = [
+        # 每 15 分鐘 — 新聞
+        ("news_15min", news_job,
+         CronTrigger(minute="*/15", timezone=tz)),
+        # 每天 16:00 — K 棒 + 還原股價(收盤後)
+        ("kbar_daily", kbar_job,
+         CronTrigger(hour=16, minute=0, timezone=tz)),
+        # 每天 16:30 — CMoney 持股
+        ("holdings_daily", holdings_job,
+         CronTrigger(hour=16, minute=30, timezone=tz)),
+        # 每天 20:00 — TWSE 配息預告
+        ("announce_daily", announce_job,
+         CronTrigger(hour=20, minute=0, timezone=tz)),
+        # 每天 23:00 — 健康度總檢查
+        ("health_daily", health_job,
+         CronTrigger(hour=23, minute=0, timezone=tz)),
+        # 每週日 02:00 — dividend 全量 sync
+        ("dividend_weekly", dividend_job,
+         CronTrigger(day_of_week="sun", hour=2, minute=0, timezone=tz)),
+        # 每週一 03:00 — etf_universe 同步
+        ("universe_weekly", universe_job,
+         CronTrigger(day_of_week="mon", hour=3, minute=0, timezone=tz)),
+    ]
+
+    for job_id, fn, trig in jobs:
+        scheduler.add_job(
+            fn,
+            trigger=trig,
+            id=job_id,
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+        logger.info("[scheduler] job registered: %s", job_id)
 
     scheduler.start()
-    logger.info(
-        "Scheduler started (tz=%s, daily_sync=%02d:%02d)",
-        settings.scheduler_timezone,
-        settings.daily_fetch_hour,
-        settings.daily_fetch_minute,
-    )
+    logger.info("Scheduler started (tz=%s, %d jobs)", tz, len(jobs))
     _scheduler = scheduler
     return scheduler
 
