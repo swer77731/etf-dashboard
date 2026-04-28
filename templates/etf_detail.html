@@ -553,11 +553,12 @@
       type: 'line',
       showSymbol: false,
       smooth: false,
-      lineStyle: { width: 1.5, color: muted, type: 'dashed' },
+      // 線粗 2、長線段 dash [10, 6](中性灰隨主題切換,白底/暗底都看得清)
+      lineStyle: { width: 2, color: muted, type: [10, 6] },
       itemStyle: { color: muted },
       data: taiexNorm,
       emphasis: { disabled: true },
-      z: 2,
+      z: 2,   // ETF 線 z:3 在上,TAIEX 在下
     };
 
     function buildOption(showTaiex) {
