@@ -398,6 +398,14 @@ async def ranking_detail(request: Request, kind: str, p: str = "3m") -> HTMLResp
     )
 
 
+@router.get("/monthly-income", response_class=HTMLResponse)
+async def monthly_income_page(request: Request) -> HTMLResponse:
+    """月月配試算器頁面 — 100% 前端 + AJAX 打 /api/monthly-income/analyze。"""
+    return templates.TemplateResponse(
+        request, "monthly_income.html", _common_ctx(),
+    )
+
+
 @router.get("/holdings", response_class=HTMLResponse)
 async def holdings_page(request: Request, codes: str = "") -> HTMLResponse:
     """ETF 持股分析頁 — Alpine.js + AJAX,前端打 /api/etf/{code}/holdings。

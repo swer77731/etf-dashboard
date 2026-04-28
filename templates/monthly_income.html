@@ -1,0 +1,511 @@
+{% extends "base.html" %}
+
+{% block title %}月月配試算器 — {{ brand_full }}{% endblock %}
+
+{% block head %}
+<style>
+  /* === ETF chip(picker)=== */
+  .mi-chip {
+    display: inline-flex; align-items: center; gap: 0.45rem;
+    padding: 0.4rem 0.75rem; border-radius: 0.45rem;
+    font-size: 1rem;
+    background: rgb(var(--c-accent) / 0.13);
+    border: 1px solid rgb(var(--c-accent) / 0.45);
+    color: rgb(var(--c-accent));
+  }
+  .mi-chip-x {
+    width: 1.15rem; height: 1.15rem;
+    border-radius: 9999px;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background 0.15s ease;
+  }
+  .mi-chip-x:hover { background: rgb(var(--c-accent) / 0.35); }
+
+  .picker-shell { position: relative; }
+  .picker-suggest {
+    position: absolute; top: 100%; left: 0; right: 0;
+    margin-top: 0.5rem;
+    background: rgb(var(--c-card));
+    border: 1px solid rgb(var(--c-border));
+    border-radius: 0.5rem;
+    box-shadow: 0 12px 40px -8px rgba(0,0,0,0.45);
+    max-height: 18rem; overflow-y: auto;
+    z-index: 30;
+  }
+  .picker-row {
+    width: 100%; text-align: left;
+    padding: 0.6rem 0.85rem;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 0.75rem;
+    transition: background 0.1s ease;
+  }
+  .picker-row:hover, .picker-row.is-active { background: rgb(var(--c-accent) / 0.1); }
+  .picker-row:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* === 紅色警語 banner === */
+  .mi-warning-banner {
+    background: rgb(239 68 68 / 0.08);
+    border: 1px solid rgb(239 68 68 / 0.4);
+    border-radius: 0.5rem;
+    padding: 0.85rem 1rem;
+    color: rgb(252 165 165);
+    font-size: 0.9rem;
+    line-height: 1.55;
+  }
+
+  /* === 月份覆蓋 12 格 === */
+  .month-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.6rem;
+  }
+  @media (max-width: 640px) {
+    .month-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  .month-cell {
+    background: rgb(var(--c-bg-soft));
+    border: 1px solid rgb(var(--c-border));
+    border-radius: 0.55rem;
+    padding: 0.7rem 0.8rem 0.85rem;
+    min-height: 5rem;
+    transition: border-color 0.2s ease, background 0.2s ease;
+  }
+  .month-cell.is-covered {
+    background: rgb(var(--c-accent) / 0.06);
+    border-color: rgb(var(--c-accent) / 0.4);
+  }
+  .month-cell.is-uncovered {
+    border-style: dashed;
+    border-color: rgb(239 68 68 / 0.3);
+  }
+  .month-cell-num {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: rgb(var(--c-fg));
+    margin-bottom: 0.4rem;
+  }
+  .month-cell-uncovered-tag {
+    color: rgb(239 68 68);
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  .month-etf-pill {
+    display: inline-block;
+    margin: 2px 3px 2px 0;
+    padding: 1px 6px;
+    border-radius: 0.25rem;
+    background: rgb(var(--c-accent) / 0.18);
+    color: rgb(var(--c-accent));
+    font-size: 0.78rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  /* === Coverage banner === */
+  .cov-fully {
+    background: rgb(34 197 94 / 0.1);
+    border: 1px solid rgb(34 197 94 / 0.4);
+    color: rgb(134 239 172);
+  }
+  .cov-partial {
+    background: rgb(245 158 11 / 0.1);
+    border: 1px solid rgb(245 158 11 / 0.4);
+    color: rgb(252 211 77);
+  }
+  .cov-banner {
+    border-radius: 0.5rem;
+    padding: 0.7rem 1rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+
+  /* === 個別 ETF 卡片 === */
+  .etf-card {
+    background: rgb(var(--c-bg-soft));
+    border: 1px solid rgb(var(--c-border));
+    border-radius: 0.55rem;
+    padding: 1rem 1.1rem;
+  }
+  .etf-card.is-error { border-color: rgb(239 68 68 / 0.4); background: rgb(239 68 68 / 0.06); }
+
+  .pattern-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-left: 0.5rem;
+    vertical-align: 1px;
+  }
+  .pattern-monthly   { background: rgb(34 197 94 / 0.18); color: rgb(134 239 172); border: 1px solid rgb(34 197 94 / 0.4); }
+  .pattern-quarterly { background: rgb(var(--c-accent) / 0.15); color: rgb(var(--c-accent)); border: 1px solid rgb(var(--c-accent) / 0.4); }
+  .pattern-semi      { background: rgb(168 85 247 / 0.15); color: rgb(196 181 253); border: 1px solid rgb(168 85 247 / 0.4); }
+  .pattern-annual    { background: rgb(245 158 11 / 0.15); color: rgb(252 211 77); border: 1px solid rgb(245 158 11 / 0.4); }
+  .pattern-irregular { background: rgb(var(--c-muted) / 0.2); color: rgb(var(--c-muted)); border: 1px solid rgb(var(--c-muted) / 0.4); }
+
+  /* === typical_dividend_months 12 圓點 === */
+  .month-dots {
+    display: flex; gap: 5px;
+    flex-wrap: wrap;
+  }
+  .month-dot {
+    width: 1.6rem; height: 1.6rem;
+    border-radius: 50%;
+    background: rgb(var(--c-border));
+    color: rgb(var(--c-muted));
+    font-size: 0.7rem;
+    font-weight: 600;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background 0.25s ease, color 0.25s ease;
+  }
+  .month-dot.is-on {
+    background: rgb(var(--c-accent));
+    color: white;
+    box-shadow: 0 0 6px rgb(var(--c-accent) / 0.5);
+  }
+
+  /* === 加總大字 === */
+  .summary-yield {
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: rgb(239 68 68);
+    line-height: 1;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# === Hero 區 === #}
+<section class="mb-6 relative">
+  <div class="text-xs text-muted tracking-widest mb-2">
+    <a href="/" class="hover:text-accent">首頁</a>
+    <span class="mx-1">/</span>
+    <span>月月配試算器</span>
+  </div>
+
+  <h1 class="text-2xl sm:text-3xl font-bold mb-2 tracking-tight leading-tight">
+    <span class="hero-text">月月配試算器</span>
+  </h1>
+  <p class="text-sm sm:text-base text-muted mb-4">
+    自選 ETF,試算每月幾號可以領到錢
+  </p>
+
+  <div class="mi-warning-banner">
+    <strong>※ 提醒</strong>:本試算器以歷史配息資料推估,不代表未來保證。殖利率會變、配息會變、本金會波動。
+  </div>
+</section>
+
+<section class="relative section-card rounded-xl p-5 sm:p-7 mb-7"
+         x-data="monthlyIncomePicker()" x-init="init()">
+
+  {# === A. ETF 多選 === #}
+  <div class="mb-2 flex items-center justify-between">
+    <label class="text-base text-fg font-medium">選擇要組合的 ETF(最多 10 支)</label>
+    <span class="text-sm text-muted num" x-text="`已選 ${codes.length} / 10`"></span>
+  </div>
+
+  <div class="picker-shell bg-bg-soft border border-border rounded-md p-2 transition mb-4"
+       @click.outside="open=false">
+    <div class="flex flex-wrap gap-1.5 items-center">
+      <template x-for="(c, i) in codes" :key="c.code">
+        <span class="mi-chip">
+          <span class="font-mono font-semibold" x-text="c.code"></span>
+          <span class="text-fg/85 hidden sm:inline" x-text="c.name || ''" x-cloak></span>
+          <button type="button" @click.prevent="removeAt(i)" class="mi-chip-x" :aria-label="'移除 '+c.code">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </span>
+      </template>
+      <input type="text"
+             x-model="query"
+             @focus="open=true; ensure()"
+             @input.debounce.180ms="fetch()"
+             @keydown.down.prevent="moveActive(1)"
+             @keydown.up.prevent="moveActive(-1)"
+             @keydown.enter.prevent="onEnter()"
+             @keydown.escape="open=false"
+             @keydown.backspace="onBackspace()"
+             :placeholder="codes.length === 0 ? '輸入 ETF 代號(例:0056)' : (codes.length >= 10 ? '已達 10 支上限' : '繼續加入')"
+             :disabled="codes.length >= 10"
+             class="flex-1 min-w-[180px] bg-transparent px-1.5 py-1 text-base text-fg outline-none placeholder:text-muted/60 disabled:opacity-50">
+    </div>
+
+    <div x-show="open && (suggestions.length > 0 || loading || query)" x-cloak
+         x-transition.opacity.duration.150ms class="picker-suggest">
+      <div x-show="loading" class="px-3 py-3 text-sm text-muted">搜尋中…</div>
+      <ul x-show="!loading && suggestions.length > 0">
+        <template x-for="(s, idx) in suggestions" :key="s.code">
+          <li>
+            <button type="button" @click.prevent="addCode(s)"
+                    @mouseenter="activeIdx=idx"
+                    :class="activeIdx===idx ? 'is-active' : ''"
+                    :disabled="isSelected(s.code) || codes.length >= 10"
+                    class="picker-row">
+              <span class="flex items-baseline gap-2 min-w-0">
+                <span class="font-mono font-semibold text-fg" x-text="s.code"></span>
+                <span class="text-sm text-fg/85 truncate" x-text="s.name"></span>
+                <span x-show="isSelected(s.code)" class="text-[0.65rem] text-muted shrink-0">已選</span>
+              </span>
+              <span class="text-xs text-muted shrink-0" x-text="s.category_label || ''"></span>
+            </button>
+          </li>
+        </template>
+      </ul>
+      <div x-show="!loading && suggestions.length === 0 && query"
+           class="px-3 py-3 text-sm text-muted">找不到符合的 ETF</div>
+    </div>
+  </div>
+
+  {# === Empty / loading / error state === #}
+  <div x-show="codes.length === 0" class="text-center py-10">
+    <div class="text-base sm:text-lg text-fg/85">選 ETF 開始試算 →</div>
+    <div class="text-sm text-muted mt-1">在上方輸入框打代號(例:0056、00878)</div>
+  </div>
+  <div x-show="codes.length > 0 && data_loading" x-cloak class="text-center py-8 text-base text-muted">
+    試算中…
+  </div>
+  <div x-show="error_msg" x-cloak class="cov-banner" style="background: rgb(239 68 68 / 0.1); border: 1px solid rgb(239 68 68 / 0.4); color: rgb(252 165 165);">
+    <span x-text="error_msg"></span>
+  </div>
+
+  <template x-if="api_data && !data_loading">
+    <div>
+
+      {# === B. 月份覆蓋區 === #}
+      <div class="mb-3 mt-2"
+           :class="api_data.fully_covered ? 'cov-banner cov-fully' : (api_data.uncovered_months.length > 0 ? 'cov-banner cov-partial' : '')">
+        <span x-show="api_data.fully_covered">✓ 12 個月全覆蓋,真的月月領得到</span>
+        <span x-show="!api_data.fully_covered && api_data.uncovered_months.length > 0">
+          ⚠ 缺 <span x-text="api_data.uncovered_months.map(m => m + ' 月').join('、')"></span>(這些月沒配息)
+        </span>
+      </div>
+
+      <h2 class="text-xl sm:text-2xl font-semibold mb-3 mt-5">
+        <span class="w-1 h-7 bg-accent rounded-full inline-block align-middle mr-2" style="box-shadow: 0 0 8px var(--c-accent-glow);"></span>
+        月份覆蓋
+      </h2>
+
+      <div class="month-grid">
+        <template x-for="m in 12" :key="m">
+          <div class="month-cell"
+               :class="isMonthCovered(m) ? 'is-covered' : 'is-uncovered'">
+            <div class="month-cell-num" x-text="m + ' 月'"></div>
+            <template x-if="isMonthCovered(m)">
+              <div>
+                <template x-for="code in monthEtfs(m)" :key="code">
+                  <span class="month-etf-pill" x-text="code"></span>
+                </template>
+              </div>
+            </template>
+            <div x-show="!isMonthCovered(m)" class="month-cell-uncovered-tag">— 斷糧</div>
+          </div>
+        </template>
+      </div>
+
+      {# === C. 個別 ETF 卡片區 === #}
+      <h2 class="text-xl sm:text-2xl font-semibold mb-3 mt-7">
+        <span class="w-1 h-7 bg-accent rounded-full inline-block align-middle mr-2" style="box-shadow: 0 0 8px var(--c-accent-glow);"></span>
+        個別 ETF 配息特性
+      </h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-7">
+        <template x-for="etf in api_data.etfs" :key="etf.code">
+          <div class="etf-card" :class="etf.error ? 'is-error' : ''">
+            <template x-if="etf.error">
+              <div>
+                <div class="font-mono text-base font-semibold text-down" x-text="etf.code"></div>
+                <div class="text-sm text-down mt-1" x-text="'⚠ ' + etf.error"></div>
+              </div>
+            </template>
+            <template x-if="!etf.error">
+              <div>
+                <div class="flex items-baseline flex-wrap gap-1">
+                  <span class="font-mono text-lg font-bold text-accent" x-text="etf.code"></span>
+                  <span class="text-base text-fg ml-1" x-text="etf.name"></span>
+                  <template x-if="etf.dividend_pattern">
+                    <span class="pattern-badge" :class="patternColor(etf.dividend_pattern)" x-text="etf.dividend_pattern"></span>
+                  </template>
+                </div>
+
+                {# 12 圓點月份視覺化 #}
+                <div class="month-dots mt-3">
+                  <template x-for="m in 12" :key="m">
+                    <span class="month-dot"
+                          :class="etf.typical_dividend_months.includes(m) ? 'is-on' : ''"
+                          x-text="m"></span>
+                  </template>
+                </div>
+
+                <template x-if="etf.note">
+                  <div class="text-sm text-muted mt-3" x-text="etf.note"></div>
+                </template>
+
+                <template x-if="!etf.note && etf.last_full_year_yield_pct !== null">
+                  <div class="mt-3">
+                    <div class="text-sm text-muted">
+                      <span x-text="etf.last_full_year"></span> 年殖利率
+                    </div>
+                    <div class="text-2xl font-bold text-up num"
+                         x-text="etf.last_full_year_yield_pct.toFixed(2) + '%'"></div>
+                    <div class="text-xs text-muted mt-1">
+                      累計配 <span x-text="etf.last_full_year_total_dividend_per_share"></span> 元/股
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+
+      {# === E. 加總區 === #}
+      <div x-show="api_data.weighted_avg_yield_pct !== null" class="bg-bg-soft border border-border rounded-lg p-5 sm:p-6 mb-5">
+        <div class="text-sm text-muted mb-2">
+          組合等權平均殖利率(<span x-text="(api_data.etfs.find(e => e.last_full_year)?.last_full_year) || ''"></span> 年)
+        </div>
+        <div class="summary-yield" x-text="api_data.weighted_avg_yield_pct.toFixed(2) + '%'"></div>
+        <div class="text-xs text-muted mt-3 leading-relaxed">
+          ※ 等權平均 = 假設你各放等量資金到每支 ETF。實際殖利率會因買進時點 / 配息政策變動而不同。
+        </div>
+      </div>
+
+      {# === F. 歷史配息明細(摺疊,Commit 4 才完整實作)=== #}
+      <details class="text-sm">
+        <summary class="cursor-pointer text-muted hover:text-fg py-2">
+          展開:歷史配息明細(過去 5 年)
+        </summary>
+        <div class="mt-3 text-sm text-muted">
+          歷史明細展開細節將在 Phase 5 Commit 4 推出。
+        </div>
+      </details>
+
+    </div>
+  </template>
+</section>
+
+<section class="text-xs text-muted text-center mt-12 mb-6 max-w-2xl mx-auto leading-relaxed px-4">
+  本頁僅呈現 ETF 公開配息資料推估。任何投資判斷請自行評估或諮詢合格之投資顧問。
+</section>
+
+<script>
+function monthlyIncomePicker() {
+  return {
+    codes: [],          // [{code, name, category}]
+    query: '',
+    open: false,
+    loading: false,
+    suggestions: [],
+    activeIdx: -1,
+    cache: {},
+    data_loading: false,
+    api_data: null,
+    error_msg: null,
+    _debounceTimer: null,
+
+    init() {},
+
+    // === picker ===
+    isSelected(code) { return this.codes.some(c => c.code === code); },
+    async ensure() { if (this.suggestions.length === 0) await this.fetch(); },
+    async fetch() {
+      const q = this.query.trim();
+      if (this.cache[q]) {
+        this.suggestions = this.cache[q];
+        this.activeIdx = this.suggestions.length > 0 ? 0 : -1;
+        return;
+      }
+      this.loading = true;
+      try {
+        const r = await window.fetch(`/api/etf/search?q=${encodeURIComponent(q)}&limit=20&code_only=1`);
+        const d = await r.json();
+        this.suggestions = d.items || [];
+        this.cache[q] = this.suggestions;
+        this.activeIdx = this.suggestions.length > 0 ? 0 : -1;
+      } catch (e) {
+        this.suggestions = [];
+      } finally {
+        this.loading = false;
+      }
+    },
+    moveActive(d) {
+      if (!this.suggestions.length) return;
+      const n = this.suggestions.length;
+      this.activeIdx = ((this.activeIdx + d) % n + n) % n;
+    },
+    onEnter() {
+      if (this.activeIdx >= 0 && this.suggestions[this.activeIdx]) {
+        this.addCode(this.suggestions[this.activeIdx]);
+      } else if (this.query.trim()) {
+        this.addCode({ code: this.query.trim().toUpperCase(), name: '' });
+      }
+    },
+    onBackspace() {
+      if (this.query === '' && this.codes.length > 0) {
+        this.codes.pop();
+        this.scheduleAnalyze();
+      }
+    },
+    addCode(s) {
+      if (this.codes.length >= 10 || this.isSelected(s.code)) return;
+      this.codes.push({ code: s.code, name: s.name || '', category: s.category || '' });
+      this.query = '';
+      this.suggestions = [];
+      this.activeIdx = -1;
+      this.open = false;
+      this.scheduleAnalyze();
+    },
+    removeAt(i) {
+      this.codes.splice(i, 1);
+      this.scheduleAnalyze();
+    },
+
+    // === API ===
+    scheduleAnalyze() {
+      if (this._debounceTimer) clearTimeout(this._debounceTimer);
+      if (this.codes.length === 0) {
+        this.api_data = null;
+        this.error_msg = null;
+        return;
+      }
+      this._debounceTimer = setTimeout(() => this.runAnalyze(), 300);
+    },
+    async runAnalyze() {
+      this.data_loading = true;
+      this.error_msg = null;
+      try {
+        const codeList = this.codes.map(c => c.code).join(',');
+        const r = await window.fetch(`/api/monthly-income/analyze?codes=${encodeURIComponent(codeList)}`);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        this.api_data = await r.json();
+      } catch (e) {
+        this.error_msg = '試算失敗,請重試';
+        this.api_data = null;
+      } finally {
+        this.data_loading = false;
+      }
+    },
+
+    // === view helpers ===
+    monthEtfs(m) {
+      if (!this.api_data) return [];
+      return this.api_data.month_coverage[String(m)] || [];
+    },
+    isMonthCovered(m) {
+      return this.monthEtfs(m).length > 0;
+    },
+    patternColor(pattern) {
+      switch (pattern) {
+        case '月配':   return 'pattern-monthly';
+        case '季配':   return 'pattern-quarterly';
+        case '半年配': return 'pattern-semi';
+        case '年配':   return 'pattern-annual';
+        default:       return 'pattern-irregular';
+      }
+    },
+  };
+}
+</script>
+{% endblock %}
