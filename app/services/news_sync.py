@@ -18,6 +18,9 @@ from app.database import session_scope
 from app.models.etf import ETF
 from app.models.news import News
 from app.services import finmind
+from app.services.sync_status import record_sync_attempt
+
+SYNC_SOURCE = "news_sync"
 
 logger = logging.getLogger(__name__)
 
@@ -146,13 +149,22 @@ def _persist_news(rows: list[dict], etf_code: str) -> int:
 def sync_recent(days_back: int = 2, codes: Iterable[str] | None = None) -> dict:
     """每日排程入口 — 為指定 ETF 抓最近 N 天新聞,寫入 DB。
 
-    days_back=2 涵蓋週末(週一啟動可補週六週日)
+    days_back=2 涵蓋週末(週一啟動可補週六週日)。
+
+    紀律 #20:每筆 (code, day) fetch 是一個 attempt,
+    expected = len(codes) × days,actual = 沒爆例外的 attempt 數,
+    missing = ["{code}@{date}", ...] 失敗清單 → record_sync_attempt。
     """
     finmind.log_quota("before news sync")
 
     code_list = list(codes) if codes is not None else list_news_target_codes()
     today = date.today()
     days = [today - timedelta(days=i) for i in range(days_back)]
+
+    expected_total = len(code_list) * len(days)
+    actual_count = 0
+    missing_attempts: list[str] = []
+    errors_log: list[str] = []
 
     summary = {
         "etfs": len(code_list),
@@ -170,8 +182,12 @@ def sync_recent(days_back: int = 2, codes: Iterable[str] | None = None) -> dict:
                 summary["calls"] += 1
                 summary["rows_seen"] += len(rows)
                 summary["rows_written"] += _persist_news(rows, code)
+                actual_count += 1
             except Exception as e:
                 summary["errors"] += 1
+                tag = f"{code}@{d.isoformat()}"
+                missing_attempts.append(tag)
+                errors_log.append(f"{tag}: {type(e).__name__}: {str(e)[:60]}")
                 logger.exception("[news_sync] failed %s @ %s: %s", code, d, e)
         if i % 10 == 0 or i == len(code_list):
             q = finmind.check_quota()
@@ -182,6 +198,20 @@ def sync_recent(days_back: int = 2, codes: Iterable[str] | None = None) -> dict:
             )
 
     finmind.log_quota("after news sync")
+
+    # 紀律 #20
+    success = len(missing_attempts) == 0
+    record_sync_attempt(
+        source=SYNC_SOURCE,
+        success=success,
+        rows=summary["rows_written"],
+        error="; ".join(errors_log)[:1900] if errors_log else None,
+        missing=missing_attempts,
+    )
+    summary["expected"] = expected_total
+    summary["actual"] = actual_count
+    summary["missing"] = missing_attempts
+
     logger.info("[news_sync] done: %s", summary)
     return summary
 
