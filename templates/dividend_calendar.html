@@ -275,4 +275,37 @@
   資料來源:台灣證券交易所 / 公開公告 · 未來除息日依 ETF 發行商最新公告為準
 </section>
 
+{# === 手機自動切列表 + localStorage 記憶使用者選擇 === #}
+<script>
+  (function () {
+    var KEY = 'dividend_cal_view';
+    var url = new URL(window.location.href);
+    var currentMode = url.searchParams.get('mode') || 'cal';
+    var userPref = null;
+    try { userPref = localStorage.getItem(KEY); } catch (e) { /* 私密模式忽略 */ }
+    var isMobile = window.matchMedia('(max-width: 640px)').matches;
+
+    // 1. user 點月曆/列表 button → 記到 localStorage(視為明確偏好)
+    document.querySelectorAll('a[href*="mode=cal"], a[href*="mode=list"]').forEach(function (a) {
+      a.addEventListener('click', function () {
+        var m = a.href.indexOf('mode=cal') >= 0 ? 'cal' : 'list';
+        try { localStorage.setItem(KEY, m); } catch (e) { /* ignore */ }
+      });
+    });
+
+    // 2. 手機第一次進來、無偏好、目前是 cal → 自動 redirect 到 list
+    if (!userPref && isMobile && currentMode === 'cal') {
+      url.searchParams.set('mode', 'list');
+      window.location.replace(url.toString());
+      return;
+    }
+
+    // 3. user 有明確偏好但 URL 不符 → 一次 redirect 到偏好(跨裝置一致)
+    if (userPref && userPref !== currentMode && (userPref === 'cal' || userPref === 'list')) {
+      url.searchParams.set('mode', userPref);
+      window.location.replace(url.toString());
+    }
+  })();
+</script>
+
 {% endblock %}
