@@ -220,6 +220,34 @@
   .style-a-section .a-card:not(:last-child) { border-bottom: none; }
 }
 
+/* === A · 淺色版(WSJ / FT 紙質終端)=== */
+.style-a-light-section { background:#F5F5F0; color:#1A1A1A; font-family:'Inter',sans-serif; padding:2rem 1.75rem; border:1px solid #D8D4C8; border-radius:0; }
+.style-a-light-section h2 { font-family:'JetBrains Mono',monospace; font-size:1.4rem; font-weight:700; color:#B8860B; letter-spacing:.12em; text-transform:uppercase; margin-bottom:.5rem; }
+.style-a-light-section .a-subtitle { font-size:.85rem; color:#666; margin-bottom:1.5rem; letter-spacing:.05em; }
+.style-a-light-section .a-warning { background:#FFF6F0; border:1px solid #C8102E; color:#8B1414; padding:1rem 1.1rem; font-family:'JetBrains Mono',monospace; font-size:.85rem; margin-bottom:2rem; line-height:1.55; }
+.style-a-light-section .a-warning strong { color:#C8102E; font-weight:700; }
+.style-a-light-section h3 { font-family:'JetBrains Mono',monospace; font-size:.85rem; font-weight:700; color:#B8860B; letter-spacing:.18em; text-transform:uppercase; margin:2rem 0 1rem; border-bottom:1px solid #D8D4C8; padding-bottom:.6rem; }
+.style-a-light-section .a-month-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:0; margin-bottom:.5rem; }
+.style-a-light-section .a-month-cell { background:#FFFFFF; border:1px solid #D8D4C8; padding:.75rem .7rem; font-family:'JetBrains Mono',monospace; }
+.style-a-light-section .a-month-num { font-size:.7rem; color:#999; letter-spacing:.1em; margin-bottom:.35rem; }
+.style-a-light-section .a-month-code { font-size:.95rem; font-weight:600; color:#0A6E3D; }
+.style-a-light-section .a-cards { display:grid; grid-template-columns:repeat(3,1fr); gap:0; }
+.style-a-light-section .a-card { background:#FFFFFF; border:1px solid #D8D4C8; border-right:none; padding:1.5rem 1.4rem; }
+.style-a-light-section .a-card:last-child { border-right:1px solid #D8D4C8; }
+.style-a-light-section .a-code { font-family:'JetBrains Mono',monospace; color:#0A6E3D; font-size:1.1rem; font-weight:600; letter-spacing:.05em; }
+.style-a-light-section .a-name { color:#444; font-size:.9rem; margin-top:.25rem; }
+.style-a-light-section .a-pattern { display:inline-block; background:rgba(184,134,11,.1); color:#B8860B; border:1px solid #B8860B; padding:2px 9px; margin-top:.7rem; font-family:'JetBrains Mono',monospace; font-size:.7rem; letter-spacing:.12em; text-transform:uppercase; }
+.style-a-light-section .a-yield { font-family:'JetBrains Mono',monospace; font-size:48px; font-weight:600; color:#000; margin-top:1.2rem; line-height:1; letter-spacing:-.02em; }
+.style-a-light-section .a-yield-arrow { color:#C8102E; font-size:.45em; vertical-align:.55em; margin-right:.15em; }
+.style-a-light-section .a-yield-label { font-family:'JetBrains Mono',monospace; font-size:.7rem; color:#777; letter-spacing:.18em; text-transform:uppercase; margin-top:.6rem; }
+.style-a-light-section .a-yield-sub { font-family:'JetBrains Mono',monospace; font-size:.78rem; color:#666; margin-top:.4rem; }
+.style-a-light-section .a-summary { background:#FFFFFF; border:2px solid #B8860B; padding:2rem 1.5rem; text-align:center; margin-top:2rem; }
+.style-a-light-section .a-summary-label { font-family:'JetBrains Mono',monospace; font-size:.85rem; color:#B8860B; letter-spacing:.18em; text-transform:uppercase; margin-bottom:.75rem; }
+.style-a-light-section .a-summary-num { font-family:'JetBrains Mono',monospace; font-size:64px; color:#B8860B; line-height:1; font-weight:600; letter-spacing:-.02em; }
+.style-a-light-section .a-pick-btn { display:inline-block; background:#1A1A1A; color:#FFFFFF; font-family:'JetBrains Mono',monospace; font-weight:700; padding:.85rem 1.8rem; cursor:pointer; font-size:.85rem; letter-spacing:.18em; text-transform:uppercase; margin-top:1.5rem; border:none; transition:background .15s ease; }
+.style-a-light-section .a-pick-btn:hover { background:#B8860B; }
+@media (max-width:768px) { .style-a-light-section .a-month-grid { grid-template-columns:repeat(3,1fr); } .style-a-light-section .a-cards { grid-template-columns:1fr; } .style-a-light-section .a-card { border-right:1px solid #D8D4C8; } }
+
 
 /* ============================================================
    B. 台灣財經感(鉅亨網 / 元大)
@@ -388,6 +416,32 @@
   .style-b-section .b-month-grid { grid-template-columns: repeat(3, 1fr); }
   .style-b-section .b-cards { grid-template-columns: 1fr; }
 }
+
+/* === B · 深色版(深紅夜場感)=== */
+.style-b-dark-section { background:#1A0E0E; color:#E5D5D5; font-family:'Noto Sans TC',sans-serif; padding:2.5rem 2rem; border-radius:4px; border:1px solid #3A1818; }
+.style-b-dark-section h2 { font-family:'Noto Serif TC',serif; font-size:1.6rem; font-weight:700; color:#FFE5E5; margin-bottom:.4rem; letter-spacing:.02em; }
+.style-b-dark-section .b-subtitle { font-size:.9rem; color:#B89898; margin-bottom:1.5rem; }
+.style-b-dark-section .b-warning { background:#2A1518; border-left:4px solid #FF4D5C; border-top:1px solid #4A2025; border-right:1px solid #4A2025; border-bottom:1px solid #4A2025; color:#E5D5D5; padding:1rem 1.1rem; font-size:.92rem; margin-bottom:2rem; line-height:1.65; border-radius:4px; }
+.style-b-dark-section .b-warning strong { color:#FF6B7A; font-weight:700; }
+.style-b-dark-section h3 { font-family:'Noto Serif TC',serif; font-size:1.15rem; font-weight:700; color:#FFE5E5; margin:2rem 0 1rem; padding-left:.65rem; border-left:4px solid #FF4D5C; }
+.style-b-dark-section .b-month-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:.5rem; margin-bottom:.5rem; }
+.style-b-dark-section .b-month-cell { background:#2A1818; border:1px solid #3A2020; border-radius:4px; padding:.7rem .65rem; text-align:center; }
+.style-b-dark-section .b-month-num { font-family:'Noto Serif TC',serif; font-size:.95rem; color:#FFE5E5; font-weight:700; margin-bottom:.3rem; }
+.style-b-dark-section .b-month-code { font-size:.8rem; color:#FF6B7A; font-weight:600; }
+.style-b-dark-section .b-cards { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; }
+.style-b-dark-section .b-card { background:#2A1818; border-left:4px solid #FF4D5C; border-top:1px solid #3A2020; border-right:1px solid #3A2020; border-bottom:1px solid #3A2020; border-radius:4px; padding:1rem 1.1rem; }
+.style-b-dark-section .b-code { font-family:'Noto Serif TC',serif; color:#FFE5E5; font-size:1.1rem; font-weight:700; }
+.style-b-dark-section .b-name { color:#B89898; font-size:.9rem; margin-top:.2rem; }
+.style-b-dark-section .b-pattern { display:inline-block; background:#FF4D5C; color:#1A0E0E; padding:2px 9px; margin-top:.6rem; font-size:.78rem; font-weight:700; border-radius:3px; }
+.style-b-dark-section .b-yield { font-family:'Noto Serif TC',serif; font-size:36px; font-weight:700; color:#FF6B7A; margin-top:.85rem; line-height:1; }
+.style-b-dark-section .b-yield-label { font-size:.85rem; color:#B89898; margin-bottom:.2rem; }
+.style-b-dark-section .b-yield-sub { font-size:.82rem; color:#999; margin-top:.35rem; }
+.style-b-dark-section .b-summary { background:#2A1518; border:1px solid #4A2025; border-left:6px solid #FF4D5C; padding:1.6rem 1.5rem; text-align:center; margin-top:2rem; border-radius:4px; }
+.style-b-dark-section .b-summary-label { font-family:'Noto Sans TC',sans-serif; font-size:.95rem; color:#E5D5D5; margin-bottom:.4rem; }
+.style-b-dark-section .b-summary-num { font-family:'Noto Serif TC',serif; font-size:56px; color:#FF6B7A; font-weight:900; line-height:1; }
+.style-b-dark-section .b-pick-btn { display:inline-block; background:#FF4D5C; color:#FFFFFF; font-family:'Noto Sans TC',sans-serif; font-weight:700; padding:.8rem 2rem; border-radius:4px; cursor:pointer; font-size:1rem; margin-top:1.5rem; border:none; transition:background .2s ease; }
+.style-b-dark-section .b-pick-btn:hover { background:#FF8088; }
+@media (max-width:768px) { .style-b-dark-section .b-month-grid { grid-template-columns:repeat(3,1fr); } .style-b-dark-section .b-cards { grid-template-columns:1fr; } }
 
 
 /* ============================================================
@@ -574,6 +628,33 @@
   .style-c-section .c-month-grid { grid-template-columns: repeat(3, 1fr); }
   .style-c-section .c-cards { grid-template-columns: 1fr; }
 }
+
+/* === C · 深色版(深綠夜版)=== */
+.style-c-dark-section { background:#1F2A12; color:#E8F0DA; font-family:'Noto Sans TC',sans-serif; padding:2.5rem 2rem; border-radius:24px; box-shadow:0 4px 16px rgba(0,0,0,.3); }
+.style-c-dark-section h2 { font-family:'Noto Sans TC',sans-serif; font-size:1.7rem; font-weight:900; color:#E8F0DA; margin-bottom:.3rem; letter-spacing:-.01em; }
+.style-c-dark-section .c-subtitle { font-family:'Noto Sans TC',sans-serif; font-weight:300; font-size:.95rem; color:#A8C470; margin-bottom:1.5rem; }
+.style-c-dark-section .c-warning { background:#2A3A1A; border:2px solid #5A7030; color:#F4E5A0; padding:1.1rem 1.3rem; font-size:.95rem; border-radius:16px; margin-bottom:2rem; line-height:1.65; font-weight:400; }
+.style-c-dark-section .c-warning strong { color:#FFE585; font-weight:700; }
+.style-c-dark-section h3 { font-family:'Noto Sans TC',sans-serif; font-size:1.25rem; font-weight:800; color:#E8F0DA; margin:2rem 0 1rem; }
+.style-c-dark-section .c-month-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:.7rem; margin-bottom:.5rem; }
+.style-c-dark-section .c-month-cell { background:#2A3520; border-radius:16px; padding:.85rem .7rem; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,.2); }
+.style-c-dark-section .c-month-num { font-family:'Noto Sans TC',sans-serif; font-size:.95rem; font-weight:800; color:#E8F0DA; margin-bottom:.4rem; }
+.style-c-dark-section .c-month-code { display:inline-block; background:#A8C470; color:#1F2A12; padding:3px 10px; border-radius:9999px; font-size:.78rem; font-weight:700; }
+.style-c-dark-section .c-cards { display:grid; grid-template-columns:repeat(3,1fr); gap:1.2rem; }
+.style-c-dark-section .c-card { background:#2A3520; border-radius:20px; padding:1.4rem; box-shadow:0 4px 16px rgba(0,0,0,.25); position:relative; }
+.style-c-dark-section .c-badge { display:inline-block; width:.85rem; height:.85rem; border-radius:50%; background:#A8C470; margin-right:.5rem; vertical-align:.05rem; }
+.style-c-dark-section .c-code { font-family:'Noto Sans TC',sans-serif; color:#E8F0DA; font-size:1.1rem; font-weight:800; }
+.style-c-dark-section .c-name { color:#A8C470; font-size:.9rem; font-weight:300; margin-top:.25rem; }
+.style-c-dark-section .c-pattern { display:inline-block; background:#FFE585; color:#3B2D00; padding:3px 12px; margin-top:.7rem; font-size:.8rem; font-weight:700; border-radius:9999px; }
+.style-c-dark-section .c-yield { font-family:'Noto Sans TC',sans-serif; font-size:32px; font-weight:800; color:#E8F0DA; margin-top:1rem; line-height:1; letter-spacing:-.01em; }
+.style-c-dark-section .c-yield-label { font-size:.88rem; font-weight:300; color:#A8C470; }
+.style-c-dark-section .c-yield-sub { font-size:.85rem; font-weight:300; color:#A8C470; margin-top:.4rem; }
+.style-c-dark-section .c-summary { background:linear-gradient(135deg,#A8C470 0%,#5A7030 100%); color:#1F2A12; padding:2rem 1.6rem; border-radius:20px; text-align:center; margin-top:2rem; box-shadow:0 8px 24px rgba(0,0,0,.4); }
+.style-c-dark-section .c-summary-label { font-family:'Noto Sans TC',sans-serif; font-size:1rem; font-weight:300; color:#1F2A12; margin-bottom:.5rem; }
+.style-c-dark-section .c-summary-num { font-family:'Noto Sans TC',sans-serif; font-size:56px; font-weight:900; color:#1F2A12; line-height:1; letter-spacing:-.02em; }
+.style-c-dark-section .c-pick-btn { display:inline-block; background:#A8C470; color:#1F2A12; font-family:'Noto Sans TC',sans-serif; font-weight:700; padding:.95rem 2.2rem; border-radius:9999px; cursor:pointer; font-size:1rem; margin-top:1.5rem; border:none; box-shadow:0 4px 12px rgba(0,0,0,.3); transition:background .2s ease, transform .1s ease; }
+.style-c-dark-section .c-pick-btn:hover { background:#C4DC95; transform:translateY(-1px); }
+@media (max-width:768px) { .style-c-dark-section .c-month-grid { grid-template-columns:repeat(3,1fr); } .style-c-dark-section .c-cards { grid-template-columns:1fr; } }
 </style>
 {% endblock %}
 
@@ -594,9 +675,9 @@
 </section>
 
 
-{# ─────────────────────  A. 金融專業派(Bloomberg)  ───────────────────── #}
+{# ─────────────────────  A. 金融專業派 · 深色版(Bloomberg Terminal)  ───────────────────── #}
 <section class="style-a-section">
-  <h2>STYLE A · BLOOMBERG TERMINAL</h2>
+  <h2>STYLE A · 深色版(BLOOMBERG TERMINAL)</h2>
   <div class="a-subtitle">// FINANCIAL TERMINAL · DARK · GOLD ACCENT · MONOSPACE</div>
 
   <div class="a-warning">
@@ -650,17 +731,75 @@
   <div class="a-summary">
     <div class="a-summary-label">EST. PORTFOLIO YIELD · EQUAL-WEIGHTED</div>
     <div class="a-summary-num">9.80<span style="font-size:0.5em">%</span></div>
-    <button class="a-pick-btn" onclick="alert('已記錄選擇:風格 A — 請告訴 Swer')">SELECT STYLE A</button>
+    <button class="a-pick-btn" onclick="alert('已記錄選擇:風格 A 深色版 — 請告訴 Swer')">SELECT STYLE A · DARK</button>
   </div>
 </section>
 
 
-<div class="vp-divider"><span>— B —</span></div>
+<div class="vp-divider"><span>— A · 淺色版 —</span></div>
 
 
-{# ─────────────────────  B. 台灣財經感(鉅亨 / 元大)  ───────────────────── #}
+{# ─────────────────────  A. 淺色版(WSJ / FT 紙質終端)  ───────────────────── #}
+<section class="style-a-light-section">
+  <h2>STYLE A · 淺色版(WSJ / FT PAPER TERMINAL)</h2>
+  <div class="a-subtitle">// PAPER TERMINAL · IVORY · DARK GOLD · MONOSPACE</div>
+
+  <div class="a-warning">
+    <strong>RISK NOTICE</strong>:本工具為<strong>歷史資料試算器,非投資建議</strong>。所有數字以 2025 年實際配息為基礎預估,不保證未來結果。投資有風險,請自行判斷,虧損自負。
+  </div>
+
+  <h3>MONTHLY COVERAGE — 12-MONTH PROJECTION</h3>
+  <div class="a-month-grid">
+    {% for label, code in months_a %}
+    <div class="a-month-cell">
+      <div class="a-month-num">{{ label }}</div>
+      <div class="a-month-code">{{ code }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <h3>POSITIONS — DIVIDEND PROFILE</h3>
+  <div class="a-cards">
+    <div class="a-card">
+      <div class="a-code">0056</div>
+      <div class="a-name">元大高股息</div>
+      <div class="a-pattern">QUARTERLY</div>
+      <div class="a-yield-label">EST. YIELD</div>
+      <div class="a-yield"><span class="a-yield-arrow">▲</span>10.55<span style="font-size:0.5em">%</span></div>
+      <div class="a-yield-sub">FY2025 · TTM div 3.87 / unit</div>
+    </div>
+    <div class="a-card">
+      <div class="a-code">00878</div>
+      <div class="a-name">國泰永續高股息</div>
+      <div class="a-pattern">QUARTERLY</div>
+      <div class="a-yield-label">EST. YIELD</div>
+      <div class="a-yield"><span class="a-yield-arrow">▲</span>8.02<span style="font-size:0.5em">%</span></div>
+      <div class="a-yield-sub">FY2025 · TTM div 1.77 / unit</div>
+    </div>
+    <div class="a-card">
+      <div class="a-code">00919</div>
+      <div class="a-name">群益台灣精選高息</div>
+      <div class="a-pattern">QUARTERLY</div>
+      <div class="a-yield-label">EST. YIELD</div>
+      <div class="a-yield"><span class="a-yield-arrow">▲</span>10.82<span style="font-size:0.5em">%</span></div>
+      <div class="a-yield-sub">FY2025 · TTM div 2.52 / unit</div>
+    </div>
+  </div>
+
+  <div class="a-summary">
+    <div class="a-summary-label">EST. PORTFOLIO YIELD · EQUAL-WEIGHTED</div>
+    <div class="a-summary-num">9.80<span style="font-size:0.5em">%</span></div>
+    <button class="a-pick-btn" onclick="alert('已記錄選擇:風格 A 淺色版 — 請告訴 Swer')">SELECT STYLE A · LIGHT</button>
+  </div>
+</section>
+
+
+<div class="vp-divider"><span>— B · 淺色版 —</span></div>
+
+
+{# ─────────────────────  B. 台灣財經感 · 淺色版(鉅亨 / 元大)  ───────────────────── #}
 <section class="style-b-section">
-  <h2>風格 B · 台灣財經感</h2>
+  <h2>風格 B · 淺色版(台灣財經感)</h2>
   <div class="b-subtitle">鉅亨網 / 元大投信網風格 · 白底紅標 · 思源宋體標題</div>
 
   <div class="b-warning">
@@ -714,17 +853,75 @@
   <div class="b-summary">
     <div class="b-summary-label">預估組合等權平均殖利率</div>
     <div class="b-summary-num">9.80%</div>
-    <button class="b-pick-btn" onclick="alert('已記錄選擇:風格 B — 請告訴 Swer')">選這個風格</button>
+    <button class="b-pick-btn" onclick="alert('已記錄選擇:風格 B 淺色版 — 請告訴 Swer')">選這個風格(淺色)</button>
   </div>
 </section>
 
 
-<div class="vp-divider"><span>— C —</span></div>
+<div class="vp-divider"><span>— B · 深色版 —</span></div>
 
 
-{# ─────────────────────  C. 散戶友善 / 新世代(玉山 Wallet)  ───────────────────── #}
+{# ─────────────────────  B. 台灣財經感 · 深色版(深紅夜場)  ───────────────────── #}
+<section class="style-b-dark-section">
+  <h2>風格 B · 深色版(夜場深紅)</h2>
+  <div class="b-subtitle">深紅黑底 · 思源宋體淺色 · 紅 accent 仍醒目</div>
+
+  <div class="b-warning">
+    <strong>※ 重要提醒</strong>:本工具為<strong>歷史資料試算器,非投資建議</strong>。所有數字以 2025 年實際配息為基礎預估,不保證未來結果。投資有風險,請自行判斷,虧損自負。
+  </div>
+
+  <h3>月份覆蓋(12 月預估)</h3>
+  <div class="b-month-grid">
+    {% for label, code in months_b %}
+    <div class="b-month-cell">
+      <div class="b-month-num">{{ label }}</div>
+      <div class="b-month-code">{{ code }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <h3>個別 ETF 配息特性</h3>
+  <div class="b-cards">
+    <div class="b-card">
+      <div class="b-code">0056</div>
+      <div class="b-name">元大高股息</div>
+      <div class="b-pattern">預估季配</div>
+      <div class="b-yield-label">預估殖利率</div>
+      <div class="b-yield">10.55%</div>
+      <div class="b-yield-sub">2025 年實際 · 累計配 3.87 元/股</div>
+    </div>
+    <div class="b-card">
+      <div class="b-code">00878</div>
+      <div class="b-name">國泰永續高股息</div>
+      <div class="b-pattern">預估季配</div>
+      <div class="b-yield-label">預估殖利率</div>
+      <div class="b-yield">8.02%</div>
+      <div class="b-yield-sub">2025 年實際 · 累計配 1.77 元/股</div>
+    </div>
+    <div class="b-card">
+      <div class="b-code">00919</div>
+      <div class="b-name">群益台灣精選高息</div>
+      <div class="b-pattern">預估季配</div>
+      <div class="b-yield-label">預估殖利率</div>
+      <div class="b-yield">10.82%</div>
+      <div class="b-yield-sub">2025 年實際 · 累計配 2.52 元/股</div>
+    </div>
+  </div>
+
+  <div class="b-summary">
+    <div class="b-summary-label">預估組合等權平均殖利率</div>
+    <div class="b-summary-num">9.80%</div>
+    <button class="b-pick-btn" onclick="alert('已記錄選擇:風格 B 深色版 — 請告訴 Swer')">選這個風格(深色)</button>
+  </div>
+</section>
+
+
+<div class="vp-divider"><span>— C · 淺色版 —</span></div>
+
+
+{# ─────────────────────  C. 散戶友善 / 新世代 · 淺色版(玉山 Wallet)  ───────────────────── #}
 <section class="style-c-section">
-  <h2>風格 C · 散戶友善新世代</h2>
+  <h2>風格 C · 淺色版(散戶友善新世代)</h2>
   <div class="c-subtitle">玉山 Wallet 派 · 奶油底 / 橄欖綠 / 大圓角 · 親切語氣</div>
 
   <div class="c-warning">
@@ -781,7 +978,68 @@
   <div class="c-summary">
     <div class="c-summary-label">這組 ETF 平均下來大概領到</div>
     <div class="c-summary-num">9.80%</div>
-    <button class="c-pick-btn" onclick="alert('已記錄選擇:風格 C — 請告訴 Swer')">就選這個!</button>
+    <button class="c-pick-btn" onclick="alert('已記錄選擇:風格 C 淺色版 — 請告訴 Swer')">就選這個!(淺色)</button>
+  </div>
+</section>
+
+
+<div class="vp-divider"><span>— C · 深色版 —</span></div>
+
+
+{# ─────────────────────  C. 散戶友善 · 深色版(深綠夜版)  ───────────────────── #}
+<section class="style-c-dark-section">
+  <h2>風格 C · 深色版(夜版深綠)</h2>
+  <div class="c-subtitle">深綠灰底 / 亮橄欖綠 / 漸層 summary · 大圓角不變</div>
+
+  <div class="c-warning">
+    <strong>溫馨提醒</strong>:本工具為<strong>歷史資料試算器,不是投資建議</strong>哦!所有數字以 2025 年實際配息推估,不保證 2026 年也一樣。投資有風險,請自己判斷,賺賠自己負責 ✿
+  </div>
+
+  <h3>每個月領得到嗎?</h3>
+  <div class="c-month-grid">
+    {% for label, code in months_c %}
+    <div class="c-month-cell">
+      <div class="c-month-num">{{ label }}</div>
+      <div class="c-month-code">{{ code }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <h3>你選的 ETF</h3>
+  <div class="c-cards">
+    <div class="c-card">
+      <span class="c-badge"></span>
+      <span class="c-code">0056</span>
+      <div class="c-name">元大高股息</div>
+      <div class="c-pattern">季配</div>
+      <div class="c-yield-label">預估殖利率</div>
+      <div class="c-yield">10.55%</div>
+      <div class="c-yield-sub">2025 年累計配 3.87 元/股</div>
+    </div>
+    <div class="c-card">
+      <span class="c-badge"></span>
+      <span class="c-code">00878</span>
+      <div class="c-name">國泰永續高股息</div>
+      <div class="c-pattern">季配</div>
+      <div class="c-yield-label">預估殖利率</div>
+      <div class="c-yield">8.02%</div>
+      <div class="c-yield-sub">2025 年累計配 1.77 元/股</div>
+    </div>
+    <div class="c-card">
+      <span class="c-badge"></span>
+      <span class="c-code">00919</span>
+      <div class="c-name">群益台灣精選高息</div>
+      <div class="c-pattern">季配</div>
+      <div class="c-yield-label">預估殖利率</div>
+      <div class="c-yield">10.82%</div>
+      <div class="c-yield-sub">2025 年累計配 2.52 元/股</div>
+    </div>
+  </div>
+
+  <div class="c-summary">
+    <div class="c-summary-label">這組 ETF 平均下來大概領到</div>
+    <div class="c-summary-num">9.80%</div>
+    <button class="c-pick-btn" onclick="alert('已記錄選擇:風格 C 深色版 — 請告訴 Swer')">就選這個!(深色)</button>
   </div>
 </section>
 
