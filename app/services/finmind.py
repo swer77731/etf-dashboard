@@ -150,7 +150,23 @@ def request(
     """打 FinMind /api/v4/data,內建 throttle + quota 檢查 + 自動退讓。
 
     回傳 dataset 的 `data` list(空 list 也是合法回傳)。
+
+    配額守門兩層:
+      1. 自家 33% local quota(finmind_quota_log,過去 60 分鐘 < 2000)
+         超過 → sleep 到下個整點 + 重試一次,仍超 → raise FinMindQuotaExhausted
+      2. FinMind GLOBAL ratio(/user_info,含朋友)— 既有 HARD_RATIO 50%
+         超過 → sleep 到下個整點(safety net)
+    成功打到 FinMind → record_finmind_call 寫 finmind_quota_log。
     """
+    # 延遲 import 避免循環
+    from app.services.finmind_quota import (
+        FinMindQuotaExhausted,
+        check_finmind_quota,
+        log_quota_status_to_sync_status,
+        record_finmind_call,
+        should_block,
+    )
+
     token = settings.finmind_api_token or ""
     params: dict = {"dataset": dataset, "token": token}
     if data_id is not None:
@@ -162,7 +178,22 @@ def request(
     if extra_params:
         params.update(extra_params)
 
-    # 配額檢查 — 紅線就退
+    # === 自家 quota gate(2000/hr 自家額度,不含朋友)===
+    block, _mins = should_block()
+    if block:
+        secs = _seconds_until_next_hour() + 30   # 緩衝 30 秒
+        logger.warning(
+            "[finmind] LOCAL quota exhausted in last 60min, "
+            "sleep %d sec until next hour", secs,
+        )
+        time.sleep(secs)
+        # 醒來再驗證一次,仍超 → raise(讓 caller 標 partial)
+        if not check_finmind_quota():
+            raise FinMindQuotaExhausted(
+                "FinMind local quota still exhausted after sleep"
+            )
+
+    # === FinMind GLOBAL ratio(safety net,含朋友)===
     quota = check_quota()
     if quota.over_red_line:
         _wait_for_quota_reset(f"used {quota.used}/{quota.limit_hour} ({quota.ratio:.1%}) >= {HARD_RATIO:.0%}")
@@ -182,6 +213,12 @@ def request(
             payload = r.json()
             if payload.get("status") not in (None, 200):
                 raise FinMindError(f"FinMind error: {payload.get('msg')!r} (status={payload.get('status')})")
+            # === 自家用量計數(成功才記)===
+            try:
+                record_finmind_call(dataset)
+                log_quota_status_to_sync_status()
+            except Exception:
+                logger.exception("[finmind] record/log quota failed (non-fatal)")
             return payload.get("data", []) or []
         except httpx.HTTPError as e:
             last_err = e
