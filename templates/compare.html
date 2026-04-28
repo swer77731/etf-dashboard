@@ -352,7 +352,7 @@
     {# 期間日期 — 置中、放大、正色,紀律 #19:再大一階
        使用 aligned_start(實際對齊起點),不同上市日 ETF 比較會自動對齊 #}
     <div class="text-center mb-5">
-      <span class="num text-2xl sm:text-3xl font-bold text-fg">{{ result.aligned_start }} ~ {{ result.end }}</span>
+      <span class="num text-xl sm:text-3xl font-bold text-fg break-words">{{ result.aligned_start }} ~ {{ result.end }}</span>
       {% if result.aligned_start != result.start %}
         <div class="text-sm text-muted mt-2">
           ※ 因部分 ETF 上市日較晚,自動以最短歷史(<span class="font-mono">{{ result.aligned_start }}</span>)為共同起點
@@ -397,7 +397,7 @@
       </div>
     </header>
 
-    <div class="overflow-x-auto -mx-4 sm:mx-0">
+    <div class="table-scroll-wrap sm:mx-0">
       <table class="w-full text-lg num min-w-[860px]">
         <thead>
           <tr class="text-left text-muted border-b border-border">

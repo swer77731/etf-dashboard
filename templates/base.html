@@ -364,6 +364,35 @@
         border-radius: 9999px;
       }
       ::-webkit-scrollbar-thumb:hover { background: rgb(var(--c-muted) / 0.5); }
+
+      /* === 寬表格手機橫滑提示(右側陰影漸層暗示「右邊還有」)=== */
+      .table-scroll-wrap {
+        position: relative;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .table-scroll-wrap::after {
+        content: '';
+        position: absolute;
+        right: 0; top: 0; bottom: 0;
+        width: 28px;
+        background: linear-gradient(to right, transparent, rgba(0,0,0,0.45));
+        pointer-events: none;
+      }
+      :root[data-theme="light"] .table-scroll-wrap::after {
+        background: linear-gradient(to right, transparent, rgba(0,0,0,0.12));
+      }
+      /* 手機橫滑容器外的左右邊距吃進去,讓表格可貼齊螢幕邊 */
+      @media (max-width: 640px) {
+        .table-scroll-wrap { margin-left: -1rem; margin-right: -1rem; padding-right: 0; }
+      }
+
+      /* === 手機卡片 padding 縮(從 1.25rem → 1rem)=== */
+      /* h1/h2 多半已有 text-2xl sm:text-3xl 的 mobile-first 處理,
+         不全域 override 字級避免破壞各頁的精細調整 */
+      @media (max-width: 640px) {
+        .section-card { padding: 1rem !important; }
+      }
     </style>
     {% block head %}{% endblock %}
 </head>
