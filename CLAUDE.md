@@ -410,32 +410,56 @@ raise XxxError(_redact(str(last_err)))
 
 ---
 
-### 15. 不准擅自 kill / restart user 的 server(2026-04-27 鎖定 by user — 鐵律)
+### 15. server 重啟政策(2026-04-29 由 user 放寬 v2 / 原 2026-04-27 鎖定)
 
-> 「你不知道 user 是不是正在用網站(瀏覽器開著),兩個 process 衝突應該用 apscheduler max_instances=1 或 lock 解決,一次性驗收應該直接 call 目標函式,不要跑整個 daily_sync_job。」— user 原話
+> v1(2026-04-27):「不准擅自 kill / restart server,要 user 授權。」
+> v2(2026-04-29):「一般情況可自動重啟套用新 code,例外場景才問。」— user 原話
 
-#### 規則
-- **不准** `Stop-Process` / `taskkill` / `Get-NetTCPConnection | Stop-Process` user 的 server
-- **不准** `python run.py` / restart server **未經 user 明確授權**
-- **不准** 為了「避免衝突」就先停 user 的 server
+#### v2 規則(現行)
 
-#### 正確做法
-- **永久解法** — scheduler 已有 `max_instances=1 + coalesce=True` 防同時跑(已實作),不需要靠停 server 解決
-- **一次性驗收** — 直接 call 目標函式(例:`sync_all()`),不要跑整個 `daily_sync_job` + 不需要停 server
-- **跨 process 衝突** — SQLite 有 file lock + busy-wait 機制,大多數情境會自然 serialize,不用人為干預
+**一般情況 — 改 code 後可自動重啟,不必每次問:**
+- 改完 .py / template 等,直接重啟 server 套用新 code
+- 不必為小改動跑來問 user(原 v1 太保守,每改必問拖慢節奏)
 
-#### 例外
-- user 明確說「重啟 server」「kill 那個 process」 → OK 做
-- server 已 hang(API 不回應、無 log)→ 可緊急重啟,但**事後立刻告知**
-- migration 必須獨佔 DB(罕見)→ **先請 user 停 server**,user 同意後才動
+**例外情況 — 必須先問 user:**
+1. **改 schema / migration**(資料庫結構)— 需要 user 確認重啟時機,避免破壞跑著的 transaction
+2. **kbar_sync / dividend_sync 正在跑時**(看 server log 有無 `progress N/M` 訊息)— 等他跑完,中斷會造成 partial state + 浪費 FinMind 配額
+3. **FinMind 配額超過 80% 時** — 重啟會觸發 startup_sync 又燒配額,先問 user 確認
+4. **改完 lint / syntax 失敗** — 先修好再重啟,不要把壞 code 推上去
 
-#### 為什麼
-2026-04-27 Step 4 驗收時,我為了跑 daily_sync_job() 怕跟 server 撞 SQLite,擅自 kill 8000 port owner。後果:
-- user 可能瀏覽器開著首頁,突然 502
-- 跑 daily_sync_job 又花 5 分鐘 + burn FinMind 配額
-- 全部都不必要 — 直接 call `sync_all()` 3 秒搞定,還不影響 server
+#### 重啟 SOP
 
-跟紀律 #11(前端 cache 先驗)、#14(不准用行動代替思考)一起鎖,**再犯記點**。
+**Step 1 — kill 現有 server tree:**
+- 推薦 PID-based(踩坑 #2026-04-26 已寫過):
+  ```powershell
+  Get-CimInstance Win32_Process | Where-Object { $_.Name -eq "python.exe" -and $_.CommandLine -match "run.py|etf_dashboard|multiprocessing-fork" } | Select-Object ProcessId, ParentProcessId
+  # 找到 run.py + uvicorn reloader + uvicorn worker 三層,Stop-Process 個別 PID
+  ```
+- **避免** `taskkill /F /IM python.exe`(會誤殺 user 其他 python 進程,踩坑紀錄已警告)
+- 若 user 環境只有這個 python 跑(像 production-like),`taskkill /F /IM python.exe` 才可用
+
+**Step 2 — 啟動:**
+- `python run.py`(或 `.venv\Scripts\python.exe run.py`)
+- 等 5 秒
+- 確認 server log 看到 `Application startup complete` 才算成功
+- 沒看到 → log 應有 traceback,**修好再重啟**(別硬塞給 user)
+
+**Step 3 — verify:**
+- `curl http://127.0.0.1:8000/api/health` → 200
+- 跟 user 回報「server 重啟 OK」一句話
+
+#### 不准動的東西
+
+- **cloudflared 視窗** — 永遠不碰(那是 user 自己 tunnel 視窗,不是我的範疇)
+- 重啟過程不影響 cloudflared,即使 cloudflared 暫時 502 也會自動恢復
+
+#### 為什麼放寬
+
+v1 時 user 要為每個小改動授權重啟,溝通成本太高(尤其前端 / sync 改動每天都需要)。v2 把責任分清楚:
+- **小改動**(template / sync logic / 視覺 polish):Claude 自決重啟
+- **高風險場景**(schema / 跑 sync 時 / 配額紅線 / lint 壞):仍要 user 拍板
+
+跟紀律 #11(前端 cache 先驗)、#14(不准用行動代替思考)一起鎖。
 
 ---
 
