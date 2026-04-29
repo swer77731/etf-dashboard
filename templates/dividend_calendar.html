@@ -87,6 +87,17 @@
     margin-top: 1rem;
   }
   .list-day-header:first-child { margin-top: 0; }
+
+  /* === 列表模式手機 stack(避免代號名稱被切)=== */
+  @media (max-width: 640px) {
+    .list-day-li {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: 0.4rem !important;
+    }
+    .list-day-li > * { width: 100%; }
+    .list-day-li-cash { text-align: left !important; }
+  }
 </style>
 {% endblock %}
 
@@ -230,22 +241,22 @@
           {% set ns.last_day = ev.ex_date %}
         {% endif %}
 
-          <li class="py-3.5 flex items-center gap-4 num">
+          <li class="list-day-li py-3.5 flex items-center gap-4 num">
             <a href="/etf/{{ ev.code }}" class="flex-1 min-w-0 hover:underline group">
               <div class="flex items-baseline gap-3 flex-wrap">
                 <span class="font-mono text-lg sm:text-xl font-semibold text-accent">{{ ev.code }}</span>
-                <span class="text-base sm:text-lg text-fg/90 truncate">{{ ev.name }}</span>
+                <span class="text-base sm:text-lg text-fg/90">{{ ev.name }}</span>
               </div>
             </a>
             {% if ev.yield_pct %}
-            <div class="text-right whitespace-nowrap">
+            <div class="text-right sm:whitespace-nowrap">
               <div class="text-lg sm:text-xl font-bold text-up">
                 {{ "%.2f"|format(ev.yield_pct) }}%
               </div>
               <div class="text-xs text-muted">單次殖利率</div>
             </div>
             {% endif %}
-            <div class="text-right whitespace-nowrap min-w-[7rem]">
+            <div class="list-day-li-cash text-right sm:whitespace-nowrap sm:min-w-[7rem]">
               {% if ev.cash_dividend %}
                 <div class="text-lg sm:text-xl font-semibold text-fg">
                   {{ "%.4f"|format(ev.cash_dividend) }} 元

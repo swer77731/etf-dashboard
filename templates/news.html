@@ -138,6 +138,17 @@
   }
   .news-filter-input::placeholder { color: rgb(var(--c-muted) / 0.7); }
 
+  /* 手機 filter 換行,占滿寬度方便輸入(user 紀律「好輸入」)*/
+  @media (max-width: 640px) {
+    .news-filter-input {
+      flex: 1 1 100%;
+      max-width: none;
+      min-width: 0;
+      margin-left: 0;
+      margin-top: 0.5rem;
+    }
+  }
+
   /* 分頁按鈕 */
   .news-page-btn {
     padding: 0.5rem 1rem;
