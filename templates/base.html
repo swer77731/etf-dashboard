@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+    {# 紀律 #16 — preconnect 第三方 host,瀏覽器在解析 HTML 同時就先做 DNS+TCP+TLS 握手,
+       避免抓 GA / Tailwind CDN 才開始建連線(每個第一次連線省 ~100ms)。 #}
+    <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin>
+    <link rel="preconnect" href="https://www.google-analytics.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-QEL342G95B"></script>
     <script>

@@ -16,8 +16,11 @@ N = 10
 ENDPOINTS = [
     ("/",                                                     "GET /"),
     ("/docs",                                                 "GET /docs"),
-    ("/api/etf/search?q=&limit=20&code_only=1",               "GET /api/etf/search"),
+    ("/api/etf/search?q=&limit=20&code_only=1",               "GET /api/etf/search (empty)"),
+    ("/api/etf/search?q=0050&limit=20&code_only=1",           "GET /api/etf/search?q=0050"),
     ("/compare?codes=0050&start=2025-04-29&end=2026-04-29",   "GET /compare"),
+    ("/etf/0050",                                             "GET /etf/0050"),
+    ("/news",                                                 "GET /news"),
     ("/static/img/logo.svg",                                  "GET /static/img/logo.svg"),
 ]
 
@@ -36,8 +39,9 @@ W_FORMAT = (
 
 def run_curl(url: str) -> dict | None:
     try:
+        # --compressed: 帶 Accept-Encoding gzip,br,自動解壓 — 看 server 是否真的壓縮
         r = subprocess.run(
-            ["curl", "-s", "-o", "/dev/null", "-w", W_FORMAT, url],
+            ["curl", "-s", "--compressed", "-o", "/dev/null", "-w", W_FORMAT, url],
             capture_output=True, text=True, timeout=30,
         )
     except subprocess.TimeoutExpired:

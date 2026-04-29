@@ -5,6 +5,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.types import Scope
 
@@ -57,6 +58,11 @@ app = FastAPI(
     debug=settings.debug,
     lifespan=lifespan,
 )
+
+# 紀律 #16 — 70KB 純文字 HTML 沒壓縮 = 多浪費 60KB / 使用者。
+# minimum_size=500:小 JSON / 短 HTML 不壓(壓比反而升、CPU 多餘)。
+# CachedStaticFiles 已掛 immutable header,gzip 中間層也會壓 SVG / JS / CSS,double win。
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 app.mount(
     "/static",

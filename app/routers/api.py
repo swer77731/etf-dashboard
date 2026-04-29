@@ -1,6 +1,7 @@
 """JSON API routes."""
 from __future__ import annotations
 
+import time as _time
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -8,7 +9,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.database import get_session
+from app.database import get_session, session_scope
 from app.models.etf import ETF
 from app.models.holdings import Holding
 from app.models.holdings_change import HoldingsChange
@@ -29,6 +30,46 @@ _CATEGORY_LABELS = {
     "bond": "債券型",
     "other": "其他",
 }
+
+
+# 紀律 #16 — autocomplete 高頻打,255 ETF 全表載進記憶體 5 分鐘 refresh
+# 完全不打 DB,server time 從 60ms → <1ms。daily 14:30 universe sync 會新增
+# 新 ETF,5 分鐘 TTL 對使用者體感無感。
+_ETF_LIST_CACHE: list[dict] = []
+_ETF_LIST_EXPIRES: float = 0.0
+_ETF_LIST_TTL = 300.0
+
+
+def _get_etf_list() -> list[dict]:
+    """全 ETF list memoized,5 分鐘 refresh 一次。"""
+    global _ETF_LIST_EXPIRES
+    now = _time.monotonic()
+    if _ETF_LIST_CACHE and now < _ETF_LIST_EXPIRES:
+        return _ETF_LIST_CACHE
+    with session_scope() as s:
+        rows = s.scalars(
+            select(ETF)
+            .where(ETF.is_active.is_(True))
+            .where(ETF.category != "index")
+            .order_by(ETF.code.asc())
+        ).all()
+        snapshot = [
+            {
+                "code": e.code,
+                "code_upper": e.code.upper(),
+                "name": e.name or "",
+                "category": e.category,
+                "category_label": _CATEGORY_LABELS.get(e.category, e.category),
+            }
+            for e in rows
+        ]
+    _ETF_LIST_CACHE.clear()
+    _ETF_LIST_CACHE.extend(snapshot)
+    _ETF_LIST_EXPIRES = now + _ETF_LIST_TTL
+    return _ETF_LIST_CACHE
+
+
+_DEFAULT_EMPTY_CODES = ("0050", "0056", "00878", "00919", "00929", "0056B", "00713")
 
 
 @router.get("/health")
@@ -199,9 +240,11 @@ async def search_etf(
     q: str = Query("", description="代號或名稱關鍵字"),
     limit: int = Query(20, ge=1, le=80),
     code_only: bool = Query(False, description="True 時只比對代號,不做名稱模糊搜尋"),
-    session: Session = Depends(get_session),
 ) -> dict:
     """ETF autocomplete 搜尋 — sidebar 全站搜尋 + compare 頁 chip 選擇器共用。
+
+    純記憶體 list filter(_get_etf_list 5 分鐘 refresh)— 不打 DB,
+    server time < 1ms。
 
     排序優先級:
     1. 代號完全相等(打 0050 → 0050 第一)
@@ -212,51 +255,46 @@ async def search_etf(
     code_only=0 預設:sidebar 全站搜尋(可打「高股息」之類找 ETF)。
     排除 index 類別(TAIEX 大盤不該被當 ETF 選)。
     """
+    etfs = _get_etf_list()
     keyword = (q or "").strip().upper()
+
     if not keyword:
-        # 空字串 → 回最熱門幾支
-        rows = session.scalars(
-            select(ETF)
-            .where(ETF.is_active.is_(True))
-            .where(ETF.category.in_(["market", "dividend", "active"]))
-            .where(ETF.code.in_(["0050", "0056", "00878", "00919", "00929", "0056B", "00713"]))
-            .limit(limit)
-        ).all()
-    else:
-        like = f"%{keyword}%"
-        prefix = f"{keyword}%"
-        # code_only:純代號比對;預設:代號 OR 名稱
-        if code_only:
-            match_clause = ETF.code.ilike(like)
-        else:
-            match_clause = (ETF.code.ilike(like)) | (ETF.name.like(like))
-        rows = session.scalars(
-            select(ETF)
-            .where(ETF.is_active.is_(True))
-            .where(ETF.category != "index")
-            .where(match_clause)
-            .order_by(
-                # 1. 完全相等最前(打 0050 → 0050 排第一)
-                (ETF.code == keyword).desc(),
-                # 2. 代號開頭配對(00981 → 009810~9 + 00981A/T)
-                ETF.code.ilike(prefix).desc(),
-                # 3. 字母順排(009810,009811,...,00981A,00981T)
-                ETF.code.asc(),
-            )
-            .limit(limit)
-        ).all()
+        # 空字串 → 回固定熱門幾支(同舊 SQL 邏輯)
+        chosen = [e for e in etfs if e["code"] in _DEFAULT_EMPTY_CODES][:limit]
+        return {
+            "q": q,
+            "items": [{"code": e["code"], "name": e["name"],
+                       "category": e["category"], "category_label": e["category_label"]}
+                      for e in chosen],
+        }
+
+    # 不分大小寫 substring 比對(SQL 用 ilike 可不分大小寫)
+    matched = []
+    for e in etfs:
+        code_u = e["code_upper"]
+        if keyword in code_u:
+            matched.append(e)
+        elif (not code_only) and (keyword in e["name"]):
+            # name 不轉 upper 因為中文 .upper() 是 noop;舊 SQL 用 like(case-sensitive)
+            matched.append(e)
+
+    # 三層排序(stable sort):
+    # 1. 完全相等最前
+    # 2. prefix 配對次之
+    # 3. 字母順
+    def _sort_key(e):
+        code_u = e["code_upper"]
+        return (0 if code_u == keyword else 1,
+                0 if code_u.startswith(keyword) else 1,
+                code_u)
+    matched.sort(key=_sort_key)
+    chosen = matched[:limit]
 
     return {
         "q": q,
-        "items": [
-            {
-                "code": e.code,
-                "name": e.name,
-                "category": e.category,
-                "category_label": _CATEGORY_LABELS.get(e.category, e.category),
-            }
-            for e in rows
-        ],
+        "items": [{"code": e["code"], "name": e["name"],
+                   "category": e["category"], "category_label": e["category_label"]}
+                  for e in chosen],
     }
 
 

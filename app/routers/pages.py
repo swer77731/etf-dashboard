@@ -266,6 +266,30 @@ _NEWS_DAYS_CHOICES = {"7": 7, "30": 30, "all": 365}
 _NEWS_HARD_LIMIT = 5000
 
 
+def _build_news_payload(etf: str | None, days: str) -> dict:
+    """Heavy compute for /news — 4 個 query(items + 3 個 count_news)。
+
+    func.instr(json(...)) 子字串查詢 SQLite 沒辦法走 index,每次全表掃描,
+    cache 60s 對熱門 ETF 過濾(?etf=0050)很有用。
+    """
+    days_int = _NEWS_DAYS_CHOICES.get(days, 7)
+    items = news_sync.list_recent_news(
+        etf_code=etf, limit=_NEWS_HARD_LIMIT, offset=0, days=days_int,
+    )
+    counts = {
+        "7":   news_sync.count_news(etf_code=etf, days=7),
+        "30":  news_sync.count_news(etf_code=etf, days=30),
+        "all": news_sync.count_news(etf_code=etf, days=_NEWS_DAYS_CHOICES["all"]),
+    }
+    return {
+        "items": items,
+        "total": len(items),
+        "etf_filter": etf.upper() if etf else None,
+        "days_filter": days if days in _NEWS_DAYS_CHOICES else "7",
+        "counts": counts,
+    }
+
+
 @router.get("/news", response_class=HTMLResponse)
 async def news(
     request: Request,
@@ -274,30 +298,17 @@ async def news(
 ) -> HTMLResponse:
     """新聞牆 — 100% 讀本地 news table。
 
+    TTL=60s memory cache(key=etf+days)。
     路由不分頁:一次回該窗口全部 row,前端用 JS slice 模擬分頁 + 即時搜尋(操作整個 array)。
     最多 5000 筆 hard cap 避免極端情境炸瀏覽器。
     """
-    days_int = _NEWS_DAYS_CHOICES.get(days, 7)
-    items = news_sync.list_recent_news(
-        etf_code=etf, limit=_NEWS_HARD_LIMIT, offset=0, days=days_int,
-    )
-
-    # 7 天 / 30 天 / 全部 三個 tab 各自的總數,UI 顯示用
-    counts = {
-        "7":   news_sync.count_news(etf_code=etf, days=7),
-        "30":  news_sync.count_news(etf_code=etf, days=30),
-        "all": news_sync.count_news(etf_code=etf, days=_NEWS_DAYS_CHOICES["all"]),
-    }
-
+    etf_key = etf.upper() if etf else ""
+    payload = _ttl_cached(("news", etf_key, days), lambda: _build_news_payload(etf, days))
     return templates.TemplateResponse(
         request, "news.html",
         {
             **_common_ctx(),
-            "items": items,
-            "total": len(items),
-            "etf_filter": etf.upper() if etf else None,
-            "days_filter": days if days in _NEWS_DAYS_CHOICES else "7",
-            "counts": counts,
+            **payload,
             "today_iso": date.today().isoformat(),
         },
     )
@@ -328,6 +339,47 @@ def _month_range(year: int, month: int) -> tuple[date, date, int, int]:
     return first, last, year, month
 
 
+def _build_dividend_calendar_payload(year: int, month: int, today: date) -> dict:
+    """Heavy compute for /dividend-calendar — get_dividends_in_range + 月曆網格組裝。"""
+    import calendar as _cal
+    first, last, _, _ = _month_range(year, month)
+
+    try:
+        events = dividend_metrics.get_dividends_in_range(first, last)
+    except Exception:
+        logger.exception("[dividend_calendar] failed ym=%s-%s", year, month)
+        events = []
+
+    events_by_day: dict[str, list] = {}
+    for e in events:
+        events_by_day.setdefault(e["ex_date"], []).append(e)
+
+    cal = _cal.Calendar(firstweekday=6)
+    weeks: list[list[dict | None]] = []
+    for week in cal.monthdatescalendar(year, month):
+        row: list[dict | None] = []
+        for day in week:
+            if day.month != month:
+                row.append(None)
+                continue
+            iso = day.isoformat()
+            row.append({
+                "iso": iso,
+                "day": day.day,
+                "is_today": (day == today),
+                "weekday": day.weekday(),
+                "events": events_by_day.get(iso, []),
+            })
+        weeks.append(row)
+
+    return {
+        "weeks": weeks,
+        "events": events,
+        "events_by_day": events_by_day,
+        "total_events": len(events),
+    }
+
+
 @router.get("/dividend-calendar", response_class=HTMLResponse)
 async def dividend_calendar(
     request: Request,
@@ -338,47 +390,17 @@ async def dividend_calendar(
 
     URL: /dividend-calendar?ym=2026-04&mode=cal
     mode: cal(月曆) / list(列表)
+    TTL=60s memory cache(key=year+month)— is_today 欄位 60s 內變動可忽略。
     """
-    import calendar as _cal
     today = date.today()
     year, month = _parse_ym(ym, today)
-    first, last, _, _ = _month_range(year, month)
+    payload = _ttl_cached(
+        ("div_cal", year, month, today.isoformat()),
+        lambda: _build_dividend_calendar_payload(year, month, today),
+    )
 
-    # 鄰月導覽
     prev_y, prev_m = (year - 1, 12) if month == 1 else (year, month - 1)
     next_y, next_m = (year + 1, 1) if month == 12 else (year, month + 1)
-
-    # 本月所有配息事件
-    try:
-        events = dividend_metrics.get_dividends_in_range(first, last)
-    except Exception:
-        logger.exception("[dividend_calendar] failed ym=%s-%s", year, month)
-        events = []
-
-    # 按日期分組(月曆 + 列表共用)
-    events_by_day: dict[str, list] = {}
-    for e in events:
-        events_by_day.setdefault(e["ex_date"], []).append(e)
-
-    # 月曆網格 — 6 列 x 7 欄(週一起算,週日為一週終點符合台灣習慣)
-    # 我們用週日為 col 0(更符合台灣月曆習慣)
-    cal = _cal.Calendar(firstweekday=6)   # 6 = Sunday
-    weeks: list[list[dict | None]] = []
-    for week in cal.monthdatescalendar(year, month):
-        row: list[dict | None] = []
-        for day in week:
-            if day.month != month:
-                row.append(None)   # 鄰月空格
-                continue
-            iso = day.isoformat()
-            row.append({
-                "iso": iso,
-                "day": day.day,
-                "is_today": (day == today),
-                "weekday": day.weekday(),   # 0=Mon..6=Sun
-                "events": events_by_day.get(iso, []),
-            })
-        weeks.append(row)
 
     return templates.TemplateResponse(
         request, "dividend_calendar.html",
@@ -387,10 +409,7 @@ async def dividend_calendar(
             "year": year,
             "month": month,
             "mode": mode if mode in ("cal", "list") else "cal",
-            "weeks": weeks,
-            "events": events,
-            "events_by_day": events_by_day,
-            "total_events": len(events),
+            **payload,
             "prev_ym": f"{prev_y:04d}-{prev_m:02d}",
             "next_ym": f"{next_y:04d}-{next_m:02d}",
             "today_ym": f"{today.year:04d}-{today.month:02d}",
@@ -478,46 +497,68 @@ async def monthly_income_page(request: Request) -> HTMLResponse:
     )
 
 
+def _build_holdings_initial_codes(code_list: tuple[str, ...]) -> list[dict]:
+    """Heavy part of /holdings — ETF lookup for initial_codes(只在 ?codes= 帶值時跑)。"""
+    if not code_list:
+        return []
+    from app.models.etf import ETF
+    from app.database import session_scope
+    from sqlalchemy import select
+    with session_scope() as s:
+        etfs = s.scalars(select(ETF).where(ETF.code.in_(list(code_list)))).all()
+        etf_map = {e.code: e for e in etfs}
+    out = []
+    for c in code_list:
+        e = etf_map.get(c)
+        out.append({
+            "code": c,
+            "name": e.name if e else "",
+            "category": e.category if e else "",
+        })
+    return out
+
+
 @router.get("/holdings", response_class=HTMLResponse)
 async def holdings_page(request: Request, codes: str = "") -> HTMLResponse:
     """ETF 持股分析頁 — Alpine.js + AJAX,前端打 /api/etf/{code}/holdings。
 
     URL ?codes=0050,0056 → 預先勾選那些 ETF。
     上限 3 支(plan 鎖定)。
+    TTL=60s memory cache(key=sorted codes)。
     """
-    initial_codes: list[dict] = []
-    code_list = [c.strip().upper() for c in codes.split(",") if c.strip()][:3]
-    if code_list:
-        from app.models.etf import ETF
-        from app.database import session_scope
-        from sqlalchemy import select
-        with session_scope() as s:
-            etfs = s.scalars(select(ETF).where(ETF.code.in_(code_list))).all()
-            etf_map = {e.code: e for e in etfs}
-        for c in code_list:
-            e = etf_map.get(c)
-            initial_codes.append({
-                "code": c,
-                "name": e.name if e else "",
-                "category": e.category if e else "",
-            })
-
+    code_list = tuple([c.strip().upper() for c in codes.split(",") if c.strip()][:3])
+    initial_codes = _ttl_cached(
+        ("holdings_init", tuple(sorted(code_list))),
+        lambda: _build_holdings_initial_codes(code_list),
+    )
     return templates.TemplateResponse(
         request, "holdings.html",
         {**_common_ctx(), "initial_codes": initial_codes},
     )
 
 
-@router.get("/etf/{code}", response_class=HTMLResponse)
-async def etf_detail(request: Request, code: str) -> HTMLResponse:
-    """ETF 詳情頁 — 100% 讀本地 DB,不打外部 API。"""
+def _build_etf_detail_payload(code: str):
+    """Heavy compute for /etf/{code} — 6 期間報酬 + K 棒走勢 + 配息歷史 + 相關新聞。"""
     detail = etf_metrics.get_etf_detail(code)
     if not detail:
-        raise HTTPException(status_code=404, detail=f"找不到 ETF: {code}")
+        return None
     related_news = news_sync.list_recent_news(etf_code=code.upper(), limit=10)
+    return {"etf": detail, "related_news": related_news}
+
+
+@router.get("/etf/{code}", response_class=HTMLResponse)
+async def etf_detail(request: Request, code: str) -> HTMLResponse:
+    """ETF 詳情頁 — 100% 讀本地 DB,不打外部 API。
+
+    TTL=60s memory cache(key=code)— 詳情頁是高流量入口,255 ETF 命中率高。
+    """
+    code_norm = code.upper()
+    payload = _ttl_cached(("etf_detail", code_norm), lambda: _build_etf_detail_payload(code_norm))
+    if payload is None:
+        raise HTTPException(status_code=404, detail=f"找不到 ETF: {code}")
     return templates.TemplateResponse(
         request, "etf_detail.html",
-        {**_common_ctx(), "etf": detail, "related_news": related_news},
+        {**_common_ctx(), **payload},
     )
 
 
