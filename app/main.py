@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from starlette.types import Scope
 
 from app.config import PROJECT_ROOT, settings
 from app.database import init_db
@@ -13,6 +14,21 @@ from app.routers import api as api_router
 from app.routers import monthly_income as monthly_income_router
 from app.routers import pages as pages_router
 from app.scheduler import shutdown_scheduler, start_scheduler, startup_sync_if_needed
+
+
+class CachedStaticFiles(StaticFiles):
+    """StaticFiles + 1-year immutable Cache-Control。
+
+    紀律 #16 — Tokyo→Taipei 每次 static 抓 130ms RTT 太傷,瀏覽器一輩子
+    cache 該檔案。改 logo / chart-watermark.js 等資產時,**檔名加版本後綴**
+    (logo.v2.svg)或在 query string 帶版本(?v=2)強制 reload,**不然
+    1 年內舊客戶看到的是舊檔**。風險可接受 — 我們的 static 變動本來就少。
+    """
+    async def get_response(self, path: str, scope: Scope):
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
 
 logging.basicConfig(
     level=logging.INFO,
@@ -44,7 +60,7 @@ app = FastAPI(
 
 app.mount(
     "/static",
-    StaticFiles(directory=str(PROJECT_ROOT / "static")),
+    CachedStaticFiles(directory=str(PROJECT_ROOT / "static")),
     name="static",
 )
 

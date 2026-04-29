@@ -70,6 +70,23 @@ import time as _time
 _INDEX_CACHE: dict = {"data": None, "expires_at": 0.0}
 _INDEX_CACHE_TTL = 60.0
 
+# 紀律 #16 — 通用 TTL cache。/compare 與 /ranking 同樣 read-heavy + 算 ranking
+# 重,搬同套 cache pattern 過來。鍵用 tuple,值存 (expires_at, payload)。
+# 無 lock(同首頁 cache 設計),stampede 容忍。
+_ENDPOINT_CACHE: dict[tuple, tuple[float, object]] = {}
+_ENDPOINT_TTL = 60.0
+
+
+def _ttl_cached(key: tuple, build_fn):
+    """Get-or-build with 60s TTL,key 必須 hashable。"""
+    now = _time.monotonic()
+    entry = _ENDPOINT_CACHE.get(key)
+    if entry is not None and now < entry[0]:
+        return entry[1]
+    val = build_fn()
+    _ENDPOINT_CACHE[key] = (now + _ENDPOINT_TTL, val)
+    return val
+
 
 def _build_index_payload() -> dict:
     """heavy 部分(market / sections / dividends / news)— 給 cache wrapper 包。"""
@@ -180,29 +197,12 @@ def _parse_date(s: str | None, default: date) -> date:
         return default
 
 
-@router.get("/compare", response_class=HTMLResponse)
-async def compare(
-    request: Request,
-    codes: str = "",
-    start: str | None = None,
-    end: str | None = None,
-) -> HTMLResponse:
-    """績效比較頁 — 自選 ETF + 自選日期區間 + 統計表 + 累積報酬走勢圖。"""
-    today = date.today()
-    end_date = _parse_date(end, today)
-    start_date = _parse_date(start, today - timedelta(days=365))
-    if start_date > end_date:
-        start_date, end_date = end_date, start_date
-
-    # 上限 6 支(避免圖表太擠)
-    code_list = [c.strip().upper() for c in codes.split(",") if c.strip()][:6]
-
+def _build_compare_payload(code_tuple: tuple[str, ...], start_date: date, end_date: date) -> dict:
+    """Heavy compute for /compare — performance.compare_etfs + dict assembly."""
     from dataclasses import asdict
+    code_list = list(code_tuple)
     result = performance.compare_etfs(code_list, start_date, end_date)
-    # 把 dataclass(slots=True 沒 __dict__)轉成 plain dict 給 template 與 ECharts JSON 用
     stats_dicts = [asdict(s) for s in result["stats"]]
-
-    # 合成 chip 顯示用的 codes_list — found 用完整資訊,not_found/insufficient 仍保留代號讓 user 看見
     stats_by_code = {s["code"]: s for s in stats_dicts}
     codes_list = []
     for c in code_list:
@@ -216,21 +216,45 @@ async def compare(
             })
         else:
             codes_list.append({"code": c, "name": "", "category": "", "category_label": ""})
+    return {
+        "result": {**result, "stats": stats_dicts},
+        "form": {
+            "codes": ",".join(code_list),
+            "codes_list": codes_list,
+            "start": start_date.isoformat(),
+            "end": end_date.isoformat(),
+        },
+    }
+
+
+@router.get("/compare", response_class=HTMLResponse)
+async def compare(
+    request: Request,
+    codes: str = "",
+    start: str | None = None,
+    end: str | None = None,
+) -> HTMLResponse:
+    """績效比較頁 — 自選 ETF + 自選日期區間 + 統計表 + 累積報酬走勢圖。
+
+    TTL=60s memory cache(key = sorted code tuple + start + end)— 熱門組合
+    例如預設 0050 / 0050+0056 等命中率高,server compute 從 ~50ms 降到 <1ms。
+    """
+    today = date.today()
+    end_date = _parse_date(end, today)
+    start_date = _parse_date(start, today - timedelta(days=365))
+    if start_date > end_date:
+        start_date, end_date = end_date, start_date
+
+    # 上限 6 支(避免圖表太擠);保留輸入順序但 cache key 用排序版避免 0050,0056 / 0056,0050 命中分裂
+    code_list = [c.strip().upper() for c in codes.split(",") if c.strip()][:6]
+    cache_key = ("compare", tuple(sorted(code_list)), start_date.isoformat(), end_date.isoformat())
+    payload = _ttl_cached(cache_key, lambda: _build_compare_payload(tuple(code_list), start_date, end_date))
 
     return templates.TemplateResponse(
         request, "compare.html",
         {
             **_common_ctx(),
-            "result": {
-                **result,
-                "stats": stats_dicts,
-            },
-            "form": {
-                "codes": ",".join(code_list),
-                "codes_list": codes_list,
-                "start": start_date.isoformat(),
-                "end": end_date.isoformat(),
-            },
+            **payload,
         },
     )
 
@@ -406,18 +430,21 @@ async def ranking_detail(request: Request, kind: str, p: str = "3m") -> HTMLResp
     meta = _RANKING_KIND_LABEL[kind]
     LIMIT = 30
 
-    try:
-        if kind == "top":
-            data = ranking.get_top_movers(p, limit=LIMIT)
-        elif kind == "leverage_pos":
-            data = ranking.get_leverage_ranking(p, "positive", limit=LIMIT)
-        elif kind == "leverage_neg":
-            data = ranking.get_leverage_ranking(p, "inverse", limit=LIMIT)
-        else:
-            data = ranking.get_ranking(kind, p, limit=LIMIT)
-    except Exception:
-        logger.exception("[ranking_detail] failed kind=%s p=%s", kind, p)
-        data = None
+    def _build():
+        try:
+            if kind == "top":
+                return ranking.get_top_movers(p, limit=LIMIT)
+            if kind == "leverage_pos":
+                return ranking.get_leverage_ranking(p, "positive", limit=LIMIT)
+            if kind == "leverage_neg":
+                return ranking.get_leverage_ranking(p, "inverse", limit=LIMIT)
+            return ranking.get_ranking(kind, p, limit=LIMIT)
+        except Exception:
+            logger.exception("[ranking_detail] failed kind=%s p=%s", kind, p)
+            return None
+
+    # 8 kinds × 5 periods = 40 個 cache 槽,熱命中率高
+    data = _ttl_cached(("ranking", kind, p, LIMIT), _build)
 
     return templates.TemplateResponse(
         request, "ranking_detail.html",
