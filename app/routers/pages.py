@@ -70,11 +70,29 @@ import time as _time
 _INDEX_CACHE: dict = {"data": None, "expires_at": 0.0}
 _INDEX_CACHE_TTL = 60.0
 
-# 紀律 #16 — 通用 TTL cache。/compare 與 /ranking 同樣 read-heavy + 算 ranking
-# 重,搬同套 cache pattern 過來。鍵用 tuple,值存 (expires_at, payload)。
-# 無 lock(同首頁 cache 設計),stampede 容忍。
+# 紀律 #16 — 通用 TTL cache。/compare /ranking /news /etf /dividend 全套同套。
+# 鍵用 tuple,值存 (expires_at, payload | html)。無 lock,stampede 容忍。
+# /news 渲染後 HTML ~900KB(5000 row × 多欄位)→ 必須上 cap 防 OOM。
 _ENDPOINT_CACHE: dict[tuple, tuple[float, object]] = {}
 _ENDPOINT_TTL = 60.0
+_ENDPOINT_CACHE_MAX = 200
+
+
+def _evict_expired_if_full():
+    """超過 200 個 entry 時清掉所有已過期 entry。
+    沒有過期就清最早 expire 的 50 個(LRU-ish by expiration)。"""
+    if len(_ENDPOINT_CACHE) <= _ENDPOINT_CACHE_MAX:
+        return
+    now = _time.monotonic()
+    # 先清過期
+    expired = [k for k, (exp, _) in _ENDPOINT_CACHE.items() if exp < now]
+    for k in expired:
+        _ENDPOINT_CACHE.pop(k, None)
+    # 還是太多 → 清最快過期的 50 個
+    if len(_ENDPOINT_CACHE) > _ENDPOINT_CACHE_MAX:
+        oldest = sorted(_ENDPOINT_CACHE.items(), key=lambda kv: kv[1][0])[:50]
+        for k, _ in oldest:
+            _ENDPOINT_CACHE.pop(k, None)
 
 
 def _ttl_cached(key: tuple, build_fn):
@@ -84,8 +102,43 @@ def _ttl_cached(key: tuple, build_fn):
     if entry is not None and now < entry[0]:
         return entry[1]
     val = build_fn()
+    _evict_expired_if_full()
     _ENDPOINT_CACHE[key] = (now + _ENDPOINT_TTL, val)
     return val
+
+
+def _render_cached(key: tuple, template_name: str, ctx_builder):
+    """Cache rendered HTML for 60s。
+
+    紀律 #16 進階版:除了 payload,連 Jinja render 也 cache。重 template
+    (news 5000 row / etf_detail 7 sections / dividend_calendar 月曆網格)
+    渲染本身要 50-100ms,只 cache payload 救不到這層。
+
+    使用前提(已驗):templates 不使用 request.url_for / 不引用 request.*,
+    HTML 對所有訪客內容相同 → 直接回 cached bytes 安全。
+
+    ctx_builder 回 None → 視為 404(不 cache)。
+    回 str → cache 並 return HTMLResponse。
+    """
+    now = _time.monotonic()
+    entry = _ENDPOINT_CACHE.get(key)
+    if entry is not None and now < entry[0]:
+        cached = entry[1]
+        if cached is None:
+            return None
+        return HTMLResponse(content=cached)
+
+    ctx = ctx_builder()
+    if ctx is None:
+        # 短 TTL 30s cache None,避免被刷 404 流量打爆
+        _evict_expired_if_full()
+        _ENDPOINT_CACHE[key] = (now + 30.0, None)
+        return None
+
+    html = templates.env.get_template(template_name).render(ctx)
+    _evict_expired_if_full()
+    _ENDPOINT_CACHE[key] = (now + _ENDPOINT_TTL, html)
+    return HTMLResponse(content=html)
 
 
 def _build_index_payload() -> dict:
@@ -298,20 +351,23 @@ async def news(
 ) -> HTMLResponse:
     """新聞牆 — 100% 讀本地 news table。
 
-    TTL=60s memory cache(key=etf+days)。
-    路由不分頁:一次回該窗口全部 row,前端用 JS slice 模擬分頁 + 即時搜尋(操作整個 array)。
-    最多 5000 筆 hard cap 避免極端情境炸瀏覽器。
+    TTL=60s rendered-HTML cache(key=etf+days+today_iso)。
+    news.html 5000 row hard cap × 多欄位 Jinja 渲染 ~100ms,只 cache payload
+    救不到。連 HTML 一起 cache 後 server time 從 ~125ms → <5ms 命中。
+    today_iso 進 key 確保跨日自動失效(「今日消息」紅縱線標記正確)。
     """
     etf_key = etf.upper() if etf else ""
-    payload = _ttl_cached(("news", etf_key, days), lambda: _build_news_payload(etf, days))
-    return templates.TemplateResponse(
-        request, "news.html",
-        {
+    today_iso = date.today().isoformat()
+
+    def _build():
+        return {
             **_common_ctx(),
-            **payload,
-            "today_iso": date.today().isoformat(),
-        },
-    )
+            **_build_news_payload(etf, days),
+            "today_iso": today_iso,
+            "request": request,
+        }
+
+    return _render_cached(("news_html", etf_key, days, today_iso), "news.html", _build)
 
 
 def _parse_ym(ym: str | None, today: date) -> tuple[int, int]:
@@ -390,32 +446,35 @@ async def dividend_calendar(
 
     URL: /dividend-calendar?ym=2026-04&mode=cal
     mode: cal(月曆) / list(列表)
-    TTL=60s memory cache(key=year+month)— is_today 欄位 60s 內變動可忽略。
+    TTL=60s rendered-HTML cache — 月曆網格 6×7 × 多 events render 偏重。
+    Key 含 today_iso → 跨日「is_today」紅框自動失效。
     """
     today = date.today()
+    today_iso = today.isoformat()
     year, month = _parse_ym(ym, today)
-    payload = _ttl_cached(
-        ("div_cal", year, month, today.isoformat()),
-        lambda: _build_dividend_calendar_payload(year, month, today),
-    )
-
+    mode_norm = mode if mode in ("cal", "list") else "cal"
     prev_y, prev_m = (year - 1, 12) if month == 1 else (year, month - 1)
     next_y, next_m = (year + 1, 1) if month == 12 else (year, month + 1)
 
-    return templates.TemplateResponse(
-        request, "dividend_calendar.html",
-        {
+    def _build():
+        return {
             **_common_ctx(),
             "year": year,
             "month": month,
-            "mode": mode if mode in ("cal", "list") else "cal",
-            **payload,
+            "mode": mode_norm,
+            **_build_dividend_calendar_payload(year, month, today),
             "prev_ym": f"{prev_y:04d}-{prev_m:02d}",
             "next_ym": f"{next_y:04d}-{next_m:02d}",
             "today_ym": f"{today.year:04d}-{today.month:02d}",
-            "today_iso": today.isoformat(),
+            "today_iso": today_iso,
             "is_current_month": (year == today.year and month == today.month),
-        },
+            "request": request,
+        }
+
+    return _render_cached(
+        ("div_cal_html", year, month, mode_norm, today_iso),
+        "dividend_calendar.html",
+        _build,
     )
 
 
@@ -550,16 +609,21 @@ def _build_etf_detail_payload(code: str):
 async def etf_detail(request: Request, code: str) -> HTMLResponse:
     """ETF 詳情頁 — 100% 讀本地 DB,不打外部 API。
 
-    TTL=60s memory cache(key=code)— 詳情頁是高流量入口,255 ETF 命中率高。
+    TTL=60s rendered-HTML cache(key=code)— 詳情頁 etf_detail.html 渲染重
+    (7 sections + 配息歷史表 + 走勢圖數據),cache 連 Jinja render 一起省。
     """
     code_norm = code.upper()
-    payload = _ttl_cached(("etf_detail", code_norm), lambda: _build_etf_detail_payload(code_norm))
-    if payload is None:
+
+    def _build():
+        payload = _build_etf_detail_payload(code_norm)
+        if payload is None:
+            return None
+        return {**_common_ctx(), **payload, "request": request}
+
+    response = _render_cached(("etf_detail_html", code_norm), "etf_detail.html", _build)
+    if response is None:
         raise HTTPException(status_code=404, detail=f"找不到 ETF: {code}")
-    return templates.TemplateResponse(
-        request, "etf_detail.html",
-        {**_common_ctx(), **payload},
-    )
+    return response
 
 
 @router.get("/test_holdings", response_class=HTMLResponse)
