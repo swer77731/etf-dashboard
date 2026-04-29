@@ -410,56 +410,45 @@ raise XxxError(_redact(str(last_err)))
 
 ---
 
-### 15. server 重啟政策(2026-04-29 由 user 放寬 v2 / 原 2026-04-27 鎖定)
+### 15. 工作模式 — Claude Code 全權處理技術細節(2026-04-29 由 user 鎖 v3)
 
-> v1(2026-04-27):「不准擅自 kill / restart server,要 user 授權。」
-> v2(2026-04-29):「一般情況可自動重啟套用新 code,例外場景才問。」— user 原話
+> 「全權給你,卡住才問我。」— user 原話 v3
 
-#### v2 規則(現行)
+#### 規則
 
-**一般情況 — 改 code 後可自動重啟,不必每次問:**
-- 改完 .py / template 等,直接重啟 server 套用新 code
-- 不必為小改動跑來問 user(原 v1 太保守,每改必問拖慢節奏)
+**Claude Code 自決:**
+所有技術細節 — 改 code、commit、push、重啟 server、改 schema、改資料、跑 migration、改紀律檔、刪檔、改 cron、改任何東西。做完報告結果就好,不必每步問。
 
-**例外情況 — 必須先問 user:**
-1. **改 schema / migration**(資料庫結構)— 需要 user 確認重啟時機,避免破壞跑著的 transaction
-2. **kbar_sync / dividend_sync 正在跑時**(看 server log 有無 `progress N/M` 訊息)— 等他跑完,中斷會造成 partial state + 浪費 FinMind 配額
-3. **FinMind 配額超過 80% 時** — 重啟會觸發 startup_sync 又燒配額,先問 user 確認
-4. **改完 lint / syntax 失敗** — 先修好再重啟,不要把壞 code 推上去
+**只在 2 種情況問 user:**
 
-#### 重啟 SOP
+1. **解不出來 / 不確定哪條路對** — 試過幾次仍卡住、技術判斷沒把握、有兩條路選不下手 → 帶選項問 user
+2. **要花錢** — 刷 user 信用卡 / 買 domain / 訂閱服務 / 升級 API plan → **一定要 user 點頭**
 
-**Step 1 — kill 現有 server tree:**
-- 推薦 PID-based(踩坑 #2026-04-26 已寫過):
-  ```powershell
-  Get-CimInstance Win32_Process | Where-Object { $_.Name -eq "python.exe" -and $_.CommandLine -match "run.py|etf_dashboard|multiprocessing-fork" } | Select-Object ProcessId, ParentProcessId
-  # 找到 run.py + uvicorn reloader + uvicorn worker 三層,Stop-Process 個別 PID
-  ```
-- **避免** `taskkill /F /IM python.exe`(會誤殺 user 其他 python 進程,踩坑紀錄已警告)
-- 若 user 環境只有這個 python 跑(像 production-like),`taskkill /F /IM python.exe` 才可用
+#### 演化史(供下次 session 看)
 
-**Step 2 — 啟動:**
-- `python run.py`(或 `.venv\Scripts\python.exe run.py`)
-- 等 5 秒
-- 確認 server log 看到 `Application startup complete` 才算成功
-- 沒看到 → log 應有 traceback,**修好再重啟**(別硬塞給 user)
+- **v1**(2026-04-27)— 「不准擅自重啟 server」鐵律,每動必問
+- **v2**(2026-04-29)— 例外清單模式(改 schema / sync 跑著 / 配額紅線 / lint 壞才問)
+- **v3**(2026-04-29 by user)— 全砍。Claude 全權,只 stuck / 花錢 才問。
 
-**Step 3 — verify:**
-- `curl http://127.0.0.1:8000/api/health` → 200
-- 跟 user 回報「server 重啟 OK」一句話
+#### 邊界(仍生效)
 
-#### 不准動的東西
+雖然全權但仍受其他紀律約束:
+- 紀律 #1 白癡都會用 / 紀律 #19 字級基準 → UI / UX 判斷時參考
+- 紀律 #14 不准用行動代替思考 → 改 code 前讀 code,執行 ≤ 3 次仍解不出 → 算 stuck → 問 user
+- 紀律 #17 不准 copy 不是自己寫的 code → 重寫保險
+- 紀律 #18 不准 token 漏進 log → redact
+- 紀律 #20 資料完整性 → record_sync_attempt + missing 標明
+- 紀律 #21 ETF inactive 標記必須先驗證
 
-- **cloudflared 視窗** — 永遠不碰(那是 user 自己 tunnel 視窗,不是我的範疇)
-- 重啟過程不影響 cloudflared,即使 cloudflared 暫時 502 也會自動恢復
+#### 重啟 server SOP(供參考,但 user 已經不用授權了)
 
-#### 為什麼放寬
+PID-based kill 3-PID server tree(避開 `taskkill /F /IM python.exe` 誤殺 user 其他 python — 踩坑 2026-04-26)→ `python run.py` → 等 ready → curl /api/health → 一句話回報「重啟完」。
 
-v1 時 user 要為每個小改動授權重啟,溝通成本太高(尤其前端 / sync 改動每天都需要)。v2 把責任分清楚:
-- **小改動**(template / sync logic / 視覺 polish):Claude 自決重啟
-- **高風險場景**(schema / 跑 sync 時 / 配額紅線 / lint 壞):仍要 user 拍板
+**不准動 cloudflared 視窗**(user tunnel,Claude 不碰)。
 
-跟紀律 #11(前端 cache 先驗)、#14(不准用行動代替思考)一起鎖。
+#### 為什麼最後放這麼寬
+
+v1/v2 每動必問拖慢節奏。user 認定「Claude 工程判斷夠 reliable,我只要出主意」。Claude 用紀律 #14 當煞車(stuck 就問,不亂飆)。
 
 ---
 
