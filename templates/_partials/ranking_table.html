@@ -20,7 +20,7 @@
       資料更新中,請稍候。
     </div>
   {% else %}
-    <div class="overflow-x-auto -mx-4 sm:mx-0">
+    <div class="table-scroll-wrap tbl-mobile-card sm:mx-0">
       <table class="w-full text-base min-w-[640px] num">
         <thead>
           <tr class="text-left text-muted border-b border-border">
@@ -38,21 +38,29 @@
         <tbody>
           {% for r in data.rows %}
           <tr class="border-b border-border/40 hover:bg-bg/40">
-            <td class="py-3 px-4 sm:px-3 text-muted text-base">{{ loop.index }}</td>
-            <td class="py-3 px-3 font-mono text-base sm:text-lg">
+            <td class="col-primary py-3 px-4 sm:px-3 text-muted text-base" data-label="名次">
+              <span class="hidden sm:inline">{{ loop.index }}</span>
+              <span class="sm:hidden">
+                <span class="text-xs text-muted mr-1">#{{ loop.index }}</span>
+                <a href="/etf/{{ r.code }}" class="font-mono font-semibold text-accent hover:underline">{{ r.code }}</a>
+                <span class="ml-1.5 text-fg/85">{{ r.name }}</span>
+                {% if show_category %}<span class="ml-1 text-xs text-muted">{{ r.category_label }}</span>{% endif %}
+              </span>
+            </td>
+            <td class="py-3 px-3 font-mono text-base sm:text-lg hidden sm:table-cell">
               <a href="/etf/{{ r.code }}" class="text-accent hover:underline">{{ r.code }}</a>
             </td>
-            <td class="py-3 px-3 truncate max-w-[200px] text-base">{{ r.name }}</td>
+            <td class="py-3 px-3 truncate max-w-[200px] text-base hidden sm:table-cell">{{ r.name }}</td>
             {% if show_category %}
             <td class="py-3 px-3 text-muted text-base hidden sm:table-cell">{{ r.category_label }}</td>
             {% endif %}
-            <td class="py-3 px-3 text-right text-base sm:text-lg">
+            <td class="py-3 px-3 text-right text-base sm:text-lg" data-label="收盤">
               {%- if r.last_close is not none -%}{{ "%.2f"|format(r.last_close) }}{%- else -%}—{%- endif -%}
             </td>
-            <td class="py-3 px-3 text-right text-base sm:text-lg font-semibold {{ pct_color(r.period_return_pct) }}">
+            <td class="py-3 px-3 text-right text-base sm:text-lg font-semibold {{ pct_color(r.period_return_pct) }}" data-label="期間報酬">
               {{ fmt_pct(r.period_return_pct) }}
             </td>
-            <td class="py-3 px-3 text-right text-base sm:text-lg font-semibold {{ pct_color(r.vs_index_pct) }}">
+            <td class="py-3 px-3 text-right text-base sm:text-lg font-semibold {{ pct_color(r.vs_index_pct) }}" data-label="vs 大盤">
               {{ fmt_pct(r.vs_index_pct) }}
             </td>
           </tr>

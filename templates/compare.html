@@ -397,7 +397,7 @@
       </div>
     </header>
 
-    <div class="table-scroll-wrap sm:mx-0">
+    <div class="table-scroll-wrap tbl-mobile-card sm:mx-0">
       <table class="w-full text-lg num min-w-[860px]">
         <thead>
           <tr class="text-left text-muted border-b border-border">
@@ -415,7 +415,7 @@
         <tbody>
           {% for s in result.stats %}
           <tr class="border-b border-border/40 hover:bg-bg/40">
-            <td class="py-3.5 px-3">
+            <td class="col-primary py-3.5 px-3">
               <a href="/etf/{{ s.code }}" class="font-mono text-accent hover:underline font-semibold">{{ s.code }}</a>
               <span class="ml-2">{{ s.name }}</span>
               {% if s.leverage_subtype == "positive" %}
@@ -424,17 +424,17 @@
                 <span class="ml-2 px-1.5 py-0.5 text-xs font-semibold bg-amber-500/20 text-amber-300 rounded">{{ s.leverage_multiplier }} 倍</span>
               {% endif %}
             </td>
-            <td class="py-3.5 px-3 text-right font-bold {{ pct_color(s.total_return_pct) }}">{{ fmt_pct(s.total_return_pct) }}</td>
-            <td class="py-3.5 px-3 text-right font-semibold {{ pct_color(s.annualized_return_pct) }}">{{ fmt_pct(s.annualized_return_pct) }}</td>
-            <td class="py-3.5 px-3 text-right">{{ fmt_pct(s.volatility_pct, signed=False) }}</td>
-            <td class="py-3.5 px-3 text-right">{{ fmt_num(s.sharpe) }}</td>
-            <td class="py-3.5 px-3 text-right">{{ fmt_num(s.sortino) }}</td>
-            <td class="py-3.5 px-3 text-right text-down font-semibold">{{ fmt_pct(s.max_drawdown_pct) }}</td>
-            <td class="py-3.5 px-3 text-right">
+            <td class="py-3.5 px-3 text-right font-bold {{ pct_color(s.total_return_pct) }}" data-label="總報酬">{{ fmt_pct(s.total_return_pct) }}</td>
+            <td class="py-3.5 px-3 text-right font-semibold {{ pct_color(s.annualized_return_pct) }}" data-label="年化報酬">{{ fmt_pct(s.annualized_return_pct) }}</td>
+            <td class="py-3.5 px-3 text-right" data-label="年化波動">{{ fmt_pct(s.volatility_pct, signed=False) }}</td>
+            <td class="py-3.5 px-3 text-right" data-label="夏普值">{{ fmt_num(s.sharpe) }}</td>
+            <td class="py-3.5 px-3 text-right" data-label="Sortino">{{ fmt_num(s.sortino) }}</td>
+            <td class="py-3.5 px-3 text-right text-down font-semibold" data-label="最大回撤">{{ fmt_pct(s.max_drawdown_pct) }}</td>
+            <td class="py-3.5 px-3 text-right" data-label="最佳年">
               {% if s.best_year %}<span class="text-sm text-muted">{{ s.best_year }} </span>{% endif %}
               <span class="font-semibold {{ pct_color(s.best_year_pct) }}">{{ fmt_pct(s.best_year_pct) }}</span>
             </td>
-            <td class="py-3.5 px-3 text-right">
+            <td class="py-3.5 px-3 text-right" data-label="最差年">
               {% if s.worst_year %}<span class="text-sm text-muted">{{ s.worst_year }} </span>{% endif %}
               <span class="font-semibold {{ pct_color(s.worst_year_pct) }}">{{ fmt_pct(s.worst_year_pct) }}</span>
             </td>

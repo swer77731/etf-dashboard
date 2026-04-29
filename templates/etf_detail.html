@@ -343,7 +343,7 @@
     {# 年度小計表 — 一眼看完每年領多少 (紀律 #19 字體放大) #}
     <div class="mb-6">
       <div class="text-base text-muted mb-2 font-semibold">年度小計</div>
-      <div class="overflow-x-auto -mx-4 sm:mx-0">
+      <div class="table-scroll-wrap tbl-mobile-card sm:mx-0">
         <table class="w-full text-lg num min-w-[520px]">
           <thead>
             <tr class="text-left text-muted border-b border-border bg-bg-soft/40">
@@ -357,11 +357,11 @@
           <tbody>
             {% for y in etf.history_summary.by_year %}
             <tr class="border-b border-border/40 hover:bg-bg/40">
-              <td class="py-3.5 px-3 font-bold">{{ y.year }}</td>
-              <td class="py-3.5 px-3 text-right">{{ y.count }} 次</td>
-              <td class="py-3.5 px-3 text-right font-bold text-up">{{ "%.4f"|format(y.total_cash) }}</td>
-              <td class="py-3.5 px-3 text-right text-muted">{{ "%.4f"|format(y.avg_per_event) }}</td>
-              <td class="py-3.5 px-3 text-right">
+              <td class="col-primary py-3.5 px-3 font-bold text-lg">{{ y.year }} 年</td>
+              <td class="py-3.5 px-3 text-right" data-label="配息次數">{{ y.count }} 次</td>
+              <td class="py-3.5 px-3 text-right font-bold text-up" data-label="總額(元/股)">{{ "%.4f"|format(y.total_cash) }}</td>
+              <td class="py-3.5 px-3 text-right text-muted" data-label="每次平均">{{ "%.4f"|format(y.avg_per_event) }}</td>
+              <td class="py-3.5 px-3 text-right" data-label="估算年化殖利率">
                 {% if y.estimated_annual_yield_pct is not none %}
                   <span class="text-up font-bold">{{ "%.2f"|format(y.estimated_annual_yield_pct) }}%</span>
                 {% else %}
@@ -381,7 +381,7 @@
     {# 細項 — 全部 5 年的逐筆配息 (紀律 #19 字體放大) #}
     <div>
       <div class="text-base text-muted mb-2 font-semibold">配息細項({{ etf.history_summary.total_events }} 筆 · 由新到舊)</div>
-      <div class="overflow-x-auto -mx-4 sm:mx-0">
+      <div class="table-scroll-wrap tbl-mobile-card sm:mx-0">
         <table class="w-full text-lg num min-w-[480px]">
           <thead>
             <tr class="text-left text-muted border-b border-border">
@@ -393,8 +393,8 @@
           <tbody>
             {% for d in etf.history_summary.rows %}
             <tr class="border-b border-border/40 hover:bg-bg/40">
-              <td class="py-3.5 px-3 font-bold">{{ d.ex_date }}</td>
-              <td class="py-3.5 px-3 text-right font-bold text-up">{{ "%.4f"|format(d.cash_dividend) }}</td>
+              <td class="col-primary py-3.5 px-3 font-bold">{{ d.ex_date }}</td>
+              <td class="py-3.5 px-3 text-right font-bold text-up" data-label="每股配息">{{ "%.4f"|format(d.cash_dividend) }}</td>
               <td class="py-3.5 px-3 hidden sm:table-cell text-muted">{{ d.payment_date or "—" }}</td>
             </tr>
             {% endfor %}

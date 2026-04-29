@@ -365,19 +365,60 @@
       }
       ::-webkit-scrollbar-thumb:hover { background: rgb(var(--c-muted) / 0.5); }
 
-      /* === 寬表格手機橫滑容器 ===
-         拿掉了 ::after 右側陰影漸層 — position:absolute right:0 在
-         overflow-x:auto 容器內跨瀏覽器行為不一致(部分舊 WebKit 把絕對
-         元素黏到 content 右緣,scroll 時 shadow 跟著動,出現在欄位中間
-         看起來像黑色直紋 bug)。手機使用者本就懂寬表可滑,scroll 自帶
-         affordance 已足夠。 */
+      /* === 寬表格手機橫滑容器(桌面用) === */
       .table-scroll-wrap {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
       }
-      /* 手機橫滑容器外的左右邊距吃進去,讓表格可貼齊螢幕邊 */
       @media (max-width: 640px) {
-        .table-scroll-wrap { margin-left: -1rem; margin-right: -1rem; }
+        .table-scroll-wrap { margin-left: -0.5rem; margin-right: -0.5rem; }
+      }
+
+      /* === 寬表格手機改 card stack(避免橫滑) ===
+         user 紀律:「不要滑動的感覺,一目了然」
+         套用方式:wrapper 加 class="tbl-mobile-card",每個 td 加 data-label,
+         主欄(代號+名稱)用 class="col-primary" 在卡片頂部全寬顯示。
+         桌面樣式不動(@media 640px 內生效),table 行會在手機自動轉直立 card。 */
+      @media (max-width: 640px) {
+        .tbl-mobile-card { overflow-x: visible !important; margin: 0 !important; }
+        .tbl-mobile-card table { display: block; min-width: 0 !important; width: 100%; }
+        .tbl-mobile-card thead { display: none; }
+        .tbl-mobile-card tbody { display: block; }
+        .tbl-mobile-card tr {
+          display: block;
+          border: 1px solid rgb(var(--c-border));
+          border-radius: 0.55rem;
+          padding: 0.7rem 0.85rem;
+          margin-bottom: 0.55rem;
+          background: rgb(var(--c-bg-soft));
+        }
+        .tbl-mobile-card td {
+          display: flex !important;
+          justify-content: space-between;
+          align-items: baseline;
+          border: none !important;
+          padding: 0.28rem 0 !important;
+          gap: 0.75rem;
+          text-align: right !important;
+        }
+        .tbl-mobile-card td::before {
+          content: attr(data-label);
+          color: rgb(var(--c-muted));
+          font-size: 0.82rem;
+          font-weight: 500;
+          flex-shrink: 0;
+          text-align: left;
+        }
+        /* col-primary 用於主欄(代號 / 名稱),全寬不分 label/value */
+        .tbl-mobile-card td.col-primary {
+          display: block !important;
+          text-align: left !important;
+          border-bottom: 1px solid rgb(var(--c-border) / 0.6) !important;
+          padding-bottom: 0.5rem !important;
+          margin-bottom: 0.4rem !important;
+          max-width: none !important;
+        }
+        .tbl-mobile-card td.col-primary::before { content: none; }
       }
 
       /* === 手機字體一點點微縮(16 → 15.5px ≈ -3%)=== */
