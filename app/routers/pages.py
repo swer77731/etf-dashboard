@@ -13,11 +13,16 @@ from fastapi import HTTPException
 
 from app.config import PROJECT_ROOT, settings
 from app.services import dividend_metrics, etf_metrics, news_sync, performance, ranking
+from app.services.time_utils import humanize_relative, is_fresh_news
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(PROJECT_ROOT / "templates"))
+
+# 紀律 #16 — server-side relative time,JS 失效時 SSR 已正確,且時區走 Asia/Taipei 不漂
+templates.env.filters["humanize_relative"] = humanize_relative
+templates.env.filters["is_fresh_news"] = is_fresh_news
 
 
 _LOGO_SVG = PROJECT_ROOT / "static" / "img" / "logo.svg"

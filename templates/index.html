@@ -99,26 +99,5 @@
   資料來源:台灣證券交易所 / TAIEX 為台灣加權股價指數 · 報酬以還原股價計算,如與券商略有差異以您券商為準
 </section>
 
-{# === 相對時間自動格式化 === #}
-<script>
-  (function () {
-    function rel(iso) {
-      if (!iso) return null;
-      const d = new Date(iso);
-      if (isNaN(d.getTime())) return null;
-      const diff = (Date.now() - d.getTime()) / 1000;
-      if (diff < 60) return "剛剛";
-      if (diff < 3600) return Math.floor(diff/60) + " 分鐘前";
-      if (diff < 86400) return Math.floor(diff/3600) + " 小時前";
-      if (diff < 86400*2) return "昨天";
-      if (diff < 86400*7) return Math.floor(diff/86400) + " 天前";
-      return iso.slice(0, 10);
-    }
-    document.querySelectorAll('.news-time[data-published]').forEach(el => {
-      const pub = el.getAttribute('data-published');
-      const r = rel(pub);
-      if (r) el.textContent = r;
-    });
-  })();
-</script>
+{# 相對時間 / fresh 標記由 Jinja filter humanize_relative + is_fresh_news 在 server 端 render(Asia/Taipei),JS 不再重算 #}
 {% endblock %}

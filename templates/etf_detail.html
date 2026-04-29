@@ -433,7 +433,10 @@
         <a href="{{ n.url }}" target="_blank" rel="noopener noreferrer"
            class="block hover:bg-bg-soft/50 -mx-2 px-2 py-2 rounded-md transition group">
           <div class="flex items-baseline gap-3 flex-wrap mb-1">
-            <span class="text-xs text-muted num">{{ n.published_at[:10] if n.published_at else "—" }}</span>
+            {% set rel_time = n.published_at | humanize_relative %}
+            <span class="text-xs num {% if n.published_at | is_fresh_news %}text-up font-semibold{% else %}text-muted{% endif %}">
+              {{ rel_time if rel_time else "—" }}
+            </span>
             {% if n.source %}
               <span class="text-xs text-muted">{{ n.source }}</span>
             {% endif %}

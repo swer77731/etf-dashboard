@@ -31,8 +31,10 @@
                 {{ n.title }}
               </div>
               <div class="mt-1 flex items-baseline gap-2 flex-wrap text-xs sm:text-sm text-muted">
-                <span class="news-time num" data-published="{{ n.published_at or '' }}">
-                  {%- if n.published_at -%}{{ n.published_at[:16] }}{%- else -%}—{%- endif -%}
+                {% set rel_time = n.published_at | humanize_relative %}
+                <span class="news-time num {% if n.published_at | is_fresh_news %}text-up font-semibold{% endif %}"
+                      data-published="{{ n.published_at or '' }}">
+                  {%- if rel_time -%}{{ rel_time }}{%- else -%}—{%- endif -%}
                 </span>
                 {% if n.source %}
                 <span>·</span>

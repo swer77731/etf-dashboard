@@ -223,8 +223,9 @@
   <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
   <div class="card-content">
     {% for n in items %}
-      {% set pub_date = n.published_at[:10] if n.published_at else '' %}
       {% set search_text = ((n.etf_tags|join(' ')) ~ ' ' ~ n.title)|lower %}
+      {% set rel_time = n.published_at | humanize_relative %}
+      {% set fresh = n.published_at | is_fresh_news %}
       {# 緊湊 1-line layout:[ETF chip] [標題........]   [來源 · 時間] #}
       <div class="news-row"
            data-index="{{ loop.index0 }}"
@@ -241,10 +242,10 @@
           </div>
           {# 右側 meta:來源 · 時間(純灰色文字,無框) #}
           {% if n.source or n.published_at %}
-            <span class="news-meta" data-meta>
+            <span class="news-meta {% if fresh %}is-fresh{% endif %}" data-meta>
               {% if n.source %}{{ n.source }}{% endif %}
-              {% if n.source and n.published_at %} · {% endif %}
-              {% if n.published_at %}<span data-time-text>{{ pub_date }}</span>{% endif %}
+              {% if n.source and rel_time %} · {% endif %}
+              {% if rel_time %}<span data-time-text>{{ rel_time }}</span>{% endif %}
             </span>
           {% endif %}
         </div>
@@ -285,49 +286,14 @@
 
 <script>
   // ============================================================
-  // 1. 時間 pill 改寫:人類友善格式(擇一,不並列)
-  //    < 60min  → 剛剛                        + fresh(紅)
-  //    < 6 hr   → X 小時前                    + fresh(紅)
-  //    6-23 hr  → X 小時前                    灰
-  //    1 day    → 昨天                        灰
-  //    2-6 days → X 天前                      灰
-  //    >= 7 days → YYYY-MM-DD                 灰
-  // 2. Filter:即時搜尋,debounce 100ms,操作整個 row array
+  // 時間 / fresh 標記:由 server-side Jinja filter humanize_relative
+  // + is_fresh_news 渲染好(Asia/Taipei),JS 不再重算,避免時區漂移。
+  // 1. Filter:即時搜尋,debounce 100ms,操作整個 row array
   //    - 有值 → 隱藏分頁器,顯示「搜尋結果: N 筆」
   //    - 無值 → 恢復分頁器
-  // 3. Pagination:純 JS,30 筆/頁 slice
+  // 2. Pagination:純 JS,50 筆/頁 slice
   // ============================================================
   (function () {
-    // --- 時間人類友善格式 ---
-    function humanTime(iso) {
-      if (!iso) return null;
-      var d = new Date(iso);
-      if (isNaN(d.getTime())) return null;
-      var now = new Date();
-      var diffMin = Math.floor((now - d) / 60000);
-      if (diffMin < 60)   return { text: '剛剛', fresh: true };
-      var diffHr = Math.floor(diffMin / 60);
-      if (diffHr < 6)     return { text: diffHr + ' 小時前', fresh: true };
-      if (diffHr < 24)    return { text: diffHr + ' 小時前', fresh: false };
-      var diffDay = Math.floor(diffHr / 24);
-      if (diffDay === 1)  return { text: '昨天', fresh: false };
-      if (diffDay < 7)    return { text: diffDay + ' 天前', fresh: false };
-      return { text: iso.slice(0, 10), fresh: false };
-    }
-
-    // 套用時間到所有 row(只跑一次)
-    document.querySelectorAll('.news-row').forEach(function (row) {
-      var pub = row.getAttribute('data-published');
-      if (!pub) return;
-      var info = humanTime(pub);
-      if (!info) return;
-      var meta = row.querySelector('[data-meta]');
-      var text = row.querySelector('[data-time-text]');
-      if (text) text.textContent = info.text;
-      // < 6hr fresh:meta 整段變紅(包含來源 · 時間)
-      if (info.fresh && meta) meta.classList.add('is-fresh');
-    });
-
     // --- Filter + Pagination state ---
     var rows = Array.prototype.slice.call(document.querySelectorAll('.news-row'));
     var input = document.getElementById('news-filter');
