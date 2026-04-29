@@ -152,7 +152,7 @@
 </section>
 
 <section class="relative section-card rounded-xl p-5 sm:p-7 mb-7"
-         x-data='holdingsPicker({initialCodes: {{ initial_codes | tojson }}})'
+         x-data='holdingsPicker({initialCodes: {{ initial_codes | tojson }}, days: {{ days }}})'
          x-init="init()">
 
   {# === ETF picker(上限 3 支)=== #}
@@ -256,18 +256,32 @@
     </ul>
   </div>
 
-  {# === 區塊 2:持股變動(近 N 日)=== #}
+  {# === 區塊 2:持股變動(可切 1 / 7 / 30 個交易日)=== #}
   <div x-show="codes.length > 0 && !data_loading && changes.length > 0" x-cloak class="mb-7">
-    <h2 class="text-xl sm:text-2xl font-semibold mb-3">
-      <span class="w-1 h-7 bg-accent rounded-full inline-block align-middle mr-2" style="box-shadow: 0 0 8px var(--c-accent-glow);"></span>
-      持股變動
-    </h2>
+    <div class="flex items-baseline justify-between gap-3 flex-wrap mb-3">
+      <h2 class="text-xl sm:text-2xl font-semibold">
+        <span class="w-1 h-7 bg-accent rounded-full inline-block align-middle mr-2" style="box-shadow: 0 0 8px var(--c-accent-glow);"></span>
+        持股變動
+      </h2>
+      {# 1 / 7 / 30 toggle — 點按鈕改 ?days= 整頁 reload #}
+      <div class="inline-flex rounded-md border border-border bg-bg-soft overflow-hidden text-sm">
+        {% for d in days_options %}
+        <button type="button"
+                @click.prevent="switchDays({{ d }})"
+                class="px-3 py-1.5 transition border-r border-border last:border-r-0
+                       {% if d == days %}bg-accent/15 text-accent font-semibold{% else %}text-muted hover:text-fg hover:bg-card-hover{% endif %}">
+          {{ d }} 天
+        </button>
+        {% endfor %}
+      </div>
+    </div>
     <template x-for="ch in changes" :key="ch.code">
       <div class="bg-bg-soft border border-border rounded-lg p-5 mb-4">
         <div class="text-base sm:text-lg font-semibold mb-1 flex items-baseline gap-2 flex-wrap">
           <span class="font-mono text-accent text-lg" x-text="ch.code"></span>
           <span x-text="ch.name"></span>
-          <span class="text-sm text-muted num" x-text="ch.previous_date + ' → ' + ch.latest_date"></span>
+          <span class="text-sm text-muted num"
+                x-text="`最近 ${days} 個交易日 (${ch.previous_date} → ${ch.latest_date})`"></span>
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-3">
           <div>
@@ -279,7 +293,7 @@
               <template x-for="b in ch.buy.slice(0, 10)" :key="b.stock_code">
                 <li class="flex justify-between gap-2">
                   <span class="truncate"><span class="font-mono" x-text="b.stock_code"></span> <span x-text="b.stock_name"></span></span>
-                  <span class="dir-buy whitespace-nowrap" x-text="'+' + Math.round(b.shares_diff/1000).toLocaleString() + ' 張'"></span>
+                  <span class="dir-buy whitespace-nowrap" x-text="'+' + b.weight_diff.toFixed(2) + '%'"></span>
                 </li>
               </template>
               <li x-show="ch.buy.length === 0" class="text-muted">—</li>
@@ -294,7 +308,7 @@
               <template x-for="s in ch.sell.slice(0, 10)" :key="s.stock_code">
                 <li class="flex justify-between gap-2">
                   <span class="truncate"><span class="font-mono" x-text="s.stock_code"></span> <span x-text="s.stock_name"></span></span>
-                  <span class="dir-sell whitespace-nowrap" x-text="Math.round(s.shares_diff/1000).toLocaleString() + ' 張'"></span>
+                  <span class="dir-sell whitespace-nowrap" x-text="s.weight_diff.toFixed(2) + '%'"></span>
                 </li>
               </template>
               <li x-show="ch.sell.length === 0" class="text-muted">—</li>
@@ -309,12 +323,15 @@
               <template x-for="n in ch.new.slice(0, 10)" :key="n.stock_code">
                 <li class="flex justify-between gap-2">
                   <span class="truncate"><span class="font-mono" x-text="n.stock_code"></span> <span x-text="n.stock_name"></span></span>
-                  <span class="dir-new whitespace-nowrap" x-text="'+' + Math.round(n.shares_diff/1000).toLocaleString() + ' 張'"></span>
+                  <span class="dir-new whitespace-nowrap" x-text="'+' + n.weight_diff.toFixed(2) + '%'"></span>
                 </li>
               </template>
               <li x-show="ch.new.length === 0" class="text-muted">—</li>
             </ul>
           </div>
+        </div>
+        <div class="text-xs text-muted mt-3">
+          數值為權重變化(%)— ETF 對該個股的曝險變化
         </div>
       </div>
     </template>
@@ -376,6 +393,7 @@
 function holdingsPicker(opts) {
   return {
     codes: (opts.initialCodes || []).slice(0, 3),
+    days: opts.days || 7,
     query: '',
     open: false,
     loading: false,
@@ -383,11 +401,17 @@ function holdingsPicker(opts) {
     activeIdx: -1,
     cache: {},
     holdings: [],     // [{code, name, holdings: [{rank, stock_code, stock_name, weight, sector}]}]
-    changes: [],      // [{code, name, latest_date, previous_date, buy: [...], sell: [...], new: [...]}]
+    changes: [],      // [{code, name, latest_date, previous_date, days, buy: [...], sell: [...], new: [...]}]
     data_loading: false,
 
     init() {
       if (this.codes.length > 0) this.loadAll();
+    },
+
+    // 1 / 7 / 30 切換 — 整頁 reload(URL 友善 + 60s cache 友善)
+    switchDays(d) {
+      const codesParam = encodeURIComponent(this.codes.map(c => c.code).join(','));
+      window.location = `/holdings?codes=${codesParam}&days=${d}`;
     },
 
     // === picker ===
@@ -458,7 +482,7 @@ function holdingsPicker(opts) {
         // 並行 fetch
         const [hRes, cRes] = await Promise.all([
           Promise.all(codes.map(c => window.fetch(`/api/etf/${c}/holdings`).then(r => r.json()))),
-          Promise.all(codes.map(c => window.fetch(`/api/etf/${c}/holdings_change`).then(r => r.json()))),
+          Promise.all(codes.map(c => window.fetch(`/api/etf/${c}/holdings_change?days=${this.days}`).then(r => r.json()))),
         ]);
         this.holdings = hRes.filter(h => h && h.holdings && h.holdings.length > 0);
         this.changes = cRes.filter(c => c && (c.buy.length + c.sell.length + c.new.length > 0));

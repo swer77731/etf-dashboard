@@ -212,63 +212,39 @@
      class="news-tab {% if days_filter == '30' %}is-active{% endif %}">
     近 30 天 <span class="count num">{{ counts['30'] }}</span>
   </a>
-  <a href="{{ base_qs }}days=all"
-     class="news-tab {% if days_filter == 'all' %}is-active{% endif %}">
-    全部 <span class="count num">{{ counts['all'] }}</span>
-  </a>
 
   <input type="text" id="news-filter"
          class="news-filter-input"
-         placeholder="搜尋代號或關鍵字 (例: 0050、高股息)"
+         placeholder="搜尋已載入新聞(代號或關鍵字)"
          autocomplete="off">
 </section>
 
-{# 動態 count 顯示(JS 維護):預設「第 X 頁 · 共 Y 頁 · Z 則」/ filter 狀態「搜尋結果: N 筆」 #}
-<div class="mb-4 text-xs text-muted num" id="news-count-info">第 1 頁 · 共 {{ total }} 則</div>
+<div class="mb-4 text-xs text-muted num" id="news-count-info">
+  已載入 <span id="news-loaded">{{ items|length }}</span> / 共 {{ total }} 則
+</div>
 
 {% if items %}
 <section class="relative section-card rounded-xl p-3 sm:p-5 mb-7">
   <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
-  <div class="card-content">
-    {% for n in items %}
-      {% set search_text = ((n.etf_tags|join(' ')) ~ ' ' ~ n.title)|lower %}
-      {% set rel_time = n.published_at | humanize_relative %}
-      {% set fresh = n.published_at | is_fresh_news %}
-      {# 緊湊 1-line layout:[ETF chip] [標題........]   [來源 · 時間] #}
-      <div class="news-row"
-           data-index="{{ loop.index0 }}"
-           data-search="{{ search_text }}"
-           data-published="{{ n.published_at or '' }}">
-        <div class="news-row-flex">
-          <div class="news-row-main">
-            {% for tag in n.etf_tags[:3] %}
-              <a href="/etf/{{ tag }}" class="news-etf-tag">{{ tag }}</a>
-            {% endfor %}
-            <a href="{{ n.url }}" target="_blank" rel="noopener noreferrer"
-               class="news-title-link" title="{{ n.title }}">
-              <span class="news-title">{{ n.title }}</span>
-            </a>
-          </div>
-          {# 右側 meta:來源 · 時間(純灰色文字,無框) #}
-          {% if n.source or n.published_at %}
-            <span class="news-meta {% if fresh %}is-fresh{% endif %}" data-meta>
-              {% if n.source %}{{ n.source }}{% endif %}
-              {% if n.source and rel_time %} · {% endif %}
-              {% if rel_time %}<span data-time-text>{{ rel_time }}</span>{% endif %}
-            </span>
-          {% endif %}
-        </div>
-      </div>
-    {% endfor %}
+  <div class="card-content" id="news-list">
+    {% include "_partials/news_rows.html" %}
   </div>
   <div class="card-watermark">ETF Watch</div>
 </section>
 
-{# === Pagination(JS 控制 — filter 啟用時自動隱藏)=== #}
-<nav id="news-pager" class="flex items-center justify-center gap-3 mb-8">
-  <button type="button" id="news-prev" class="news-page-btn" disabled>← 上一頁</button>
-  <span id="news-page-label" class="text-sm text-muted">第 1 頁</span>
-  <button type="button" id="news-next" class="news-page-btn">下一頁 →</button>
+{# 載入更多 / 已到底 #}
+<nav class="flex items-center justify-center mb-8">
+  {% if has_more %}
+    <button type="button" id="news-load-more"
+            data-next-page="{{ page + 1 }}"
+            data-etf="{{ etf_filter or '' }}"
+            data-days="{{ days_filter }}"
+            class="news-page-btn">
+      載入更多 ↓
+    </button>
+  {% else %}
+    <span class="text-sm text-muted">— 已到底 —</span>
+  {% endif %}
 </nav>
 
 {% else %}
@@ -278,11 +254,7 @@
     {{ etf_filter }} 在這個期間沒有相關新聞。
     <div class="mt-3"><a href="/news?days={{ days_filter }}" class="text-accent hover:underline">看全部新聞</a></div>
   {% else %}
-    {% if days_filter != 'all' %}
-      近 {{ days_filter }} 天暫無新聞。<a href="/news?days=all" class="text-accent hover:underline">看全部</a>
-    {% else %}
-      新聞同步中,請稍後再回來看看。
-    {% endif %}
+    近 {{ days_filter }} 天暫無新聞,請稍後再回來看看。
     <div class="mt-3 text-sm">每 15 分鐘自動更新最新新聞。</div>
   {% endif %}
 </section>
@@ -295,58 +267,33 @@
 
 <script>
   // ============================================================
-  // 時間 / fresh 標記:由 server-side Jinja filter humanize_relative
-  // + is_fresh_news 渲染好(Asia/Taipei),JS 不再重算,避免時區漂移。
-  // 1. Filter:即時搜尋,debounce 100ms,操作整個 row array
-  //    - 有值 → 隱藏分頁器,顯示「搜尋結果: N 筆」
-  //    - 無值 → 恢復分頁器
-  // 2. Pagination:純 JS,50 筆/頁 slice
+  // 紀律 #16 — server-side pagination(30 筆/頁)+ 載入更多
+  // 1. 載入更多:fetch /news/_partial?page=N → 解析 HTML → appendChild
+  //    cache 60s 命中後 server time < 5ms,網路 90ms RTT 為主
+  // 2. 即時搜尋:在「已載入」row 上做 substring 過濾
+  //    placeholder 已說明「搜尋已載入新聞」
+  // 3. 時間 / fresh 標記:server-side render 完成,JS 不重算
   // ============================================================
   (function () {
-    // --- Filter + Pagination state ---
-    var rows = Array.prototype.slice.call(document.querySelectorAll('.news-row'));
+    var listEl = document.getElementById('news-list');
+    var loadedEl = document.getElementById('news-loaded');
     var input = document.getElementById('news-filter');
-    var countInfo = document.getElementById('news-count-info');
-    var pager = document.getElementById('news-pager');
-    var btnPrev = document.getElementById('news-prev');
-    var btnNext = document.getElementById('news-next');
-    var pageLabel = document.getElementById('news-page-label');
+    var btnMore = document.getElementById('news-load-more');
+    var loading = false;
 
-    var PAGE_SIZE = 50;
-    var currentPage = 1;
-    var currentQuery = '';
-
-    function applyView() {
-      var q = currentQuery.trim().toLowerCase();
-      if (q) {
-        // Filter mode:show all matching rows, hide pagination
-        var n = 0;
-        rows.forEach(function (row) {
-          var match = (row.dataset.search || '').indexOf(q) !== -1;
-          row.classList.toggle('is-hidden', !match);
-          if (match) n++;
-        });
-        if (pager) pager.style.display = 'none';
-        if (countInfo) countInfo.textContent = '搜尋結果:' + n + ' 筆';
-      } else {
-        // Pagination mode:slice page
-        var totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
-        if (currentPage > totalPages) currentPage = totalPages;
-        var start = (currentPage - 1) * PAGE_SIZE;
-        var end = start + PAGE_SIZE;
-        rows.forEach(function (row, idx) {
-          row.classList.toggle('is-hidden', !(idx >= start && idx < end));
-        });
-        if (pager) pager.style.display = totalPages > 1 ? '' : 'none';
-        if (btnPrev) btnPrev.disabled = currentPage <= 1;
-        if (btnNext) btnNext.disabled = currentPage >= totalPages;
-        if (pageLabel) pageLabel.textContent = '第 ' + currentPage + ' / ' + totalPages + ' 頁';
-        if (countInfo) countInfo.textContent =
-          '第 ' + currentPage + ' 頁 · 共 ' + totalPages + ' 頁 · ' + rows.length + ' 則';
+    // === 即時搜尋 ===
+    function applyFilter() {
+      var q = (input ? input.value : '').trim().toLowerCase();
+      var rows = listEl.querySelectorAll('.news-row');
+      if (!q) {
+        rows.forEach(function (r) { r.classList.remove('is-hidden'); });
+        return;
       }
+      rows.forEach(function (r) {
+        var match = (r.dataset.search || '').indexOf(q) !== -1;
+        r.classList.toggle('is-hidden', !match);
+      });
     }
-
-    // Debounce helper(本地寫,避免外部依賴)
     function debounce(fn, delay) {
       var t = null;
       return function () {
@@ -355,23 +302,55 @@
         t = setTimeout(function () { fn.apply(ctx, args); }, delay);
       };
     }
+    if (input) input.addEventListener('input', debounce(applyFilter, 100));
 
-    if (input) {
-      input.addEventListener('input', debounce(function () {
-        currentQuery = input.value;
-        currentPage = 1;
-        applyView();
-      }, 100));
+    // === 載入更多 ===
+    async function loadMore() {
+      if (!btnMore || loading) return;
+      loading = true;
+      var origText = btnMore.textContent;
+      btnMore.textContent = '載入中…';
+      btnMore.disabled = true;
+
+      var nextPage = parseInt(btnMore.dataset.nextPage, 10) || 2;
+      var etf = btnMore.dataset.etf || '';
+      var days = btnMore.dataset.days || '7';
+      var qs = '?days=' + encodeURIComponent(days) + '&page=' + nextPage;
+      if (etf) qs += '&etf=' + encodeURIComponent(etf);
+
+      try {
+        var r = await fetch('/news/_partial' + qs, { credentials: 'same-origin' });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        var html = await r.text();
+        var tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        var newRows = tmp.querySelectorAll('.news-row');
+        newRows.forEach(function (r) { listEl.appendChild(r); });
+
+        // 更新 已載入 X
+        if (loadedEl) loadedEl.textContent = listEl.querySelectorAll('.news-row').length;
+
+        // 沒新 row 或不到一頁 = 到底
+        if (newRows.length < 30) {
+          var nav = btnMore.parentElement;
+          nav.innerHTML = '<span class="text-sm text-muted">— 已到底 —</span>';
+        } else {
+          btnMore.dataset.nextPage = String(nextPage + 1);
+          btnMore.textContent = origText;
+          btnMore.disabled = false;
+        }
+
+        // 套既有 filter(若有 query)
+        applyFilter();
+      } catch (e) {
+        console.error('[news] load more failed', e);
+        btnMore.textContent = '載入失敗,點此重試';
+        btnMore.disabled = false;
+      } finally {
+        loading = false;
+      }
     }
-    if (btnPrev) btnPrev.addEventListener('click', function () {
-      if (currentPage > 1) { currentPage--; applyView(); window.scrollTo(0, 0); }
-    });
-    if (btnNext) btnNext.addEventListener('click', function () {
-      currentPage++; applyView(); window.scrollTo(0, 0);
-    });
-
-    // 初始化
-    applyView();
+    if (btnMore) btnMore.addEventListener('click', loadMore);
   })();
 </script>
 

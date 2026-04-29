@@ -1,0 +1,28 @@
+{# 新聞 rows partial — /news 首頁與 /news/_partial「載入更多」共用 #}
+{% for n in items %}
+  {% set search_text = ((n.etf_tags|join(' ')) ~ ' ' ~ n.title)|lower %}
+  {% set rel_time = n.published_at | humanize_relative %}
+  {% set fresh = n.published_at | is_fresh_news %}
+  <div class="news-row"
+       data-search="{{ search_text }}"
+       data-published="{{ n.published_at or '' }}">
+    <div class="news-row-flex">
+      <div class="news-row-main">
+        {% for tag in n.etf_tags[:3] %}
+          <a href="/etf/{{ tag }}" class="news-etf-tag">{{ tag }}</a>
+        {% endfor %}
+        <a href="{{ n.url }}" target="_blank" rel="noopener noreferrer"
+           class="news-title-link" title="{{ n.title }}">
+          <span class="news-title">{{ n.title }}</span>
+        </a>
+      </div>
+      {% if n.source or n.published_at %}
+        <span class="news-meta {% if fresh %}is-fresh{% endif %}" data-meta>
+          {% if n.source %}{{ n.source }}{% endif %}
+          {% if n.source and rel_time %} · {% endif %}
+          {% if rel_time %}<span data-time-text>{{ rel_time }}</span>{% endif %}
+        </span>
+      {% endif %}
+    </div>
+  </div>
+{% endfor %}

@@ -174,14 +174,143 @@ async def get_etf_holdings(
     }
 
 
+_ALLOWED_DAYS = (1, 7, 30)
+
+
+def _compute_holdings_change_window(
+    session: Session, etf_id: int, days: int,
+) -> dict:
+    """從 holdings 表 daily snapshots 算 latest 與 N 批前的權重 diff。
+
+    紀律 #16 — 直接讀 holdings.weight,沒有 shares 資料故用權重 diff(%)
+    取代 shares_diff(更貼合 ETF 曝險語意,客戶看「重押 +0.45%」更直觀)。
+
+    days ∈ {1, 7, 30} — 找 distinct updated_at DESC 取 [0] 與 [days],
+    若資料不夠就用最舊那批。
+    """
+    from sqlalchemy import desc, distinct
+
+    dates = session.scalars(
+        select(distinct(Holding.updated_at))
+        .where(Holding.etf_id == etf_id)
+        .order_by(desc(Holding.updated_at))
+    ).all()
+
+    if not dates:
+        return {"latest_date": None, "previous_date": None,
+                "buy": [], "sell": [], "new": []}
+
+    latest_dt = dates[0]
+    prev_idx = min(days, len(dates) - 1)
+    prev_dt = dates[prev_idx]
+
+    if latest_dt == prev_dt:
+        return {
+            "latest_date": latest_dt.date().isoformat(),
+            "previous_date": prev_dt.date().isoformat(),
+            "buy": [], "sell": [], "new": [],
+        }
+
+    latest_rows = session.scalars(
+        select(Holding).where(Holding.etf_id == etf_id, Holding.updated_at == latest_dt)
+    ).all()
+    prev_rows = session.scalars(
+        select(Holding).where(Holding.etf_id == etf_id, Holding.updated_at == prev_dt)
+    ).all()
+
+    latest_map = {h.stock_code: h for h in latest_rows}
+    prev_map = {h.stock_code: h for h in prev_rows}
+
+    buy: list[dict] = []
+    sell: list[dict] = []
+    new_: list[dict] = []
+    NOISE_THRESHOLD = 0.01   # 權重 diff 小於 0.01% 視為雜訊不顯示
+
+    for code, h in latest_map.items():
+        prev_h = prev_map.get(code)
+        if prev_h is None:
+            new_.append({
+                "stock_code": code,
+                "stock_name": h.stock_name,
+                "direction": "new",
+                "weight_diff": round(h.weight, 3),
+                "weight_latest": round(h.weight, 3),
+            })
+        else:
+            wdiff = h.weight - prev_h.weight
+            if abs(wdiff) < NOISE_THRESHOLD:
+                continue
+            entry = {
+                "stock_code": code,
+                "stock_name": h.stock_name,
+                "direction": "buy" if wdiff > 0 else "sell",
+                "weight_diff": round(wdiff, 3),
+                "weight_latest": round(h.weight, 3),
+            }
+            (buy if wdiff > 0 else sell).append(entry)
+
+    # 從 Top 10 掉出去 = 該批未列在前 10 → 視為「賣出」(weight 降到 0)
+    for code, prev_h in prev_map.items():
+        if code in latest_map:
+            continue
+        sell.append({
+            "stock_code": code,
+            "stock_name": prev_h.stock_name,
+            "direction": "sell",
+            "weight_diff": round(-prev_h.weight, 3),
+            "weight_latest": 0.0,
+        })
+
+    buy.sort(key=lambda x: x["weight_diff"], reverse=True)
+    sell.sort(key=lambda x: x["weight_diff"])   # 最負的先(賣超最多)
+    new_.sort(key=lambda x: x["weight_diff"], reverse=True)
+
+    return {
+        "latest_date": latest_dt.date().isoformat(),
+        "previous_date": prev_dt.date().isoformat(),
+        "buy": buy[:10],
+        "sell": sell[:10],
+        "new": new_[:10],
+    }
+
+
 @router.get("/etf/{code}/holdings_change")
 async def get_etf_holdings_change(
     code: str,
+    days: int = Query(7, description="回看交易日數,允許 1 / 7 / 30"),
     session: Session = Depends(get_session),
 ) -> dict:
-    """ETF 近 N 日持股變動 — 買超 / 賣超 / 新增。
+    """ETF 近 N 個交易日持股變動 — 買超 / 賣超 / 新增。
 
-    100% 讀本地 holdings_change table。
+    100% 讀本地 holdings table 算權重 diff。
+    days 不在 {1,7,30} → 回退 7。
+    """
+    if days not in _ALLOWED_DAYS:
+        days = 7
+
+    code = code.upper()
+    etf = session.scalar(select(ETF).where(ETF.code == code))
+    if not etf:
+        raise HTTPException(404, f"ETF not found: {code}")
+
+    payload = _compute_holdings_change_window(session, etf.id, days)
+    return {
+        "code": code,
+        "name": etf.name,
+        "days": days,
+        **payload,
+    }
+
+
+# 舊路由保留(備用 — 用既有 holdings_change 表,有 shares_diff)
+@router.get("/etf/{code}/holdings_change_legacy")
+async def get_etf_holdings_change_legacy(
+    code: str,
+    session: Session = Depends(get_session),
+) -> dict:
+    """舊版 API — 讀 holdings_change pre-computed 表(CMoney 10-day window)。
+
+    保留供未來除錯比對 / API 兼容,UI 不再用。
     """
     code = code.upper()
     etf = session.scalar(select(ETF).where(ETF.code == code))

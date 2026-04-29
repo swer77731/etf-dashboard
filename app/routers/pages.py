@@ -312,31 +312,33 @@ async def compare(
     )
 
 
-# 「全部」改 365 天(原本 None = 全表),124 NULL row 自動排除
-_NEWS_DAYS_CHOICES = {"7": 7, "30": 30, "all": 365}
+# 紀律 #16 — news pagination:
+# 預設一頁 30 筆,user 點「載入更多」抓下一頁(無限滾不做,簡單可靠)。
+# 「全部」tab 拿掉(沒人滾完 937 筆,且 server-side 不再一次撈全)。
+_NEWS_DAYS_CHOICES = {"7": 7, "30": 30}
+_NEWS_PAGE_SIZE = 30
 
-# 前端 filter + pagination 上限,避免極端情境(例如 365 天有上萬筆)炸瀏覽器
-_NEWS_HARD_LIMIT = 5000
 
-
-def _build_news_payload(etf: str | None, days: str) -> dict:
-    """Heavy compute for /news — 4 個 query(items + 3 個 count_news)。
-
-    func.instr(json(...)) 子字串查詢 SQLite 沒辦法走 index,每次全表掃描,
-    cache 60s 對熱門 ETF 過濾(?etf=0050)很有用。
-    """
+def _build_news_payload(etf: str | None, days: str, page: int) -> dict:
+    """Server-side pagination — items 只回 page N 那 30 筆,counts 給 tab 顯示。"""
     days_int = _NEWS_DAYS_CHOICES.get(days, 7)
+    page = max(1, page)
+    offset = (page - 1) * _NEWS_PAGE_SIZE
     items = news_sync.list_recent_news(
-        etf_code=etf, limit=_NEWS_HARD_LIMIT, offset=0, days=days_int,
+        etf_code=etf, limit=_NEWS_PAGE_SIZE, offset=offset, days=days_int,
     )
     counts = {
-        "7":   news_sync.count_news(etf_code=etf, days=7),
-        "30":  news_sync.count_news(etf_code=etf, days=30),
-        "all": news_sync.count_news(etf_code=etf, days=_NEWS_DAYS_CHOICES["all"]),
+        "7":  news_sync.count_news(etf_code=etf, days=7),
+        "30": news_sync.count_news(etf_code=etf, days=30),
     }
+    total = counts.get(days, len(items))
+    has_more = (offset + len(items)) < total
     return {
         "items": items,
-        "total": len(items),
+        "page": page,
+        "page_size": _NEWS_PAGE_SIZE,
+        "has_more": has_more,
+        "total": total,
         "etf_filter": etf.upper() if etf else None,
         "days_filter": days if days in _NEWS_DAYS_CHOICES else "7",
         "counts": counts,
@@ -347,27 +349,60 @@ def _build_news_payload(etf: str | None, days: str) -> dict:
 async def news(
     request: Request,
     etf: str | None = None,
-    days: str = "7",   # 7 / 30 / all,預設近 7 天(快訊)
+    days: str = "7",   # 7 / 30,預設近 7 天(快訊);舊 "all" 自動回退 30
+    page: int = 1,
 ) -> HTMLResponse:
     """新聞牆 — 100% 讀本地 news table。
 
-    TTL=60s rendered-HTML cache(key=etf+days+today_iso)。
-    news.html 5000 row hard cap × 多欄位 Jinja 渲染 ~100ms,只 cache payload
-    救不到。連 HTML 一起 cache 後 server time 從 ~125ms → <5ms 命中。
-    today_iso 進 key 確保跨日自動失效(「今日消息」紅縱線標記正確)。
+    TTL=60s rendered-HTML cache(key=etf+days+page+today_iso)。
+    page=1 為首頁,後續由 /news/_partial 抓 page=2,3,... 並由 JS append。
     """
+    if days not in _NEWS_DAYS_CHOICES:
+        days = "7"
     etf_key = etf.upper() if etf else ""
     today_iso = date.today().isoformat()
 
     def _build():
         return {
             **_common_ctx(),
-            **_build_news_payload(etf, days),
+            **_build_news_payload(etf, days, page),
             "today_iso": today_iso,
             "request": request,
         }
 
-    return _render_cached(("news_html", etf_key, days, today_iso), "news.html", _build)
+    return _render_cached(
+        ("news_html", etf_key, days, page, today_iso), "news.html", _build,
+    )
+
+
+@router.get("/news/_partial", response_class=HTMLResponse)
+async def news_partial(
+    request: Request,
+    etf: str | None = None,
+    days: str = "7",
+    page: int = 2,
+) -> HTMLResponse:
+    """「載入更多」endpoint — 回 30 筆 news rows HTML fragment。
+
+    JS 抓回來後 appendChild 到既有 .card-content 裡。
+    cache 同樣 60s TTL(key 包 page),熱門組合命中率高。
+    """
+    if days not in _NEWS_DAYS_CHOICES:
+        days = "7"
+    etf_key = etf.upper() if etf else ""
+    today_iso = date.today().isoformat()
+
+    def _build():
+        return {
+            **_build_news_payload(etf, days, page),
+            "today_iso": today_iso,
+        }
+
+    return _render_cached(
+        ("news_partial", etf_key, days, page, today_iso),
+        "_partials/news_rows.html",
+        _build,
+    )
 
 
 def _parse_ym(ym: str | None, today: date) -> tuple[int, int]:
@@ -577,14 +612,23 @@ def _build_holdings_initial_codes(code_list: tuple[str, ...]) -> list[dict]:
     return out
 
 
+_HOLDINGS_ALLOWED_DAYS = (1, 7, 30)
+
+
 @router.get("/holdings", response_class=HTMLResponse)
-async def holdings_page(request: Request, codes: str = "") -> HTMLResponse:
+async def holdings_page(
+    request: Request,
+    codes: str = "",
+    days: int = 7,
+) -> HTMLResponse:
     """ETF 持股分析頁 — Alpine.js + AJAX,前端打 /api/etf/{code}/holdings。
 
     URL ?codes=0050,0056 → 預先勾選那些 ETF。
-    上限 3 支(plan 鎖定)。
-    TTL=60s memory cache(key=sorted codes)。
+    URL ?days=1 / 7 / 30 → 持股變動 section 區間切換,預設 7。
+    上限 3 支(plan 鎖定)。TTL=60s memory cache(key=sorted codes + days)。
     """
+    if days not in _HOLDINGS_ALLOWED_DAYS:
+        days = 7
     code_list = tuple([c.strip().upper() for c in codes.split(",") if c.strip()][:3])
     initial_codes = _ttl_cached(
         ("holdings_init", tuple(sorted(code_list))),
@@ -592,7 +636,12 @@ async def holdings_page(request: Request, codes: str = "") -> HTMLResponse:
     )
     return templates.TemplateResponse(
         request, "holdings.html",
-        {**_common_ctx(), "initial_codes": initial_codes},
+        {
+            **_common_ctx(),
+            "initial_codes": initial_codes,
+            "days": days,
+            "days_options": _HOLDINGS_ALLOWED_DAYS,
+        },
     )
 
 
