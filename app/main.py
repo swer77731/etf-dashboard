@@ -68,10 +68,37 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _reset_finmind_quota_on_boot() -> None:
+    """容器啟動時清空 finmind_quota_log(只在 production env)。
+
+    紀律 #16 — Bug 4:容器重啟後,前次運行寫進 quota log 的 timestamps 仍
+    在 60 分鐘窗口內被 count_recent_calls 看見 → 開機立刻判 quota 用爆 →
+    news_15min cron 觸發後 finmind.request 走 quota gate sleep 60 分鐘 →
+    一輪輪 sleep,新聞永遠不抓。清掉讓計數從 boot 重算。
+
+    不影響 universe/holdings/dividend cron 邏輯 — 它們的 quota gate 仍照常
+    跑、record 仍照常寫,只是從 0 重新累積。
+    """
+    if settings.app_env != "production":
+        return
+    try:
+        from sqlalchemy import text
+        from app.database import session_scope
+        with session_scope() as s:
+            r = s.execute(text("DELETE FROM finmind_quota_log"))
+            logger.info(
+                "[startup] cleared %d rows from finmind_quota_log (production boot — Bug 4 fix)",
+                r.rowcount,
+            )
+    except Exception:
+        logger.exception("[startup] reset finmind_quota_log failed (non-fatal)")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Booting %s (env=%s)", settings.app_name, settings.app_env)
     init_db()
+    _reset_finmind_quota_on_boot()
     start_scheduler()
     startup_sync_if_needed()  # 背景跑,不卡 web 啟動
     logger.info("Startup complete — listening on %s:%s", settings.host, settings.port)

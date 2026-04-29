@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex,nofollow">
+  <title>{% block title %}後台 — {{ brand_full }}{% endblock %}</title>
+
+  <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js" defer></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bg:        '#0a0e1a',
+            card:      '#131829',
+            'card-hi': '#1a2138',
+            border:    '#1f2937',
+            fg:        '#e5e7eb',
+            muted:     '#9ca3af',
+            up:        '#ef4444',
+            down:      '#10b981',
+            accent:    '#3b82f6',
+            warning:   '#f59e0b',
+          },
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background: #0a0e1a;
+      color: #e5e7eb;
+      font-family: 'Noto Sans TC', ui-sans-serif, system-ui, sans-serif;
+    }
+    .num {
+      font-variant-numeric: tabular-nums;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .card { background: #131829; border: 1px solid #1f2937; border-radius: 0.75rem; }
+    .stat-num { font-size: 2.25rem; font-weight: 700; line-height: 1; }
+    .change-up { color: #ef4444; }
+    .change-down { color: #10b981; }
+    .change-flat { color: #9ca3af; }
+    /* table 緊湊 */
+    .admin-table { width: 100%; border-collapse: collapse; }
+    .admin-table th { text-align: left; font-size: 0.85rem; color: #9ca3af; font-weight: 500;
+                       padding: 0.5rem 0.75rem; border-bottom: 1px solid #1f2937; }
+    .admin-table td { padding: 0.6rem 0.75rem; border-bottom: 1px solid #1f2937; font-size: 0.92rem; }
+    .admin-table tr:hover td { background: #1a2138; }
+    .admin-table .num-col { font-family: ui-monospace, monospace; }
+  </style>
+
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header class="border-b border-border">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="/" class="text-sm text-muted hover:text-fg transition">← 回前台</a>
+        <span class="text-muted">|</span>
+        <h1 class="text-base sm:text-lg font-semibold">{{ brand_zh }} · 後台</h1>
+      </div>
+      <div class="flex items-center gap-3 text-sm">
+        {% block nav %}{% endblock %}
+        <a href="/admin/logout" class="text-muted hover:text-fg transition">登出</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

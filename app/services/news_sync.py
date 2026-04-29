@@ -2,7 +2,7 @@
 
 策略:
 - 主流 3 類(主動 + 市值 + 高股息)~55 支 ETF
-- 每天 14:30 抓最近 1~2 天的新聞(已 URL 去重)
+- 每 15 分鐘抓最近 1~2 天的新聞(已 URL 去重,APScheduler news_15min cron)
 - 自動標記 etf_tags(該則新聞 link 對應的 ETF 代號清單,可疊加多支)
 """
 from __future__ import annotations
