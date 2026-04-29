@@ -60,9 +60,19 @@ def _common_ctx() -> dict:
     }
 
 
-@router.get("/", response_class=HTMLResponse)
-async def index(request: Request) -> HTMLResponse:
-    """首頁 — Phase 2A 瘦身版:hero / 市場概況 / 配息公布欄 / 6 類別卡 2x3 / 新聞 5 則。"""
+# 首頁 60s memory cache — 紀律 #16,Tokyo→Taipei p50 920ms→~50ms
+# 首頁 7 個 heavy block(market overview + 6 sections + dividends + news)= 800+ms
+# server compute,但內容只有 14:30 sync 後才會變,60s TTL 對使用者體感無感
+# 但對 server 是 16 倍負擔削減。stampede 容忍 — 同時 N 個 cache miss 各自跑
+# 一次,寫回 last-wins,後續全 hit。不上 lock 換簡潔。
+import time as _time
+
+_INDEX_CACHE: dict = {"data": None, "expires_at": 0.0}
+_INDEX_CACHE_TTL = 60.0
+
+
+def _build_index_payload() -> dict:
+    """heavy 部分(market / sections / dividends / news)— 給 cache wrapper 包。"""
     try:
         market = ranking.get_market_overview()
     except Exception:
@@ -71,7 +81,6 @@ async def index(request: Request) -> HTMLResponse:
 
     # Phase 2A: 6 類別卡 2x3,每張 Top 5
     sections = []
-
     try:
         sections.append({
             "kind": "top_movers",
@@ -125,15 +134,38 @@ async def index(request: Request) -> HTMLResponse:
         logger.exception("[index] latest_news failed")
         latest_news = []
 
+    return {
+        "sections": sections,
+        "market": market,
+        "upcoming_dividends": upcoming,
+        "upcoming_group_labels": dividend_metrics.GROUP_LABELS,
+        "latest_news": latest_news,
+    }
+
+
+def _get_index_payload() -> dict:
+    """60s TTL cache wrapper。每進程獨立(reload 後 cold,正常)。"""
+    now = _time.monotonic()
+    if _INDEX_CACHE["data"] is not None and now < _INDEX_CACHE["expires_at"]:
+        return _INDEX_CACHE["data"]
+    payload = _build_index_payload()
+    _INDEX_CACHE["data"] = payload
+    _INDEX_CACHE["expires_at"] = now + _INDEX_CACHE_TTL
+    return payload
+
+
+@router.get("/", response_class=HTMLResponse)
+async def index(request: Request) -> HTMLResponse:
+    """首頁 — Phase 2A 瘦身版:hero / 市場概況 / 配息公布欄 / 6 類別卡 2x3 / 新聞 5 則。
+
+    TTL=60s memory cache(紀律 #16):heavy 部分 cache,brand / today_iso 即時。
+    """
+    payload = _get_index_payload()
     return templates.TemplateResponse(
         request, "index.html",
         {
             **_common_ctx(),
-            "sections": sections,
-            "market": market,
-            "upcoming_dividends": upcoming,
-            "upcoming_group_labels": dividend_metrics.GROUP_LABELS,
-            "latest_news": latest_news,
+            **payload,
             "today_iso": date.today().isoformat(),
         },
     )
