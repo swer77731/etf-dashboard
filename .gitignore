@@ -26,6 +26,10 @@ data/*.db-journal
 data/*.sqlite
 data/*.sqlite3
 
+# SQLite backups(migration 留下的時戳備份檔)
+data/*.bak.*
+data/*.bak
+
 # OS
 .DS_Store
 Thumbs.db
@@ -51,3 +55,10 @@ logs/
 
 # Temp curl/inspect outputs (verify-only, never commit)
 _tmp*.html
+_*.html
+_*.json
+
+# Root-only 圖片(user 截圖等)— 不擋 static/img 子目錄資產
+/*.jpg
+/*.jpeg
+/*.png
