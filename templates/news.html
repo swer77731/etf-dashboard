@@ -204,9 +204,13 @@
 {# === 期間 tab + 即時搜尋欄 === #}
 {% set base_qs = '?etf=' + etf_filter + '&' if etf_filter else '?' %}
 <section class="mb-3 flex items-center gap-2 flex-wrap">
+  <a href="{{ base_qs }}days=1"
+     class="news-tab {% if days_filter == '1' %}is-active{% endif %}">
+    今日 <span class="count num">{{ counts['1'] }}</span>
+  </a>
   <a href="{{ base_qs }}days=7"
      class="news-tab {% if days_filter == '7' %}is-active{% endif %}">
-    今日消息 <span class="count num">{{ counts['7'] }}</span>
+    近 7 天 <span class="count num">{{ counts['7'] }}</span>
   </a>
   <a href="{{ base_qs }}days=30"
      class="news-tab {% if days_filter == '30' %}is-active{% endif %}">

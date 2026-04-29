@@ -314,8 +314,10 @@ async def compare(
 
 # 紀律 #16 — news pagination:
 # 預設一頁 30 筆,user 點「載入更多」抓下一頁(無限滾不做,簡單可靠)。
-# 「全部」tab 拿掉(沒人滾完 937 筆,且 server-side 不再一次撈全)。
-_NEWS_DAYS_CHOICES = {"7": 7, "30": 30}
+# 三 tab:今日(1 天)/ 近 7 天 / 近 30 天 — user 原意「今日」就是今天的快訊
+# (不是 7 天前後)。「全部」tab 拿掉(沒人滾完 900+ 筆)。
+_NEWS_DAYS_CHOICES = {"1": 1, "7": 7, "30": 30}
+_NEWS_DEFAULT_DAYS = "7"
 _NEWS_PAGE_SIZE = 30
 
 
@@ -328,6 +330,7 @@ def _build_news_payload(etf: str | None, days: str, page: int) -> dict:
         etf_code=etf, limit=_NEWS_PAGE_SIZE, offset=offset, days=days_int,
     )
     counts = {
+        "1":  news_sync.count_news(etf_code=etf, days=1),
         "7":  news_sync.count_news(etf_code=etf, days=7),
         "30": news_sync.count_news(etf_code=etf, days=30),
     }
@@ -340,7 +343,7 @@ def _build_news_payload(etf: str | None, days: str, page: int) -> dict:
         "has_more": has_more,
         "total": total,
         "etf_filter": etf.upper() if etf else None,
-        "days_filter": days if days in _NEWS_DAYS_CHOICES else "7",
+        "days_filter": days if days in _NEWS_DAYS_CHOICES else _NEWS_DEFAULT_DAYS,
         "counts": counts,
     }
 
@@ -358,7 +361,7 @@ async def news(
     page=1 為首頁,後續由 /news/_partial 抓 page=2,3,... 並由 JS append。
     """
     if days not in _NEWS_DAYS_CHOICES:
-        days = "7"
+        days = _NEWS_DEFAULT_DAYS
     etf_key = etf.upper() if etf else ""
     today_iso = date.today().isoformat()
 
@@ -388,7 +391,7 @@ async def news_partial(
     cache 同樣 60s TTL(key 包 page),熱門組合命中率高。
     """
     if days not in _NEWS_DAYS_CHOICES:
-        days = "7"
+        days = _NEWS_DEFAULT_DAYS
     etf_key = etf.upper() if etf else ""
     today_iso = date.today().isoformat()
 
