@@ -135,14 +135,23 @@ def _persist_news(rows: list[dict], etf_code: str) -> int:
                     existing.published_at = pub_dt
                 continue
 
-            session.add(News(
+            # 紀律 #20:用 SQLite native upsert(ON CONFLICT DO NOTHING)防 UNIQUE
+            # race。情境:同篇文章涵蓋多支 ETF 時,A session 剛 commit URL X,B
+            # session 緊接著抓同 URL,existing_map 還沒看見 X(connection pool /
+            # commit visibility delay)→ 走到 add → 撞 url unique → IntegrityError
+            # 整個 (code, day) attempt 被誤標 missing。改 upsert 後 race 撞鍵就
+            # 靜默忽略,etf_code 沒 merge 進去也無妨 — 下次 sync 該 ETF 抓同 URL
+            # 會走 existing_map update tags 路徑補上,最終一致。
+            stmt = sqlite_insert(News).values(
                 title=title[:1000],
                 url=url[:512],
                 source=source[:64] if source else None,
                 published_at=pub_dt,
                 etf_tags=[etf_code],
-            ))
-            written += 1
+            ).on_conflict_do_nothing(index_elements=['url'])
+            result = session.execute(stmt)
+            if result.rowcount > 0:
+                written += 1
     return written
 
 
