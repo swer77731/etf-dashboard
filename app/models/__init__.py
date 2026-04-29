@@ -6,3 +6,4 @@ from app.models.news import News  # noqa: F401
 from app.models.sync_status import SyncStatus  # noqa: F401
 from app.models.holdings import Holding  # noqa: F401
 from app.models.holdings_change import HoldingsChange  # noqa: F401
+from app.models.analytics import AnalyticsLog, SearchLog, CompareLog  # noqa: F401

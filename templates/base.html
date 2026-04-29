@@ -451,15 +451,18 @@
          class="lg:hidden fixed inset-0 bg-black/60 z-30"></div>
 
     {# === Sidebar === #}
-    {# 紀律 #16 — 手機點 <a> 導覽連結時自動關抽屜(原本擋住內容)。
-       event delegation:閉合條件是 click target 是 <a href> 連結且非 footer 浮水印。
-       桌面版 sidebarOpen 永遠 false,設 false 無副作用。 #}
+    {# 紀律 #16 補強 — Bug 3 v2:
+       原本靜態 class 只有 lg:translate-x-0,手機端 Alpine hydrate 之前 transform
+       沒值 → aside 預設可見,擋住內容(LINE 內建瀏覽器尤其慢,FOUC 明顯)。
+       改:靜態加 -translate-x-full,手機預設藏左外。lg: 維持顯示。
+       Alpine hydrate 後 :class 用 !important 強制覆蓋 sidebarOpen=true 時可見。
+       點 <a href> event delegation 自動關。 #}
     <aside @click="if ($event.target.closest('a[href]')) sidebarOpen = false"
            class="fixed top-0 bottom-0 left-0 w-64 z-40 flex flex-col p-5
                   bg-card border-r border-border
                   transform transition-transform duration-200 ease-out
-                  lg:translate-x-0"
-           :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
+                  -translate-x-full lg:translate-x-0"
+           :class="{ '!translate-x-0': sidebarOpen }"
            style="background: linear-gradient(180deg, rgb(var(--c-card)) 0%, rgb(var(--c-bg-soft)) 100%);">
 
       <a href="/" class="flex items-center gap-3 mb-8 group">

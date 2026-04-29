@@ -1,0 +1,276 @@
+{% extends "admin/_base.html" %}
+
+{% block title %}流量分析 — {{ brand_full }}{% endblock %}
+
+{% block nav %}
+  <span class="text-muted">|</span>
+  <a href="/admin/analytics?range_days=7"
+     class="{% if range_days == 7 %}text-fg font-semibold{% else %}text-muted hover:text-fg{% endif %} transition">
+    近 7 天
+  </a>
+  <a href="/admin/analytics?range_days=30"
+     class="{% if range_days == 30 %}text-fg font-semibold{% else %}text-muted hover:text-fg{% endif %} transition">
+    近 30 天
+  </a>
+  <span class="text-muted">|</span>
+  <a href="/admin/send_daily_report" class="text-muted hover:text-fg transition" title="即時推一次今日 TG 日報">推送日報</a>
+{% endblock %}
+
+{% block content %}
+
+{# === 大字數字卡 — 今日綜合 === #}
+<section class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+  {% set ov = overview %}
+
+  {% macro stat_card(label, value, change_pct, suffix='') %}
+    {% if change_pct is none %}
+      {% set change_class = 'change-flat' %}
+      {% set change_text = '—' %}
+    {% elif change_pct > 0 %}
+      {% set change_class = 'change-up' %}
+      {% set change_text = '+' ~ change_pct ~ '%' %}
+    {% elif change_pct < 0 %}
+      {% set change_class = 'change-down' %}
+      {% set change_text = change_pct ~ '%' %}
+    {% else %}
+      {% set change_class = 'change-flat' %}
+      {% set change_text = '持平' %}
+    {% endif %}
+    <div class="card p-4">
+      <div class="text-xs text-muted mb-1">{{ label }}</div>
+      <div class="stat-num num">{{ value }}{{ suffix }}</div>
+      <div class="text-xs num mt-1 {{ change_class }}">{{ change_text }} <span class="text-muted">vs 昨日</span></div>
+    </div>
+  {% endmacro %}
+
+  {{ stat_card('今日訪客 (DAU)', ov.dau, ov.dau_change_pct) }}
+  {{ stat_card('今日瀏覽 (PV)', ov.pv, ov.pv_change_pct) }}
+  {% set dur = ov.avg_duration_sec %}
+  {% if dur >= 60 %}
+    {% set dur_disp = (dur // 60)|int ~ ' 分 ' ~ (dur % 60)|int ~ ' 秒' %}
+  {% else %}
+    {% set dur_disp = dur|round(0)|int ~ ' 秒' %}
+  {% endif %}
+  <div class="card p-4">
+    <div class="text-xs text-muted mb-1">平均停留</div>
+    <div class="stat-num num">{{ dur_disp }}</div>
+    <div class="text-xs text-muted mt-1">多頁訪問者 max-min</div>
+  </div>
+  <div class="card p-4">
+    <div class="text-xs text-muted mb-1">今天 ({{ today_iso }})</div>
+    <div class="text-base mt-2 text-fg">期間 <span class="font-semibold">近 {{ range_days }} 天</span></div>
+    <div class="text-xs text-muted mt-1">下表 / 圓餅圖共用</div>
+  </div>
+</section>
+
+{# === DAU 30 天折線圖 === #}
+<section class="card p-4 mb-6">
+  <h3 class="text-base font-semibold mb-3">DAU / PV 近 30 天</h3>
+  <div id="trend-chart" style="height: 240px;"></div>
+</section>
+
+{# === Top ETF + Top 功能 === #}
+<section class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+  <div class="card p-4">
+    <h3 class="text-base font-semibold mb-3">熱門 ETF Top 10 <span class="text-xs text-muted ml-2">近 {{ range_days }} 天</span></h3>
+    {% if etfs %}
+      <table class="admin-table">
+        <thead><tr><th>#</th><th>代號</th><th>名稱</th><th class="text-right">瀏覽次數</th></tr></thead>
+        <tbody>
+          {% for e in etfs %}
+            <tr>
+              <td class="num-col text-muted">{{ loop.index }}</td>
+              <td class="num-col"><a href="/etf/{{ e.code }}" class="text-accent hover:underline">{{ e.code }}</a></td>
+              <td class="text-fg/90">{{ e.name }}</td>
+              <td class="num-col text-right">{{ e.count }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="text-sm text-muted py-6 text-center">暫無資料</div>
+    {% endif %}
+  </div>
+
+  <div class="card p-4">
+    <h3 class="text-base font-semibold mb-3">熱門功能 <span class="text-xs text-muted ml-2">近 {{ range_days }} 天</span></h3>
+    {% if feats %}
+      <table class="admin-table">
+        <thead><tr><th>#</th><th>功能</th><th class="text-right">使用次數</th></tr></thead>
+        <tbody>
+          {% for f in feats %}
+            <tr>
+              <td class="num-col text-muted">{{ loop.index }}</td>
+              <td>{{ f.label }}</td>
+              <td class="num-col text-right">{{ f.count }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="text-sm text-muted py-6 text-center">暫無資料</div>
+    {% endif %}
+  </div>
+</section>
+
+{# === Top 搜尋 + Top 比較 === #}
+<section class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+  <div class="card p-4">
+    <h3 class="text-base font-semibold mb-3">熱門搜尋關鍵字 Top 20 <span class="text-xs text-muted ml-2">近 {{ range_days }} 天</span></h3>
+    {% if searches %}
+      <table class="admin-table">
+        <thead><tr><th>#</th><th>關鍵字</th><th class="text-right">次數</th></tr></thead>
+        <tbody>
+          {% for s in searches %}
+            <tr>
+              <td class="num-col text-muted">{{ loop.index }}</td>
+              <td>{{ s.q }}</td>
+              <td class="num-col text-right">{{ s.count }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="text-sm text-muted py-6 text-center">暫無資料</div>
+    {% endif %}
+  </div>
+
+  <div class="card p-4">
+    <h3 class="text-base font-semibold mb-3">熱門比較組合 Top 10 <span class="text-xs text-muted ml-2">近 {{ range_days }} 天</span></h3>
+    {% if compares %}
+      <table class="admin-table">
+        <thead><tr><th>#</th><th>組合</th><th class="text-right">次數</th></tr></thead>
+        <tbody>
+          {% for c in compares %}
+            <tr>
+              <td class="num-col text-muted">{{ loop.index }}</td>
+              <td class="num-col">{{ c.codes.replace(',', ' + ') }}</td>
+              <td class="num-col text-right">{{ c.count }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="text-sm text-muted py-6 text-center">暫無資料</div>
+    {% endif %}
+  </div>
+</section>
+
+{# === 流量來源圓餅圖 === #}
+<section class="card p-4 mb-6">
+  <h3 class="text-base font-semibold mb-3">流量來源 <span class="text-xs text-muted ml-2">近 {{ range_days }} 天</span></h3>
+  {% if refs %}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+      <div id="ref-chart" style="height: 260px;"></div>
+      <table class="admin-table">
+        <thead><tr><th>來源</th><th class="text-right">次數</th><th class="text-right">占比</th></tr></thead>
+        <tbody>
+          {% for r in refs %}
+            <tr>
+              <td>{{ r.label }}</td>
+              <td class="num-col text-right">{{ r.count }}</td>
+              <td class="num-col text-right">{{ r.pct }}%</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="text-sm text-muted py-6 text-center">暫無外部來源訪問</div>
+  {% endif %}
+</section>
+
+{# === 最近 100 筆即時訪問表格 === #}
+<section class="card p-4 mb-6">
+  <h3 class="text-base font-semibold mb-3">最近訪問 <span class="text-xs text-muted ml-2">最新 {{ visits|length }} 筆 · IP 已遮罩</span></h3>
+  {% if visits %}
+    <div class="overflow-x-auto">
+      <table class="admin-table min-w-[720px]">
+        <thead>
+          <tr>
+            <th>時間 (UTC)</th>
+            <th>Session</th>
+            <th>IP</th>
+            <th>頁面</th>
+            <th>路徑</th>
+            <th>瀏覽器 / OS</th>
+            <th class="text-right">耗時</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in visits %}
+            <tr>
+              <td class="num-col text-xs">{{ v.ts_utc|replace('T', ' ')|truncate(19, true, '') }}</td>
+              <td class="num-col text-xs text-muted">{{ v.session_id_short }}</td>
+              <td class="num-col text-xs">{{ v.ip_masked or '—' }}</td>
+              <td class="text-fg/90">{{ v.label }}</td>
+              <td class="num-col text-xs text-muted truncate max-w-[200px]">{{ v.path }}</td>
+              <td class="text-xs">{{ v.ua_short }}</td>
+              <td class="num-col text-right text-xs">{% if v.duration_sec %}{{ '%.0f'|format(v.duration_sec * 1000) }} ms{% else %}—{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="text-sm text-muted py-6 text-center">暫無訪問</div>
+  {% endif %}
+</section>
+
+<script>
+  // === DAU 折線 ===
+  document.addEventListener('DOMContentLoaded', function () {
+    if (typeof echarts === 'undefined') return;
+
+    const trendData = {{ trend|tojson }};
+    const refsData = {{ refs|tojson }};
+
+    if (trendData && trendData.length > 0) {
+      const el = document.getElementById('trend-chart');
+      const chart = echarts.init(el, null, { renderer: 'canvas' });
+      chart.setOption({
+        backgroundColor: 'transparent',
+        grid: { left: 40, right: 16, top: 24, bottom: 30 },
+        tooltip: { trigger: 'axis', confine: true, backgroundColor: '#0a0e1a', borderColor: '#1f2937', textStyle: { color: '#e5e7eb', fontSize: 12 } },
+        legend: { data: ['DAU', 'PV'], textStyle: { color: '#9ca3af', fontSize: 11 }, top: 0, right: 0 },
+        xAxis: {
+          type: 'category',
+          data: trendData.map(d => d.date.slice(5)),
+          axisLine: { lineStyle: { color: '#1f2937' } },
+          axisLabel: { color: '#9ca3af', fontSize: 10, interval: 'auto' },
+        },
+        yAxis: [
+          { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: '#1f2937' } }, axisLabel: { color: '#9ca3af', fontSize: 10 } },
+        ],
+        series: [
+          { name: 'DAU', type: 'line', smooth: true, data: trendData.map(d => d.dau), itemStyle: { color: '#3b82f6' }, lineStyle: { width: 2 } },
+          { name: 'PV',  type: 'line', smooth: true, data: trendData.map(d => d.pv),  itemStyle: { color: '#f59e0b' }, lineStyle: { width: 2 } },
+        ],
+      });
+      window.addEventListener('resize', () => chart.resize());
+    }
+
+    if (refsData && refsData.length > 0) {
+      const el2 = document.getElementById('ref-chart');
+      if (el2) {
+        const chart2 = echarts.init(el2, null, { renderer: 'canvas' });
+        chart2.setOption({
+          backgroundColor: 'transparent',
+          tooltip: { trigger: 'item', confine: true, backgroundColor: '#0a0e1a', borderColor: '#1f2937', textStyle: { color: '#e5e7eb' } },
+          legend: { textStyle: { color: '#9ca3af', fontSize: 11 }, bottom: 0 },
+          color: ['#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#9ca3af'],
+          series: [{
+            type: 'pie',
+            radius: ['40%', '65%'],
+            center: ['50%', '45%'],
+            data: refsData.map(r => ({ name: r.label, value: r.count })),
+            label: { color: '#e5e7eb', fontSize: 12, formatter: '{b}: {d}%' },
+          }],
+        });
+        window.addEventListener('resize', () => chart2.resize());
+      }
+    }
+  });
+</script>
+
+{% endblock %}

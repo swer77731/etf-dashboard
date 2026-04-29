@@ -235,6 +235,26 @@ async def get_etf_holdings_change(
     }
 
 
+def _log_search(q: str, hits: int) -> None:
+    """搜尋紀律 #16 — 寫進 search_log table,給後台分析。failed silent。"""
+    if not q:
+        return
+    try:
+        from datetime import datetime, timezone
+        from app.database import session_scope
+        from app.models.analytics import SearchLog
+        with session_scope() as s:
+            s.add(SearchLog(
+                q=q[:128],
+                hits=hits,
+                ts=datetime.now(tz=timezone.utc).replace(tzinfo=None),
+            ))
+    except Exception:
+        # log 寫失敗不能擋使用者搜尋
+        import logging
+        logging.getLogger(__name__).warning("[search_log] write failed", exc_info=True)
+
+
 @router.get("/etf/search")
 async def search_etf(
     q: str = Query("", description="代號或名稱關鍵字"),
@@ -259,7 +279,7 @@ async def search_etf(
     keyword = (q or "").strip().upper()
 
     if not keyword:
-        # 空字串 → 回固定熱門幾支(同舊 SQL 邏輯)
+        # 空字串 → 回固定熱門幾支(同舊 SQL 邏輯),不寫 search_log
         chosen = [e for e in etfs if e["code"] in _DEFAULT_EMPTY_CODES][:limit]
         return {
             "q": q,
@@ -289,6 +309,9 @@ async def search_etf(
                 code_u)
     matched.sort(key=_sort_key)
     chosen = matched[:limit]
+
+    # 紀律 #16 — search_log: 紀錄真實搜尋(非空 q)+ 命中筆數
+    _log_search(q.strip(), len(chosen))
 
     return {
         "q": q,

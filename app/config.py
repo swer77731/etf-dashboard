@@ -49,5 +49,8 @@ class Settings(BaseSettings):
 
     secret_key: str = "change-me-in-production"
 
+    # 後台 /admin/login 密碼。占位值 — 部署前請改 env。
+    admin_password: str = Field(default="CHANGE_ME", description="ADMIN_PASSWORD env var,後台登入用")
+
 
 settings = Settings()

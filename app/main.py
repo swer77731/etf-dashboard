@@ -10,8 +10,10 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from app.analytics_middleware import AnalyticsMiddleware
 from app.config import PROJECT_ROOT, settings
 from app.database import init_db
+from app.routers import admin as admin_router
 from app.routers import api as api_router
 from app.routers import monthly_income as monthly_income_router
 from app.routers import pages as pages_router
@@ -96,6 +98,11 @@ app.add_middleware(GZipMiddleware, minimum_size=500)
 # 註冊順序:後加先跑(LIFO),所以實際 request 先過 ServerTiming 計時 → 再 gzip 壓縮。
 app.add_middleware(ServerTimingMiddleware)
 
+# 客戶紀錄分析 — 攔每個 GET 寫 analytics_log + compare_log。
+# 排除清單:/static、/admin/*、/api/etf/search、/healthz、/favicon.ico。
+# Session cookie 7 天、IP 末段遮、5 秒去重。
+app.add_middleware(AnalyticsMiddleware)
+
 app.mount(
     "/static",
     CachedStaticFiles(directory=str(PROJECT_ROOT / "static")),
@@ -105,3 +112,4 @@ app.mount(
 app.include_router(pages_router.router)
 app.include_router(api_router.router)
 app.include_router(monthly_income_router.router)
+app.include_router(admin_router.router)

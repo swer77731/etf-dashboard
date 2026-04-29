@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex,nofollow">
+  <title>後台登入 — {{ brand_full }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { background:#0a0e1a; color:#e5e7eb; font-family:'Noto Sans TC',ui-sans-serif,system-ui,sans-serif; }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center px-4">
+  <div class="w-full max-w-sm">
+    <div class="text-center mb-6">
+      <h1 class="text-xl font-semibold">{{ brand_zh }} · 後台</h1>
+      <p class="text-sm text-gray-400 mt-1">僅限管理員</p>
+    </div>
+
+    <form method="POST" action="/admin/login"
+          class="bg-[#131829] border border-[#1f2937] rounded-xl p-6 space-y-4">
+      {% if disabled_reason %}
+        <div class="bg-amber-900/30 border border-amber-700/40 text-amber-200 text-sm rounded-md p-3">
+          ⚠ 後台目前停用 — {{ disabled_reason }}
+        </div>
+      {% endif %}
+
+      {% if error %}
+        <div class="bg-red-900/30 border border-red-700/40 text-red-200 text-sm rounded-md p-3">
+          {{ error }}
+        </div>
+      {% endif %}
+
+      <label class="block">
+        <span class="text-sm text-gray-400">密碼</span>
+        <input type="password" name="password" required autofocus
+               class="mt-1 w-full bg-[#0a0e1a] border border-[#1f2937] rounded-md px-3 py-2.5
+                      text-base text-gray-100 focus:outline-none focus:border-blue-500"
+               {% if disabled_reason %}disabled{% endif %}>
+      </label>
+
+      <button type="submit" {% if disabled_reason %}disabled{% endif %}
+              class="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:cursor-not-allowed
+                     text-white font-medium py-2.5 rounded-md transition">
+        登入
+      </button>
+    </form>
+
+    <p class="text-center text-xs text-gray-500 mt-4">
+      <a href="/" class="hover:text-gray-300">回前台首頁</a>
+    </p>
+  </div>
+</body>
+</html>

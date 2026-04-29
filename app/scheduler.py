@@ -27,6 +27,7 @@ from apscheduler.triggers.date import DateTrigger
 
 from app.config import settings
 from app.services import (
+    admin_analytics,
     dividend_announce_sync,
     dividend_sync,
     etf_universe,
@@ -34,6 +35,7 @@ from app.services import (
     holdings_sync,
     kbar_sync,
     news_sync,
+    tg_notify,
 )
 
 logger = logging.getLogger(__name__)
@@ -47,6 +49,8 @@ _locks: dict[str, threading.Lock] = {
     "announce": threading.Lock(),
     "holdings": threading.Lock(),
     "health": threading.Lock(),
+    "daily_report": threading.Lock(),
+    "analytics_cleanup": threading.Lock(),
 }
 
 # 5 分鐘後 retry 用 — APScheduler 有 max_instances=1 + coalesce 防併發
@@ -203,6 +207,35 @@ def health_job() -> None:
         _release("health")
 
 
+def daily_report_job() -> None:
+    """每天 20:00 (Taipei) 推今日 TG 日報給 ADMIN_CHAT_ID。"""
+    if not _try_lock("daily_report"):
+        return
+    try:
+        logger.info("[daily_report_job] start")
+        text = admin_analytics.build_daily_report()
+        ok = tg_notify.send_message(text)
+        logger.info("[daily_report_job] sent=%s len=%d", ok, len(text))
+    except Exception:
+        logger.exception("[daily_report_job] failed")
+    finally:
+        _release("daily_report")
+
+
+def analytics_cleanup_job() -> None:
+    """每天 03:00 (Taipei) 刪 90 天前的 analytics / search / compare logs。"""
+    if not _try_lock("analytics_cleanup"):
+        return
+    try:
+        logger.info("[analytics_cleanup_job] start")
+        result = admin_analytics.cleanup_old_logs(retain_days=90)
+        logger.info("[analytics_cleanup_job] %s", result)
+    except Exception:
+        logger.exception("[analytics_cleanup_job] failed")
+    finally:
+        _release("analytics_cleanup")
+
+
 # ─────────────────────────────────────────────────────────────
 # Startup bootstrap — server 啟動時若 DB 空就跑全量
 # ─────────────────────────────────────────────────────────────
@@ -278,6 +311,14 @@ def start_scheduler() -> AsyncIOScheduler:
         # 每週一 03:00 — etf_universe 同步
         ("universe_weekly", universe_job,
          CronTrigger(day_of_week="mon", hour=3, minute=0, timezone=tz)),
+        # 每天 03:00 — analytics 90 天清理(避開 02/03 的 weekly 工作衝突,
+        # APScheduler max_instances=1 會排隊,週日週一也會跑)
+        ("analytics_cleanup_daily", analytics_cleanup_job,
+         CronTrigger(hour=3, minute=0, timezone=tz)),
+        # 每天 20:00 — 客戶紀錄分析 TG 日報(同時段 announce_daily 跑,但兩者
+        # async 各自 lock,日報本身只查本地 analytics_log 很輕)
+        ("analytics_daily_report", daily_report_job,
+         CronTrigger(hour=20, minute=0, timezone=tz)),
     ]
 
     for job_id, fn, trig in jobs:
