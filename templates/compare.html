@@ -696,6 +696,9 @@
       grid: { left: 60, right: 24, top: 70, bottom: 44 },
       tooltip: {
         trigger: 'axis',
+        // 紀律 #16 — confine: true 把 tooltip 強制限制在 chart 範圍內,
+        // 手機窄螢幕(< 480px)貼右邊不再被切掉。
+        confine: true,
         backgroundColor: bgSoft,
         borderColor: border,
         textStyle: { color: fg, fontSize: 13 },

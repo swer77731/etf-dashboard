@@ -42,25 +42,6 @@
   .picker-row:hover, .picker-row.is-active { background: rgb(var(--c-accent) / 0.1); }
   .picker-row:disabled { opacity: 0.35; cursor: not-allowed; }
 
-  /* 集中度 警示 */
-  .conc-warn {
-    color: rgb(245 158 11);
-    font-weight: 600;
-  }
-  .conc-warn-tag {
-    display: inline-block;
-    margin-left: 0.4rem;
-    padding: 1px 6px;
-    border-radius: 0.25rem;
-    background: rgb(245 158 11 / 0.15);
-    border: 1px solid rgb(245 158 11 / 0.4);
-    color: rgb(252 211 77);
-    font-size: 0.72rem;
-    font-weight: 500;
-    vertical-align: 1px;
-    white-space: nowrap;
-  }
-
   /* 變動方向色 */
   .dir-buy { color: rgb(239 68 68); font-weight: 600; }
   .dir-sell { color: rgb(16 185 129); font-weight: 600; }
@@ -275,58 +256,7 @@
     </ul>
   </div>
 
-  {# === 區塊 2:個股集中度 === #}
-  <div x-show="codes.length > 0 && !data_loading && holdings.length > 0" x-cloak class="mb-7">
-    <h2 class="text-xl sm:text-2xl font-semibold mb-3">
-      <span class="w-1 h-7 bg-accent rounded-full inline-block align-middle mr-2" style="box-shadow: 0 0 8px var(--c-accent-glow);"></span>
-      個股集中度
-    </h2>
-    <div class="table-scroll-wrap tbl-mobile-card sm:mx-0">
-      <table class="w-full text-base num min-w-[480px]">
-        <thead>
-          <tr class="text-left text-muted border-b border-border">
-            <th class="py-3 px-3 font-semibold">ETF</th>
-            <th class="py-3 px-3 font-semibold text-right">第 1 大持股</th>
-            <th class="py-3 px-3 font-semibold text-right">Top 5 占比</th>
-            <th class="py-3 px-3 font-semibold text-right">Top 10 占比</th>
-          </tr>
-        </thead>
-        <tbody>
-          <template x-for="h in holdings" :key="h.code">
-            <tr class="border-b border-border/40">
-              <td class="col-primary py-3 px-3">
-                <span class="font-mono font-bold text-accent" x-text="h.code"></span>
-                <span class="ml-2" x-text="h.name"></span>
-              </td>
-              <td class="py-3 px-3 text-right" data-label="第 1 大持股">
-                <span x-text="h.holdings[0] ? h.holdings[0].stock_name : '—'"></span>
-                <span x-show="h.holdings[0]" class="ml-2 font-bold"
-                      :class="h.holdings[0] && h.holdings[0].weight > 30 ? 'conc-warn' : 'text-up'">
-                  <span x-text="h.holdings[0] ? h.holdings[0].weight.toFixed(2) : ''"></span>%
-                </span>
-                <span x-show="h.holdings[0] && h.holdings[0].weight > 30" class="conc-warn-tag">高度集中</span>
-              </td>
-              <td class="py-3 px-3 text-right font-bold" data-label="Top 5 占比"
-                  :class="topNWeight(h, 5) > 50 ? 'conc-warn' : 'text-fg'">
-                <span x-text="topNWeight(h, 5).toFixed(2)"></span>%
-                <span x-show="topNWeight(h, 5) > 50" class="conc-warn-tag">過半</span>
-              </td>
-              <td class="py-3 px-3 text-right font-bold" data-label="Top 10 占比"
-                  :class="topNWeight(h, 10) > 70 ? 'conc-warn' : 'text-fg'">
-                <span x-text="topNWeight(h, 10).toFixed(2)"></span>%
-                <span x-show="topNWeight(h, 10) > 70" class="conc-warn-tag">逾七成</span>
-              </td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
-    </div>
-    <div class="text-xs text-muted mt-2">
-      註:橘色警示為事實標示(第 1 大 &gt; 30% / Top5 &gt; 50% / Top10 &gt; 70%),不構成投資建議
-    </div>
-  </div>
-
-  {# === 區塊 3:持股變動(近 N 日)=== #}
+  {# === 區塊 2:持股變動(近 N 日)=== #}
   <div x-show="codes.length > 0 && !data_loading && changes.length > 0" x-cloak class="mb-7">
     <h2 class="text-xl sm:text-2xl font-semibold mb-3">
       <span class="w-1 h-7 bg-accent rounded-full inline-block align-middle mr-2" style="box-shadow: 0 0 8px var(--c-accent-glow);"></span>
@@ -390,7 +320,7 @@
     </template>
   </div>
 
-  {# === 區塊 4:共同持股(2+ ETFs 才出現)=== #}
+  {# === 區塊 3:共同持股(2+ ETFs 才出現)=== #}
   <div x-show="codes.length >= 2 && !data_loading && commonStocks().length > 0" x-cloak class="mb-7">
     <h2 class="text-xl sm:text-2xl font-semibold mb-3">
       <span class="w-1 h-7 bg-accent rounded-full inline-block align-middle mr-2" style="box-shadow: 0 0 8px var(--c-accent-glow);"></span>
@@ -417,7 +347,7 @@
     </div>
   </div>
 
-  {# === 區塊 5:基本資訊(每支 ETF 連到詳情頁)=== #}
+  {# === 區塊 4:基本資訊(每支 ETF 連到詳情頁)=== #}
   <div x-show="codes.length > 0" x-cloak class="mt-7 pt-5 border-t border-border">
     <details class="text-sm">
       <summary class="cursor-pointer text-muted hover:text-fg">展開:基本資訊 / 跳去詳情頁</summary>
@@ -537,11 +467,6 @@ function holdingsPicker(opts) {
       } finally {
         this.data_loading = false;
       }
-    },
-
-    // === 集中度 ===
-    topNWeight(h, n) {
-      return h.holdings.slice(0, n).reduce((s, x) => s + x.weight, 0);
     },
 
     // === 共同持股 ===

@@ -571,6 +571,8 @@
         grid: { left: 50, right: 20, top: 50, bottom: 40 },
         tooltip: {
           trigger: 'axis',
+          // 紀律 #16 — 手機窄螢幕 tooltip 不被切掉
+          confine: true,
           backgroundColor: bgSoft,
           borderColor: border,
           textStyle: { color: fg, fontSize: 13 },
