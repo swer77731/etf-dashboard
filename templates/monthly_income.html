@@ -130,7 +130,13 @@
     gap: 0.6rem;
   }
   @media (max-width: 640px) {
-    .month-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    /* 手機 4 欄 × 3 行(原 2×6 太長,user 抱怨要滑半天 → 不要滑動感) */
+    .month-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.35rem; }
+    .month-cell { padding: 0.45rem 0.35rem 0.55rem; min-height: 3.4rem; }
+    .month-cell-num { font-size: 0.85rem; margin-bottom: 0.2rem; }
+    .month-etf-pill {
+      font-size: 0.7rem; padding: 1px 4px; margin: 1px 2px 1px 0;
+    }
   }
   .month-cell {
     background: rgb(var(--c-bg-soft));
@@ -145,8 +151,10 @@
     border-color: rgb(var(--c-accent) / 0.4);
   }
   .month-cell.is-uncovered {
-    border-style: dashed;
-    border-color: rgb(239 68 68 / 0.3);
+    /* 不要紅虛線(像系統警告),改淡灰實線就好 */
+    border-color: rgb(var(--c-border));
+    background: transparent;
+    opacity: 0.55;
   }
   .month-cell-num {
     font-size: 1.05rem;
@@ -155,9 +163,10 @@
     margin-bottom: 0.4rem;
   }
   .month-cell-uncovered-tag {
-    color: rgb(239 68 68);
+    /* 不要紅字(像系統警告),用 muted 灰調的「—」就好 */
+    color: rgb(var(--c-muted));
     font-size: 0.85rem;
-    font-weight: 600;
+    font-weight: 500;
   }
   .month-etf-pill {
     display: inline-block;
@@ -316,13 +325,8 @@
     color: rgb(107 90 31);
   }
 
-  /* === month-cell.is-uncovered:亮模式用台灣紅虛線 === */
-  :root[data-theme="light"] .mi-page .month-cell.is-uncovered {
-    border-color: rgb(200 16 46 / 0.35);
-  }
-  :root[data-theme="light"] .mi-page .month-cell-uncovered-tag {
-    color: rgb(200 16 46);
-  }
+  /* === month-cell.is-uncovered:亮模式也用 muted 灰(統一不再紅) === */
+  /* (拿掉紅虛線 — user 說太搶眼像系統警告) */
 
   /* === pattern badges === */
   :root[data-theme="light"] .mi-page .pattern-monthly {
@@ -524,7 +528,7 @@
                 </template>
               </div>
             </template>
-            <div x-show="!isMonthCovered(m)" class="month-cell-uncovered-tag">— 斷糧</div>
+            <div x-show="!isMonthCovered(m)" class="month-cell-uncovered-tag">—</div>
           </div>
         </template>
       </div>

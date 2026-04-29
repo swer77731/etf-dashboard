@@ -380,10 +380,11 @@
         .table-scroll-wrap { margin-left: -1rem; margin-right: -1rem; }
       }
 
-      /* === 手機卡片 padding 縮(從 1.25rem → 1rem)=== */
-      /* h1/h2 多半已有 text-2xl sm:text-3xl 的 mobile-first 處理,
-         不全域 override 字級避免破壞各頁的精細調整 */
+      /* === 手機字體一點點微縮(16 → 15.5px ≈ -3%)=== */
+      /* user 說「一點點就好」,只 root font-size 縮 0.5px,所有 rem-based 等比例
+         輕微縮小;紀律 #19 老花仍可讀。 */
       @media (max-width: 640px) {
+        html { font-size: 15.5px; }
         .section-card { padding: 1rem !important; }
       }
     </style>
