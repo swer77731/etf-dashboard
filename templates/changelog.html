@@ -23,20 +23,35 @@
     border-left-color: transparent;
     padding-bottom: 0;
   }
-  .cl-tag {
-    display: inline-block;
-    font-size: 0.7rem;
-    padding: 1px 6px;
-    border-radius: 0.25rem;
-    background: rgb(var(--c-accent) / 0.15);
-    border: 1px solid rgb(var(--c-accent) / 0.4);
-    color: rgb(var(--c-accent));
-    margin-left: 0.4rem;
-    font-weight: 500;
-    vertical-align: 1px;
+  .cl-date {
+    font-size: 0.85rem;
+    color: rgb(var(--c-muted));
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    margin-bottom: 0.3rem;
   }
-  .cl-tag.tag-fix { background: rgb(245 158 11 / 0.15); border-color: rgb(245 158 11 / 0.4); color: rgb(252 211 77); }
-  .cl-tag.tag-docs { background: rgb(148 163 184 / 0.15); border-color: rgb(148 163 184 / 0.4); color: rgb(203 213 225); }
+  .cl-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: rgb(var(--c-fg));
+    margin-bottom: 0.5rem;
+  }
+  @media (min-width: 640px) { .cl-title { font-size: 1.15rem; } }
+  .cl-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .cl-list li {
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: rgb(var(--c-fg) / 0.92);
+    padding: 0.15rem 0;
+  }
+  .cl-list li::before {
+    content: "·";
+    margin-right: 0.5rem;
+    color: rgb(var(--c-muted));
+  }
 </style>
 {% endblock %}
 
@@ -53,7 +68,7 @@
     <span class="hero-text">更新日誌</span>
   </h1>
   <p class="text-sm sm:text-base text-muted">
-    {{ brand_zh }} 的功能變動紀錄。最新的在最上面。
+    {{ brand_zh }} 最近做了什麼。最新的在最上面。
   </p>
 </section>
 
@@ -63,114 +78,96 @@
   <div class="card-content">
 
     <div class="cl-entry">
-      <div class="text-base sm:text-lg font-semibold mb-1">
-        2026-04-27 — Phase 2 / 3 / 4 上線
-        <span class="cl-tag">feat</span>
-      </div>
-      <ul class="text-sm sm:text-base text-fg/90 leading-relaxed list-disc list-inside space-y-1 ml-1">
-        <li>首頁瘦身:6 類別卡 2x3 grid + 新聞快訊 5 則</li>
-        <li>新增 <a href="/ranking/active?p=3m" class="text-accent hover:underline">/ranking/{kind}</a> 各類別獨立排行頁,完整 Top 30 + 多期間切換</li>
-        <li>新增 <a href="/dividend-calendar" class="text-accent hover:underline">/dividend-calendar</a> 配息日曆(月曆 + 列表雙模式)</li>
-        <li>新增 /contact 聯絡頁、/changelog 本頁</li>
+      <div class="cl-date">2026-04-27</div>
+      <div class="cl-title">✨ 首頁變清爽 + 新增三個功能頁</div>
+      <ul class="cl-list">
+        <li>首頁瘦身 — 6 類 ETF 排行直接看,新聞 5 則直送</li>
+        <li>各類別獨立排行頁 — 看完整 Top 30,還能切不同期間</li>
+        <li>配息日曆 — 月曆視圖看哪一天哪支 ETF 除息,也能切列表</li>
+        <li>新增 聯絡頁 + 更新日誌(就是你現在看的這頁)</li>
       </ul>
     </div>
 
     <div class="cl-entry">
-      <div class="text-base sm:text-lg font-semibold mb-1">
-        2026-04-27 — ETF 持股分析
-        <span class="cl-tag">feat</span>
-      </div>
-      <ul class="text-sm sm:text-base text-fg/90 leading-relaxed list-disc list-inside space-y-1 ml-1">
-        <li>新增 <a href="/holdings" class="text-accent hover:underline">/holdings</a> 持股分析頁:Top 10 持股對比 ECharts、個股集中度警示、買超 / 賣超 / 新增變動、共同持股</li>
-        <li>每日自動同步全市場 ETF 持股 + 變動明細</li>
+      <div class="cl-date">2026-04-27</div>
+      <div class="cl-title">✨ 持股分析頁上線</div>
+      <ul class="cl-list">
+        <li>看 ETF 重押在哪些股票、誰跟誰一樣愛抱台積電</li>
+        <li>過去幾天買超 / 賣超 / 新增的個股名單</li>
+        <li>每天自動更新最新持股</li>
       </ul>
     </div>
 
     <div class="cl-entry">
-      <div class="text-base sm:text-lg font-semibold mb-1">
-        2026-04-27 — 配息相關
-        <span class="cl-tag">feat</span>
-      </div>
-      <ul class="text-sm sm:text-base text-fg/90 leading-relaxed list-disc list-inside space-y-1 ml-1">
-        <li>首頁新增「即將配息」公布欄,按月配 / 季配 / 半年年配三組分類</li>
-        <li>ETF 詳情頁新增「下次配息預告 / 最近一次」+ 即時殖利率卡</li>
-        <li>配息歷史改為 5 年:年度小計表 + 細項表</li>
-        <li>TWSE 除權息預告爬蟲上線(補未來 ex_date)</li>
+      <div class="cl-date">2026-04-27</div>
+      <div class="cl-title">✨ 配息相關功能擴充</div>
+      <ul class="cl-list">
+        <li>首頁多了「即將配息」公布欄,月配 / 季配 / 半年年配 分組</li>
+        <li>ETF 詳情頁加上「下次配息預告」+ 即時殖利率</li>
+        <li>配息歷史改成 5 年:每年小計 + 細項</li>
+        <li>主動抓證交所最新除權息預告,讓未來配息日期更早出現</li>
       </ul>
     </div>
 
     <div class="cl-entry">
-      <div class="text-base sm:text-lg font-semibold mb-1">
-        2026-04-27 — UX 批量改造
-        <span class="cl-tag">feat</span>
-      </div>
-      <ul class="text-sm sm:text-base text-fg/90 leading-relaxed list-disc list-inside space-y-1 ml-1">
-        <li>績效比較頁:ETF chip 自動完成 + 多格式日期 + 鍵盤導航(↑↓ Enter Backspace)</li>
-        <li>累積報酬圖:dashed banner「點 ETF 名稱可勾選」+ 全部顯示 / 隱藏 + 反向選</li>
-        <li>新聞牆:近 7 天預設 + 期間 tab + 相對時間(剛剛 / N 分鐘前 / N 小時前)+ 當日紅縱線</li>
-        <li>Sidebar 主導航字級放大,改善老花閱讀</li>
+      <div class="cl-date">2026-04-27</div>
+      <div class="cl-title">🎨 整體操作體驗大改</div>
+      <ul class="cl-list">
+        <li>績效比較頁:打代號自動補完,日期格式更彈性</li>
+        <li>累積報酬圖可以勾選想比較的 ETF,一鍵全部顯示 / 反向選</li>
+        <li>新聞牆改成快訊風格,顯示「剛剛 / X 分鐘前」,當日新聞紅線標示</li>
+        <li>側邊選單字體放大,看得更清楚</li>
       </ul>
     </div>
 
     <div class="cl-entry">
-      <div class="text-base sm:text-lg font-semibold mb-1">
-        2026-04-26 — Step 4 新聞牆
-        <span class="cl-tag">feat</span>
-      </div>
-      <ul class="text-sm sm:text-base text-fg/90 leading-relaxed list-disc list-inside space-y-1 ml-1">
-        <li>新增 <a href="/news" class="text-accent hover:underline">/news</a> 新聞列表頁 + 單 ETF 過濾</li>
-        <li>每 15 分鐘同步主流類別(主動 + 市值 + 高股息)~55 支 ETF 相關新聞</li>
-        <li>ETF 詳情頁新增「相關新聞」區塊</li>
+      <div class="cl-date">2026-04-26</div>
+      <div class="cl-title">✨ 新聞牆上線</div>
+      <ul class="cl-list">
+        <li>新聞牆,可以單看某支 ETF 的新聞</li>
+        <li>每 15 分鐘自動抓主流 ETF 相關報導(主動式 + 市值型 + 高股息共 ~55 支)</li>
+        <li>ETF 詳情頁加「相關新聞」區塊</li>
       </ul>
     </div>
 
     <div class="cl-entry">
-      <div class="text-base sm:text-lg font-semibold mb-1">
-        2026-04-26 — Step 3 績效比較
-        <span class="cl-tag">feat</span>
-      </div>
-      <ul class="text-sm sm:text-base text-fg/90 leading-relaxed list-disc list-inside space-y-1 ml-1">
-        <li>新增 <a href="/compare" class="text-accent hover:underline">/compare</a> 自選 ETF + 自訂期間比較頁(上限 6 支)</li>
-        <li>統計指標:總報酬、年化、年化波動、夏普、Sortino、最大回撤、最佳 / 最差年</li>
-        <li>累積報酬折線圖,槓桿型粗線、反向型虛線(Default-Safe / Optional-Powerful)</li>
-        <li>專業術語 hover tooltip 白話解釋</li>
+      <div class="cl-date">2026-04-26</div>
+      <div class="cl-title">✨ 績效比較頁上線</div>
+      <ul class="cl-list">
+        <li>自選 ETF + 自訂期間比較(最多 6 支)</li>
+        <li>看總報酬、年化、波動、夏普、最大回撤、最佳 / 最差年</li>
+        <li>累積報酬折線圖,槓桿型用粗線、反向型用虛線一眼分得出</li>
+        <li>專業術語滑過去會有白話解釋,不再覺得在看天書</li>
       </ul>
     </div>
 
     <div class="cl-entry">
-      <div class="text-base sm:text-lg font-semibold mb-1">
-        2026-04-26 — Step 2.5 ETF 詳情頁
-        <span class="cl-tag">feat</span>
-      </div>
-      <ul class="text-sm sm:text-base text-fg/90 leading-relaxed list-disc list-inside space-y-1 ml-1">
-        <li>新增 <a href="/etf/0050" class="text-accent hover:underline">/etf/{code}</a> 詳情頁:6 期間報酬、近 1 年走勢圖、配息歷史</li>
-        <li>採 Hybrid B/D 公式:短期用 raw close + 加回現金股利,長期用 adj close 處理 split</li>
-        <li>排行榜代號可直接點選跳詳情頁</li>
+      <div class="cl-date">2026-04-26</div>
+      <div class="cl-title">✨ ETF 詳情頁上線</div>
+      <ul class="cl-list">
+        <li>每支 ETF 都有專屬頁面:6 種期間報酬、近 1 年走勢圖、配息歷史</li>
+        <li>採用較貼近券商的計算方式(短期還原 + 加回現金股利,長期完整還原處理分割除權)</li>
+        <li>排行榜代號可以直接點進詳情頁</li>
       </ul>
     </div>
 
     <div class="cl-entry">
-      <div class="text-base sm:text-lg font-semibold mb-1">
-        2026-04-26 — Step 2 ETF 排行榜
-        <span class="cl-tag">feat</span>
-      </div>
-      <ul class="text-sm sm:text-base text-fg/90 leading-relaxed list-disc list-inside space-y-1 ml-1">
+      <div class="cl-date">2026-04-26</div>
+      <div class="cl-title">🚀 ETF 排行榜上線</div>
+      <ul class="cl-list">
         <li>全市場 252 支 ETF 自動分類 + 排行</li>
-        <li>近月最火、主動式、市值型、高股息、槓桿、反向 6 區塊</li>
-        <li>vs 大盤(TAIEX)欄位 + 紅綠標示</li>
-        <li>每日 14:30 自動更新</li>
+        <li>近月最火、主動式、市值型、高股息、槓桿、反向 6 個區塊</li>
+        <li>每支顯示「對比大盤(TAIEX)」,紅綠標示一眼看出有沒有打贏</li>
+        <li>每天自動更新</li>
       </ul>
     </div>
 
     <div class="cl-entry">
-      <div class="text-base sm:text-lg font-semibold mb-1">
-        2026-04-26 — Step 1 骨架
-        <span class="cl-tag">feat</span>
-      </div>
-      <ul class="text-sm sm:text-base text-fg/90 leading-relaxed list-disc list-inside space-y-1 ml-1">
-        <li>FastAPI + SQLAlchemy 2.0 + SQLite + APScheduler 基礎設施</li>
-        <li>暗色 / 亮色雙主題切換</li>
-        <li>{{ brand_full }} 上線</li>
+      <div class="cl-date">2026-04-26</div>
+      <div class="cl-title">🚀 {{ brand_full }} 正式上線</div>
+      <ul class="cl-list">
+        <li>暗色 / 亮色雙主題自由切換</li>
+        <li>第一個版本誕生!</li>
       </ul>
     </div>
 
@@ -179,7 +176,7 @@
 </section>
 
 <section class="text-xs text-muted text-center mt-12 mb-6 max-w-2xl mx-auto leading-relaxed px-4">
-  有功能建議?歡迎 <a href="/contact" class="text-accent hover:underline">來信告訴我們</a>
+  有想看的功能?<a href="/contact" class="text-accent hover:underline">告訴我</a>
 </section>
 
 {% endblock %}
