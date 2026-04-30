@@ -40,6 +40,43 @@ _EXCLUDE_EXACT = (
 DEDUP_SECONDS = 5
 
 
+# 紀律 #16 — Bot UA 黑名單(2026-04-30 鎖定 by user 診斷後)
+# 全部小寫子字串比對。任一命中 = bot,middleware 不寫 analytics_log,
+# user request 仍正常服務(避開傷害合法搜尋引擎索引或 user 自己的 curl 測試)。
+# **只用 UA 過濾,不擋 IP**(避免誤殺 user 自己的 IP)。
+_BOT_UA_PATTERNS = (
+    # 通用爬蟲
+    "bot", "crawler", "spider", "scraper",
+    # 主流爬蟲明牌
+    "googlebot", "bingbot", "baiduspider", "yandexbot", "duckduckbot",
+    # 監控服務
+    "uptimerobot", "pingdom", "statuscake", "monitis",
+    # HTTP 函式庫(腳本特徵)
+    "python-requests", "python-urllib", "aiohttp", "httpx",
+    "curl/", "wget/", "go-http-client", "okhttp", "java/", "node-fetch",
+    # Headless / 自動化
+    "headless", "phantomjs", "puppeteer", "selenium", "playwright",
+    # SEO 工具
+    "ahrefsbot", "semrushbot", "mj12bot", "dotbot", "rogerbot",
+    "dataforseobot", "petalbot",
+    # Zeabur / Cloudflare 內部健康檢查
+    "zeabur", "cloudflare-traffic",
+)
+
+
+def _is_bot_ua(ua: str | None) -> bool:
+    """空 UA 或命中黑名單關鍵字 = bot(回 True)。"""
+    if not ua:
+        return True
+    ua_low = ua.lower()
+    return any(p in ua_low for p in _BOT_UA_PATTERNS)
+
+
+# UA 規則 SQL 化 — DB 用 LIKE 沒辦法子字串大小寫不分,但 SQLite LIKE
+# 預設 case-insensitive(對 ASCII)。把同樣規則拆 LIKE 給 cleanup endpoint 用。
+BOT_UA_LIKE_PATTERNS = tuple(f"%{p}%" for p in _BOT_UA_PATTERNS)
+
+
 def _ip_mask(ip: str | None) -> str | None:
     """末段遮 xxx — IPv4: 124.156.222.63 → 124.156.222.xxx
                     IPv6: 前 4 hextets + ::xxx
@@ -146,6 +183,13 @@ class AnalyticsMiddleware(BaseHTTPMiddleware):
         if status >= 400:
             return
 
+        # 紀律 #16 — Bot UA 過濾:中黑名單不寫 log,user 仍正常拿到頁面
+        # 不擋 IP — 避免誤殺 user 自己 IP
+        ua = (request.headers.get("user-agent") or "")[:512]
+        if _is_bot_ua(ua):
+            return
+
+        ip_m = _ip_mask(_client_ip(request))
         now = _now_utc_naive()
 
         # /api/etf/search:排除清單,middleware 不寫 search_log
@@ -170,8 +214,6 @@ class AnalyticsMiddleware(BaseHTTPMiddleware):
         if _is_duplicate(sid, path):
             return
 
-        ip = _client_ip(request)
-        ua = (request.headers.get("user-agent") or "")[:512]
         referer = (request.headers.get("referer") or "").strip()[:512] or None
         qs = str(request.url.query)[:1024] if request.url.query else None
 
@@ -179,7 +221,7 @@ class AnalyticsMiddleware(BaseHTTPMiddleware):
             s.add(AnalyticsLog(
                 session_id=sid,
                 user_id=None,
-                ip_masked=_ip_mask(ip),
+                ip_masked=ip_m,
                 ua=ua,
                 path=path[:512],
                 query_string=qs,

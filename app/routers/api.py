@@ -4,7 +4,7 @@ from __future__ import annotations
 import time as _time
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
@@ -364,9 +364,13 @@ async def get_etf_holdings_change_legacy(
     }
 
 
-def _log_search(q: str, hits: int) -> None:
-    """搜尋紀律 #16 — 寫進 search_log table,給後台分析。failed silent。"""
+def _log_search(q: str, hits: int, ua: str | None = None) -> None:
+    """搜尋紀律 #16 — 寫進 search_log table。Bot UA 不寫。"""
     if not q:
+        return
+    # Bot 黑名單(同 analytics_middleware,避免 search_log 被 scanner 灌水)
+    from app.analytics_middleware import _is_bot_ua
+    if _is_bot_ua(ua):
         return
     try:
         from datetime import datetime, timezone
@@ -386,6 +390,7 @@ def _log_search(q: str, hits: int) -> None:
 
 @router.get("/etf/search")
 async def search_etf(
+    request: Request,
     q: str = Query("", description="代號或名稱關鍵字"),
     limit: int = Query(20, ge=1, le=80),
     code_only: bool = Query(False, description="True 時只比對代號,不做名稱模糊搜尋"),
@@ -439,8 +444,8 @@ async def search_etf(
     matched.sort(key=_sort_key)
     chosen = matched[:limit]
 
-    # 紀律 #16 — search_log: 紀錄真實搜尋(非空 q)+ 命中筆數
-    _log_search(q.strip(), len(chosen))
+    # 紀律 #16 — search_log: 紀錄真實搜尋(非空 q)+ 命中筆數,bot 過濾
+    _log_search(q.strip(), len(chosen), ua=request.headers.get("user-agent"))
 
     return {
         "q": q,

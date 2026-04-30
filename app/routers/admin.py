@@ -188,6 +188,83 @@ async def trigger_daily_report(request: Request):
     return {"sent": ok, "preview": text}
 
 
+# Bot 歷史紀錄清理 — 刪 analytics_log 中 UA 命中黑名單的 row
+@router.get("/bot-cleanup", response_class=HTMLResponse)
+async def bot_cleanup(request: Request):
+    if not _is_authed(request):
+        return RedirectResponse(url="/admin/login", status_code=302)
+
+    from sqlalchemy import text as sql_text
+    from app.analytics_middleware import BOT_UA_LIKE_PATTERNS, _BOT_UA_PATTERNS
+    from app.database import session_scope
+
+    # 動態組 WHERE clause:多個 LIKE OR
+    # 注意:user 給的清單只有 analytics_log 有 ua 欄位,search_log/compare_log
+    # 沒 ua → 歷史只刪得了 analytics_log。新資料三表都會走 _is_bot_ua 過濾。
+    bind_clauses = []
+    bind_params = {}
+    for i, pat in enumerate(BOT_UA_LIKE_PATTERNS):
+        key = f"p{i}"
+        bind_clauses.append(f"ua LIKE :{key}")
+        bind_params[key] = pat
+    # 額外:空 UA 也算 bot
+    where_sql = " OR ".join(bind_clauses) + " OR ua IS NULL OR ua = ''"
+
+    with session_scope() as s:
+        # Pre-count(預覽要刪幾筆)
+        pre_total = s.execute(sql_text("SELECT COUNT(*) FROM analytics_log")).scalar() or 0
+        pre_bot = s.execute(
+            sql_text(f"SELECT COUNT(*) FROM analytics_log WHERE {where_sql}"),
+            bind_params,
+        ).scalar() or 0
+
+        # DELETE
+        result = s.execute(
+            sql_text(f"DELETE FROM analytics_log WHERE {where_sql}"),
+            bind_params,
+        )
+        deleted_analytics = result.rowcount or 0
+
+        # search_log / compare_log 沒 ua 欄位,無法從歷史過濾;只能等新資料
+        post_total = s.execute(sql_text("SELECT COUNT(*) FROM analytics_log")).scalar() or 0
+        post_dau_today = s.execute(sql_text("""
+            SELECT COUNT(DISTINCT session_id) FROM analytics_log
+            WHERE date(ts) = date('now')
+        """)).scalar() or 0
+        post_pv_today = s.execute(sql_text("""
+            SELECT COUNT(*) FROM analytics_log
+            WHERE date(ts) = date('now')
+        """)).scalar() or 0
+
+    return HTMLResponse(content=f"""<!doctype html>
+<html lang="zh-Hant" data-theme="dark">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bot 清理結果</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>body {{ background:#0a0e1a; color:#e5e7eb; font-family:'Noto Sans TC',ui-sans-serif,system-ui,sans-serif; }}</style>
+</head>
+<body class="px-4 py-8 max-w-2xl mx-auto">
+  <h1 class="text-xl font-semibold mb-4">Bot 清理 完成 ✓</h1>
+  <div class="bg-[#131829] border border-[#1f2937] rounded-xl p-5 space-y-3 text-base">
+    <div class="flex justify-between"><span class="text-gray-400">清理前 analytics_log 總筆數</span><span class="num font-mono">{pre_total}</span></div>
+    <div class="flex justify-between"><span class="text-gray-400">命中 bot UA 條件筆數(預覽)</span><span class="num font-mono text-amber-400">{pre_bot}</span></div>
+    <div class="flex justify-between border-t border-[#1f2937] pt-3"><span class="text-gray-400">實際 DELETE rows</span><span class="num font-mono text-red-400">−{deleted_analytics}</span></div>
+    <div class="flex justify-between"><span class="text-gray-400">清理後 analytics_log 總筆數</span><span class="num font-mono text-green-400">{post_total}</span></div>
+    <div class="flex justify-between border-t border-[#1f2937] pt-3"><span class="text-gray-400">今日 DAU(清理後)</span><span class="num font-mono text-green-400 text-xl">{post_dau_today}</span></div>
+    <div class="flex justify-between"><span class="text-gray-400">今日 PV(清理後)</span><span class="num font-mono text-green-400">{post_pv_today}</span></div>
+  </div>
+  <div class="mt-6 text-xs text-gray-500 leading-relaxed">
+    <p>* 已套 {len(_BOT_UA_PATTERNS)} 個 UA 子字串黑名單 + 空 UA。</p>
+    <p>* search_log / compare_log 沒 ua 欄位無法歷史過濾,新資料會被 middleware 擋。</p>
+    <p>* 此 endpoint 重複跑安全(已刪過的不會再算)。</p>
+  </div>
+  <div class="mt-6 flex gap-3 text-sm">
+    <a href="/admin/bot-diagnosis" class="text-blue-400 hover:text-blue-300">→ 重看 Bot 診斷</a>
+    <a href="/admin/analytics" class="text-blue-400 hover:text-blue-300">→ Analytics</a>
+  </div>
+</body></html>""")
+
+
 # Bot 診斷 — 看 DAU 是否被 bot / scraper 灌水
 @router.get("/bot-diagnosis", response_class=HTMLResponse)
 async def bot_diagnosis(request: Request):
