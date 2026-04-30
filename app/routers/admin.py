@@ -186,3 +186,162 @@ async def trigger_daily_report(request: Request):
     text = admin_analytics.build_daily_report()
     ok = tg_notify.send_message(text)
     return {"sent": ok, "preview": text}
+
+
+# Bot 診斷 — 看 DAU 是否被 bot / scraper 灌水
+@router.get("/bot-diagnosis", response_class=HTMLResponse)
+async def bot_diagnosis(request: Request):
+    if not _is_authed(request):
+        return RedirectResponse(url="/admin/login", status_code=302)
+
+    from sqlalchemy import text as sql_text
+    from app.database import session_scope
+
+    with session_scope() as s:
+        # 1. UA 分布(今日)
+        ua_rows = s.execute(sql_text("""
+            SELECT
+                SUBSTR(COALESCE(ua, '(empty)'), 1, 100) AS ua_short,
+                COUNT(DISTINCT session_id) AS sessions,
+                COUNT(*) AS pv
+            FROM analytics_log
+            WHERE date(ts) = date('now')
+            GROUP BY ua_short
+            ORDER BY sessions DESC
+            LIMIT 30
+        """)).all()
+
+        # 2. 同 IP 開超多 session(bot 特徵)
+        ip_rows = s.execute(sql_text("""
+            SELECT
+                COALESCE(ip_masked, '(null)') AS ip_masked,
+                COUNT(DISTINCT session_id) AS sessions,
+                COUNT(*) AS pv
+            FROM analytics_log
+            WHERE date(ts) = date('now')
+            GROUP BY ip_masked
+            ORDER BY sessions DESC
+            LIMIT 20
+        """)).all()
+
+        # 3. 單 session 訪問次數分布
+        bucket_rows = s.execute(sql_text("""
+            SELECT
+                CASE
+                    WHEN cnt = 1 THEN '1 page'
+                    WHEN cnt <= 5 THEN '2-5 pages'
+                    WHEN cnt <= 20 THEN '6-20 pages'
+                    WHEN cnt <= 100 THEN '21-100 pages'
+                    ELSE '100+ pages (very suspicious)'
+                END AS bucket,
+                COUNT(*) AS session_count
+            FROM (
+                SELECT session_id, COUNT(*) AS cnt
+                FROM analytics_log
+                WHERE date(ts) = date('now')
+                GROUP BY session_id
+            )
+            GROUP BY bucket
+            ORDER BY MIN(cnt)
+        """)).all()
+
+        # 額外:總 session、總 PV 給 sanity check
+        totals = s.execute(sql_text("""
+            SELECT
+                COUNT(DISTINCT session_id) AS total_sessions,
+                COUNT(*) AS total_pv
+            FROM analytics_log
+            WHERE date(ts) = date('now')
+        """)).one()
+
+    # 簡易 inline HTML(不用 Jinja partial,單頁工具)
+    def _td(s, num=False, mono=False):
+        cls = []
+        if num:
+            cls.append('text-right num')
+        if mono:
+            cls.append('font-mono')
+        c = f' class="{" ".join(cls)}"' if cls else ''
+        return f"<td{c}>{s}</td>"
+
+    ua_html = "".join(
+        f"<tr>{_td(r.ua_short, mono=True)}{_td(r.sessions, num=True)}{_td(r.pv, num=True)}</tr>"
+        for r in ua_rows
+    )
+    ip_html = "".join(
+        f"<tr>{_td(r.ip_masked, mono=True)}{_td(r.sessions, num=True)}{_td(r.pv, num=True)}</tr>"
+        for r in ip_rows
+    )
+    bucket_html = "".join(
+        f"<tr>{_td(r.bucket)}{_td(r.session_count, num=True)}</tr>"
+        for r in bucket_rows
+    )
+
+    html = f"""<!doctype html>
+<html lang="zh-Hant" data-theme="dark">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>Bot 診斷 — 後台</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body {{ background:#0a0e1a; color:#e5e7eb; font-family:'Noto Sans TC',ui-sans-serif,system-ui,sans-serif; }}
+  .num {{ font-variant-numeric:tabular-nums; font-family:ui-monospace,monospace; }}
+  table {{ width:100%; border-collapse:collapse; font-size:0.88rem; }}
+  th {{ text-align:left; padding:0.5rem 0.75rem; border-bottom:1px solid #1f2937; color:#9ca3af; font-weight:500; }}
+  td {{ padding:0.5rem 0.75rem; border-bottom:1px solid #1f2937; word-break:break-all; }}
+  td.text-right {{ text-align:right; }}
+  td.font-mono {{ font-family:ui-monospace,monospace; font-size:0.78rem; }}
+  tr:hover td {{ background:#1a2138; }}
+  .card {{ background:#131829; border:1px solid #1f2937; border-radius:0.75rem; padding:1.25rem; margin-bottom:1.5rem; }}
+  h2 {{ font-size:1.1rem; font-weight:600; margin-bottom:0.75rem; }}
+</style>
+</head>
+<body class="px-4 sm:px-6 py-6 max-w-6xl mx-auto">
+  <header class="mb-6 flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-semibold">Bot 診斷 · 今日</h1>
+      <div class="text-sm text-gray-400 mt-1">
+        總 session = <span class="num">{totals.total_sessions}</span> ·
+        總 PV = <span class="num">{totals.total_pv}</span>
+      </div>
+    </div>
+    <a href="/admin/analytics" class="text-sm text-gray-400 hover:text-white">← 回 Analytics</a>
+  </header>
+
+  <div class="card">
+    <h2>1. 同 session 訪問次數分布(快看)</h2>
+    <table>
+      <thead><tr><th>區間</th><th class="text-right">session 數</th></tr></thead>
+      <tbody>{bucket_html}</tbody>
+    </table>
+    <p class="text-xs text-gray-500 mt-3">
+      正常人類 1-20 頁;100+ 是 bot / 爬蟲特徵。
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>2. UA 分布(Top 30,按 session 數排)</h2>
+    <table>
+      <thead><tr><th>User-Agent</th><th class="text-right">sessions</th><th class="text-right">PV</th></tr></thead>
+      <tbody>{ua_html}</tbody>
+    </table>
+    <p class="text-xs text-gray-500 mt-3">
+      看到 bot/crawler/spider/Googlebot/UptimeRobot/python-requests/curl 等就是 bot。
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>3. 同 IP 開超多 session(bot 特徵 — 真人 1-3 個就頂)</h2>
+    <table>
+      <thead><tr><th>IP(末段已遮)</th><th class="text-right">sessions</th><th class="text-right">PV</th></tr></thead>
+      <tbody>{ip_html}</tbody>
+    </table>
+  </div>
+
+  <p class="text-xs text-gray-500 mt-6">
+    截圖回給 Claude(或回報前 5 列 UA + Top 5 IP),決定要不要加 bot filter middleware。
+  </p>
+</body>
+</html>"""
+    return HTMLResponse(content=html)
