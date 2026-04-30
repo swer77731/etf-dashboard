@@ -594,21 +594,32 @@ async def visual_preview_page(request: Request) -> HTMLResponse:
 
 @router.get("/monthly-income", response_class=HTMLResponse)
 async def monthly_income_page(request: Request) -> HTMLResponse:
-    """月月配試算器頁面 — 100% 前端 + AJAX 打 /api/monthly-income/analyze。"""
-    return templates.TemplateResponse(
-        request, "monthly_income.html", _common_ctx(),
-    )
+    """月月配試算器頁面 — 100% 前端 + AJAX 打 /api/monthly-income/analyze。
 
-
-@router.get("/monthly-income-preview", response_class=HTMLResponse)
-async def monthly_income_preview_page(request: Request) -> HTMLResponse:
-    """月月配試算器預覽版 — 加投入金額 / 自訂比例 / 強化警語。
-
-    與 /monthly-income 完全獨立,共用 /api/monthly-income/analyze 後端 API。
+    年份字串動態(last_full_year = 今年-1),2027 元旦會自動切到 2026。
     """
+    today = date.today()
+    last_full_year = today.year - 1
     return templates.TemplateResponse(
-        request, "monthly_income_preview.html", _common_ctx(),
+        request, "monthly_income.html",
+        {
+            **_common_ctx(),
+            "last_full_year": last_full_year,
+            "past_3y_start": last_full_year - 2,
+            "past_3y_end": last_full_year,
+            "next_year": today.year,
+        },
     )
+
+
+@router.get("/monthly-income-preview")
+async def monthly_income_preview_redirect():
+    """舊 preview URL → 301 永久重導到正式版(已合併)。
+
+    保留是因為 user 之前可能分享過 preview URL。
+    """
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/monthly-income", status_code=301)
 
 
 def _build_holdings_initial_codes(code_list: tuple[str, ...]) -> list[dict]:
