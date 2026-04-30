@@ -104,12 +104,12 @@
   .date-cal-btn {
     position: absolute; right: 0.4rem; top: 50%; transform: translateY(-50%);
     padding: 0.4rem;
-    color: rgb(var(--c-muted));
+    /* 紀律 #16 — 「暗了」修:預設色從 muted(灰)改 fg/0.75(白文字),
+       手機 / 桌面都看得清楚。hover/focus/active 才升 accent。 */
+    color: rgb(var(--c-fg) / 0.75);
     border-radius: 0.35rem;
     transition: color 0.15s, background 0.15s;
-    /* 紀律 #16:iOS Safari 對 <button> 預設 native styling(active 狀態藍色實心
-       方塊),前端裸用會看到 user 剛點過 end 鈕還卡藍底,看起來像 icon 變色塊。
-       明確關掉 native appearance + 透明底 + 透明 tap highlight。 */
+    /* iOS Safari <button> 預設 native styling(active 藍底)— 拔掉。 */
     background: transparent;
     border: 0;
     -webkit-appearance: none;
@@ -121,27 +121,18 @@
   .date-cal-btn:focus,
   .date-cal-btn:active {
     color: rgb(var(--c-accent));
-    background: rgb(var(--c-accent) / 0.1);
+    background: rgb(var(--c-accent) / 0.12);
     outline: none;
   }
   /* 隱藏的 type=date — 只當 picker 觸發,不佔版位
-     額外 nuke 掉 webkit pseudo,避免 iOS Safari 把 native calendar indicator
-     藍色方塊穿透 opacity:0 顯示出來(width:1px 不夠) */
+     ⚠️ 不要 display:none 任何 webkit pseudo!iOS Safari showPicker()
+        會把它當不可互動 input → 拒絕跳 picker。
+        用 opacity:0 + width/height:1px 視覺隱藏即可。 */
   .date-shell input[type="date"] {
     position: absolute; right: 0.6rem; top: 50%; transform: translateY(-50%);
     width: 1px; height: 1px; opacity: 0; pointer-events: none;
-    -webkit-appearance: none;
-    appearance: none;
     background: transparent;
     border: 0;
-  }
-  .date-shell input[type="date"]::-webkit-calendar-picker-indicator,
-  .date-shell input[type="date"]::-webkit-inner-spin-button,
-  .date-shell input[type="date"]::-webkit-clear-button,
-  .date-shell input[type="date"]::-webkit-date-and-time-value {
-    -webkit-appearance: none;
-    display: none;
-    opacity: 0;
   }
 
   /* 快速期間 chip */
