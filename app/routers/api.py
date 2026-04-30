@@ -117,22 +117,12 @@ async def quota() -> dict:
 HOLDINGS_TARGET_ROWS = 10
 
 
-@router.get("/etf/{code}/holdings")
-async def get_etf_holdings(
-    code: str,
-    session: Session = Depends(get_session),
-) -> dict:
-    """ETF 持股 — 取「最新有 ≥ 10 筆」的 batch(自動跳過不完整 batch)。
-
-    100% 讀本地 holdings table(資料主權鐵律)。
-    若連一個完整 batch 都沒有,降級回傳最新批次 + is_partial=True。
-    """
-    code = code.upper()
+def _build_etf_holdings(session: Session, code: str) -> dict | None:
+    """heavy compute for /api/etf/{code}/holdings — 給 cache 包用。回 None = 404。"""
     etf = session.scalar(select(ETF).where(ETF.code == code))
     if not etf:
-        raise HTTPException(404, f"ETF not found: {code}")
+        return None
 
-    # Step 1:找「最新有 ≥ 10 筆」的 batch
     complete_batch = session.scalar(
         select(Holding.updated_at)
         .where(Holding.etf_id == etf.id)
@@ -141,8 +131,6 @@ async def get_etf_holdings(
         .order_by(Holding.updated_at.desc())
         .limit(1)
     )
-
-    # Step 2:沒完整 batch → fallback 最新 batch(避免空畫面)
     chosen_batch = complete_batch or session.scalar(
         select(func.max(Holding.updated_at)).where(Holding.etf_id == etf.id)
     )
@@ -152,7 +140,6 @@ async def get_etf_holdings(
             "updated_at": None, "holdings": [], "is_partial": False,
         }
 
-    # Step 3:拿選中 batch 的 rows
     rows = session.scalars(
         select(Holding)
         .where(Holding.etf_id == etf.id)
@@ -172,6 +159,28 @@ async def get_etf_holdings(
             "sector": r.sector,
         } for r in rows],
     }
+
+
+@router.get("/etf/{code}/holdings")
+async def get_etf_holdings(
+    code: str,
+    session: Session = Depends(get_session),
+) -> dict:
+    """ETF 持股 — TTL=5 分鐘 cache(2026-04-30 防爆優化)。
+
+    100% 讀本地 holdings table(資料主權鐵律)。
+    holdings_sync 每天 16:30 更新,5 分鐘 cache 對使用者體感無感。
+    """
+    from app.routers.pages import _ttl_cached
+    code_norm = code.upper()
+    payload = _ttl_cached(
+        ("api_holdings", code_norm),
+        lambda: _build_etf_holdings(session, code_norm),
+        ttl=300.0,
+    )
+    if payload is None:
+        raise HTTPException(404, f"ETF not found: {code}")
+    return payload
 
 
 _ALLOWED_DAYS = (1, 7, 30)
@@ -274,30 +283,45 @@ def _compute_holdings_change_window(
     }
 
 
+def _build_etf_holdings_change(session: Session, code: str, days: int) -> dict | None:
+    """heavy compute for /api/etf/{code}/holdings_change — 給 cache 包用。"""
+    etf = session.scalar(select(ETF).where(ETF.code == code))
+    if not etf:
+        return None
+    payload = _compute_holdings_change_window(session, etf.id, days)
+    return {
+        "code": code,
+        "name": etf.name,
+        "days": days,
+        **payload,
+    }
+
+
 @router.get("/etf/{code}/holdings_change")
 async def get_etf_holdings_change(
     code: str,
     days: int = Query(7, description="回看交易日數,允許 1 / 7 / 30"),
     session: Session = Depends(get_session),
 ) -> dict:
-    """ETF 近 N 個交易日持股變動 — 買超 / 賣超 / 新增。
+    """ETF 近 N 個交易日持股變動 — TTL=5 分鐘 cache(2026-04-30 防爆優化)。
 
     100% 讀本地 holdings table 算權重 diff。
-    days 不在 {1,7,30} → 回退 7。
+    days 不在 {1,7,30} → 回退 7。holdings_sync 每天 16:30 更新,
+    5 分鐘 cache 對使用者體感無感。
     """
     if days not in _ALLOWED_DAYS:
         days = 7
 
-    code = code.upper()
-    etf = session.scalar(select(ETF).where(ETF.code == code))
-    if not etf:
+    from app.routers.pages import _ttl_cached
+    code_norm = code.upper()
+    payload = _ttl_cached(
+        ("api_holdings_change", code_norm, days),
+        lambda: _build_etf_holdings_change(session, code_norm, days),
+        ttl=300.0,
+    )
+    if payload is None:
         raise HTTPException(404, f"ETF not found: {code}")
-
-    payload = _compute_holdings_change_window(session, etf.id, days)
     return {
-        "code": code,
-        "name": etf.name,
-        "days": days,
         **payload,
     }
 

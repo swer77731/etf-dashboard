@@ -95,20 +95,24 @@ def _evict_expired_if_full():
             _ENDPOINT_CACHE.pop(k, None)
 
 
-def _ttl_cached(key: tuple, build_fn):
-    """Get-or-build with 60s TTL,key 必須 hashable。"""
+def _ttl_cached(key: tuple, build_fn, ttl: float | None = None):
+    """Get-or-build with TTL(預設 60s),key 必須 hashable。
+
+    ttl 可覆寫(例:配息日曆 / API holdings 用 300s)。
+    """
     now = _time.monotonic()
     entry = _ENDPOINT_CACHE.get(key)
     if entry is not None and now < entry[0]:
         return entry[1]
     val = build_fn()
     _evict_expired_if_full()
-    _ENDPOINT_CACHE[key] = (now + _ENDPOINT_TTL, val)
+    actual_ttl = ttl if ttl is not None else _ENDPOINT_TTL
+    _ENDPOINT_CACHE[key] = (now + actual_ttl, val)
     return val
 
 
-def _render_cached(key: tuple, template_name: str, ctx_builder):
-    """Cache rendered HTML for 60s。
+def _render_cached(key: tuple, template_name: str, ctx_builder, ttl: float | None = None):
+    """Cache rendered HTML(預設 60s,可覆寫 ttl)。
 
     紀律 #16 進階版:除了 payload,連 Jinja render 也 cache。重 template
     (news 5000 row / etf_detail 7 sections / dividend_calendar 月曆網格)
@@ -137,7 +141,8 @@ def _render_cached(key: tuple, template_name: str, ctx_builder):
 
     html = templates.env.get_template(template_name).render(ctx)
     _evict_expired_if_full()
-    _ENDPOINT_CACHE[key] = (now + _ENDPOINT_TTL, html)
+    actual_ttl = ttl if ttl is not None else _ENDPOINT_TTL
+    _ENDPOINT_CACHE[key] = (now + actual_ttl, html)
     return HTMLResponse(content=html)
 
 
@@ -513,6 +518,7 @@ async def dividend_calendar(
         ("div_cal_html", year, month, mode_norm, today_iso),
         "dividend_calendar.html",
         _build,
+        ttl=300.0,   # 5 分鐘 — 配息日曆內容只有除息日當天有效,變動慢
     )
 
 
