@@ -538,14 +538,186 @@
     margin-top: 0.5rem;
     font-weight: 700;
   }
+
+  /* ============================================================
+     v2:雙模式切換 + 萬為單位 + 100% 上限 + 三道防線
+     ============================================================ */
+
+  /* === 防線 1:頁首紅色警語 banner(標題之上)=== */
+  .mi-top-warning {
+    background: rgb(239 68 68 / 0.1);
+    border: 1px solid rgb(239 68 68 / 0.5);
+    border-radius: 0.55rem;
+    padding: 0.85rem 1rem;
+    color: rgb(254 202 202);
+    font-size: 0.85rem;
+    line-height: 1.6;
+    margin-bottom: 1rem;
+    display: flex; align-items: flex-start; gap: 0.6rem;
+  }
+  @media (min-width: 640px) { .mi-top-warning { font-size: 0.9rem; } }
+  .mi-top-warning svg {
+    flex-shrink: 0;
+    width: 1.2rem; height: 1.2rem;
+    color: rgb(239 68 68);
+    margin-top: 1px;
+  }
+  .mi-top-warning b { color: rgb(252 165 165); font-weight: 700; }
+  :root[data-theme="light"] .mi-page .mi-top-warning {
+    background: rgb(200 16 46 / 0.06);
+    border-color: rgb(200 16 46 / 0.45);
+    color: rgb(139 20 20);
+  }
+  :root[data-theme="light"] .mi-page .mi-top-warning svg { color: rgb(200 16 46); }
+  :root[data-theme="light"] .mi-page .mi-top-warning b { color: rgb(200 16 46); }
+
+  /* === 模式切換(toggle)=== */
+  .mi-mode-toggle {
+    display: inline-flex;
+    background: rgb(var(--c-bg-soft));
+    border: 1px solid rgb(var(--c-border));
+    border-radius: 9999px;
+    padding: 3px;
+    margin-bottom: 1.25rem;
+  }
+  .mi-mode-toggle button {
+    padding: 0.4rem 1.1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: rgb(var(--c-muted));
+    border-radius: 9999px;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mi-mode-toggle button.is-active {
+    background: rgb(var(--c-accent));
+    color: white;
+    box-shadow: 0 0 12px rgb(var(--c-accent) / 0.4);
+  }
+  .mi-mode-toggle button:hover:not(.is-active) {
+    color: rgb(var(--c-fg));
+  }
+
+  /* 精細模式區塊滑入動畫 */
+  .mi-advanced-only {
+    transition: opacity 0.2s ease, max-height 0.3s ease;
+    overflow: hidden;
+  }
+  .mi-advanced-only[hidden] {
+    display: block !important;
+    opacity: 0;
+    max-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    pointer-events: none;
+  }
+
+  /* === 萬為單位 input 後綴 === */
+  .mi-amt-wrap {
+    position: relative;
+  }
+  .mi-amt-wrap .mi-amt-suffix {
+    position: absolute;
+    right: 0.85rem; top: 50%; transform: translateY(-50%);
+    color: rgb(var(--c-muted));
+    font-size: 1.05rem;
+    font-weight: 600;
+    pointer-events: none;
+  }
+  .mi-amt-wrap .mi-amt-input {
+    padding-right: 2.5rem;
+  }
+  .mi-amt-equiv {
+    margin-top: 0.45rem;
+    font-size: 0.85rem;
+    color: rgb(var(--c-muted));
+    font-family: ui-monospace, monospace;
+  }
+  .mi-amt-equiv .num { color: rgb(var(--c-fg)); font-weight: 600; }
+
+  /* === 100% 上限黃色閃 === */
+  @keyframes mi-cap-flash {
+    0%   { background: rgb(245 158 11 / 0.4); }
+    100% { background: rgb(var(--c-bg)); }
+  }
+  .mi-weight-input.is-flash {
+    animation: mi-cap-flash 0.35s ease;
+  }
+
+  /* === 防線 2:結果旁小字 === */
+  .mi-result-note {
+    margin-top: 0.55rem;
+    font-size: 0.78rem;
+    color: rgb(var(--c-muted));
+    line-height: 1.5;
+  }
+
+  /* === 金額橘色強調(只染金額,不染整列)=== */
+  .mi-money {
+    color: #f59e0b;
+    font-weight: 700;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  /* === 防線 3:頁尾完整免責聲明 === */
+  .mi-full-disclaimer {
+    background: rgb(var(--c-card));
+    border: 1px solid rgb(var(--c-border));
+    border-radius: 0.65rem;
+    padding: 1.25rem 1.35rem;
+    margin: 1.5rem 0 0.5rem;
+  }
+  .mi-full-disclaimer h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: rgb(var(--c-fg));
+    margin-bottom: 0.7rem;
+    display: flex; align-items: center; gap: 0.45rem;
+  }
+  .mi-full-disclaimer ol {
+    list-style: decimal;
+    padding-left: 1.4rem;
+    font-size: 0.9rem;
+    line-height: 1.75;
+    color: rgb(var(--c-fg) / 0.88);
+  }
+  .mi-full-disclaimer ol li { margin: 0.35rem 0; }
+  .mi-full-disclaimer .final {
+    margin-top: 0.85rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid rgb(var(--c-border));
+    text-align: center;
+    font-weight: 700;
+    color: rgb(239 68 68);
+    font-size: 0.95rem;
+  }
+  :root[data-theme="light"] .mi-page .mi-full-disclaimer .final {
+    color: rgb(200 16 46);
+  }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="mi-page">
 
+{# === 防線 1:頁首紅色警語(在標題之上)=== #}
+<div class="mi-top-warning">
+  <svg fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
+  </svg>
+  <div>
+    <b>⚠️ 重要聲明</b><br>
+    本工具為「歷史配息回推試算器」,所有數字以 2025 年實際配息計算,
+    <b>不代表未來收益</b>。請勿作為投資決策依據,投資有風險。
+  </div>
+</div>
+
 {# === Hero 區 === #}
-<section class="mb-6 relative">
+<section class="mb-4 relative">
   <div class="text-xs text-muted tracking-widest mb-2">
     <a href="/" class="hover:text-accent">首頁</a>
     <span class="mx-1">/</span>
@@ -564,27 +736,20 @@
   <p class="text-sm sm:text-base text-muted mb-4">
     自選 ETF,試算每月幾號可以領到錢、投入金額一年大概領多少
   </p>
-
-  <div class="mi-warning-banner">
-    <svg fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
-    </svg>
-    <div>
-      <span>⚠️ 本工具為「<strong>歷史配息試算器</strong>」,<strong>非投資建議</strong></span>
-      <div class="mi-warning-strong">
-        <ul>
-          <li>所有數字以 <strong>2025 年實際配息</strong>回推,不代表未來收益</li>
-          <li>ETF 配息會因市場狀況、配息政策變動,實際金額可能不同</li>
-          <li>請勿以此金額作為投資決策依據</li>
-        </ul>
-        <p class="final">投資有風險,請自行判斷,虧損自負。</p>
-      </div>
-    </div>
-  </div>
 </section>
 
 <section class="relative section-card rounded-xl p-5 sm:p-7 mb-7"
          x-data="monthlyIncomePicker()" x-init="init()">
+
+  {# === 模式切換 toggle === #}
+  <div class="mi-mode-toggle">
+    <button type="button"
+            :class="displayMode === 'simple' ? 'is-active' : ''"
+            @click="setDisplayMode('simple')">🟢 簡化</button>
+    <button type="button"
+            :class="displayMode === 'advanced' ? 'is-active' : ''"
+            @click="setDisplayMode('advanced')">⚙️ 精細</button>
+  </div>
 
   {# === 首次進入 Disclaimer Modal(localStorage 30 日記憶) === #}
   <div x-show="showDisclaimer" x-cloak x-transition.opacity.duration.150ms
@@ -616,8 +781,8 @@
 
   {# === A. ETF 多選 === #}
   <div class="mb-2 flex items-center justify-between">
-    <label class="text-base text-fg font-medium">選擇要組合的 ETF(最多 10 支)</label>
-    <span class="text-sm text-muted num" x-text="`已選 ${codes.length} / 10`"></span>
+    <label class="text-base text-fg font-medium">選擇要組合的 ETF(最多 5 支)</label>
+    <span class="text-sm text-muted num" x-text="`已選 ${codes.length} / 5`"></span>
   </div>
 
   <div class="picker-shell bg-bg-soft border border-border rounded-md p-2 transition mb-4"
@@ -643,8 +808,8 @@
              @keydown.enter.prevent="onEnter()"
              @keydown.escape="open=false"
              @keydown.backspace="onBackspace()"
-             :placeholder="codes.length === 0 ? '輸入 ETF 代號(例:0056)' : (codes.length >= 10 ? '已達 10 支上限' : '繼續加入')"
-             :disabled="codes.length >= 10"
+             :placeholder="codes.length === 0 ? '輸入 ETF 代號(例:0056)' : (codes.length >= 5 ? '已達 5 支上限' : '繼續加入')"
+             :disabled="codes.length >= 5"
              class="flex-1 min-w-[180px] bg-transparent px-1.5 py-1 text-base text-fg outline-none placeholder:text-muted/60 disabled:opacity-50">
     </div>
 
@@ -657,7 +822,7 @@
             <button type="button" @click.prevent="addCode(s)"
                     @mouseenter="activeIdx=idx"
                     :class="activeIdx===idx ? 'is-active' : ''"
-                    :disabled="isSelected(s.code) || codes.length >= 10"
+                    :disabled="isSelected(s.code) || codes.length >= 5"
                     class="picker-row">
               <span class="flex items-baseline gap-2 min-w-0">
                 <span class="font-mono font-semibold text-fg" x-text="s.code"></span>
@@ -689,22 +854,27 @@
   <template x-if="api_data && !data_loading">
     <div>
 
-      {# === Preview 新增 1 — 投入金額 === #}
+      {# === Preview 新增 1 — 投入金額(萬為單位)=== #}
       <div class="mi-prev-card">
         <span class="mi-prev-label">💰 投入金額(可選,留空只看殖利率)</span>
-        <div class="mi-prev-hint">總投資金額(輸入後會用千分位顯示)</div>
-        <input type="text" inputmode="numeric"
-               class="mi-amt-input num"
-               x-model="amountText"
-               @input="onAmountInput($event)"
-               @blur="formatAmount()"
-               placeholder="例:100000">
+        <div class="mi-prev-hint">輸入「萬」為單位,例如 10 = 10 萬元</div>
+        <div class="mi-amt-wrap">
+          <input type="text" inputmode="numeric"
+                 class="mi-amt-input num"
+                 x-model="amountText"
+                 @input="onAmountInput($event)"
+                 placeholder="例:10">
+          <span class="mi-amt-suffix">萬</span>
+        </div>
+        <div x-show="amount !== null && amount > 0" x-cloak class="mi-amt-equiv">
+          換算 = <span class="num" x-text="fmtMoney(amount)"></span> 元
+        </div>
         <div class="mi-quick-row">
-          <template x-for="q in quickAmounts" :key="q.value">
+          <template x-for="q in quickAmounts" :key="q.wan">
             <button type="button"
                     class="mi-quick-btn"
-                    :class="amount === q.value ? 'is-active' : ''"
-                    @click="setQuickAmount(q.value)"
+                    :class="amount === q.wan * 10000 ? 'is-active' : ''"
+                    @click="setQuickAmount(q.wan)"
                     x-text="q.label"></button>
           </template>
           <button type="button"
@@ -714,8 +884,8 @@
         </div>
       </div>
 
-      {# === Preview 新增 2 — 分配方式 === #}
-      <div class="mi-prev-card">
+      {# === Preview 新增 2 — 分配方式(只在精細模式顯示)=== #}
+      <div class="mi-prev-card mi-advanced-only" :hidden="displayMode !== 'advanced'">
         <span class="mi-prev-label">⚖️ 分配方式</span>
         <div class="mi-radio-row">
           <label>
@@ -738,6 +908,7 @@
               </span>
               <input type="number" min="0" max="100" step="0.01"
                      class="mi-weight-input"
+                     :class="weightFlash[c.code] ? 'is-flash' : ''"
                      :value="weights[c.code] !== undefined ? weights[c.code] : 0"
                      @input="setWeight(c.code, $event.target.value)">
               <span class="text-muted">%</span>
@@ -857,17 +1028,21 @@
           年實際配息計算,僅供參考
         </div>
 
-        {# 投入金額有填 → 顯示一年領 / 月均 #}
+        {# 投入金額有填 → 顯示一年領 / 月均(金額橘色 + 加「約」字) #}
         <template x-if="amount !== null && amount > 0">
           <div class="mi-result-line">
             投入 <span class="num" x-text="fmtMoney(amount)"></span> 元,
-            一年預估領 <span class="num yr" x-text="fmtMoney(annualIncome())"></span> 元<br>
-            平均每月約 <span class="num" x-text="fmtMoney(monthlyIncome())"></span> 元
+            一年預估領 <span class="mi-money">約 <span x-text="fmtMoney(annualIncome())"></span> 元</span><br>
+            平均每月<span class="mi-money">約 <span x-text="fmtMoney(monthlyIncome())"></span> 元</span>
+            {# 防線 2:結果旁小字 #}
+            <div class="mi-result-note">
+              * 此為歷史回推,不是預測;實際金額可能因配息政策變動而不同
+            </div>
           </div>
         </template>
 
-        {# 自訂比例 + 投入金額有填 → 顯示各支試算 #}
-        <template x-if="amount !== null && amount > 0 && allocMode === 'custom' && codes.length > 0">
+        {# 自訂比例 + 投入金額有填 + 精細模式 → 顯示各支試算(金額橘色 + 「約」字)#}
+        <template x-if="displayMode === 'advanced' && amount !== null && amount > 0 && allocMode === 'custom' && codes.length > 0">
           <div class="mi-breakdown">
             <div class="text-sm text-muted mb-2">各支試算:</div>
             <template x-for="c in codes" :key="c.code">
@@ -877,8 +1052,8 @@
                   投入 <span class="num" x-text="fmtMoney(amountForCode(c.code))"></span> 元
                   <span class="text-muted text-xs ml-1" x-text="'(' + (weights[c.code] || 0).toFixed(2) + '%)'"></span>
                 </span>
-                <span class="text-up font-semibold">
-                  領 <span class="num" x-text="fmtMoney(annualForCode(c.code))"></span> 元/年
+                <span class="mi-money">
+                  約 <span x-text="fmtMoney(annualForCode(c.code))"></span> 元/年
                 </span>
               </div>
             </template>
@@ -906,7 +1081,20 @@
   </template>
 </section>
 
-<section class="text-xs text-muted text-center mt-12 mb-6 max-w-2xl mx-auto leading-relaxed px-4">
+{# === 防線 3:頁尾完整免責聲明 === #}
+<section class="mi-full-disclaimer">
+  <h3>📜 完整免責聲明</h3>
+  <ol>
+    <li>本工具為「歷史配息資料試算器」,僅供學習與資訊整理,非投資建議、非投顧服務。</li>
+    <li>所有數字以 2025 年實際配息為基礎回推,不代表 ETF 未來收益。配息會因市場狀況、基金規模、配息政策變動而異。</li>
+    <li>ETF 投資涉及股價漲跌風險,可能本金虧損,本工具僅試算配息部分,未計入股價變動。</li>
+    <li>任何使用本工具進行投資決策所生之損益,本網站、作者一概不負責。</li>
+    <li>如有投資需求,請諮詢合格之投資顧問或證券分析師。</li>
+  </ol>
+  <p class="final">投資有風險,理財非兒戲,請審慎評估。</p>
+</section>
+
+<section class="text-xs text-muted text-center mt-6 mb-6 max-w-2xl mx-auto leading-relaxed px-4">
   本頁僅呈現 ETF 公開配息資料推估。任何投資判斷請自行評估或諮詢合格之投資顧問。
 </section>
 
@@ -930,21 +1118,35 @@ function monthlyIncomePicker() {
     // 首次警語 Modal — localStorage 30 日記憶
     showDisclaimer: false,
 
-    // Preview 新增:投入金額 + 分配方式
-    amount: null,           // number 或 null
-    amountText: '',         // input 顯示文字(含千分位)
+    // Preview 新增:投入金額 + 分配方式 + 雙模式
+    amount: null,           // number 或 null(以「元」存內部)
+    amountText: '',         // input 顯示文字(萬為單位)
     quickAmounts: [
-      { value: 10000,   label: '1 萬' },
-      { value: 50000,   label: '5 萬' },
-      { value: 100000,  label: '10 萬' },
-      { value: 500000,  label: '50 萬' },
-      { value: 1000000, label: '100 萬' },
+      { wan: 1,   label: '1 萬' },
+      { wan: 5,   label: '5 萬' },
+      { wan: 10,  label: '10 萬' },
+      { wan: 50,  label: '50 萬' },
+      { wan: 100, label: '100 萬' },
     ],
     allocMode: 'equal',     // 'equal' | 'custom'
     weights: {},            // {code: percent} — custom 模式用
+    weightFlash: {},        // {code: bool} — 100% 上限觸發黃色閃
+    displayMode: 'simple',  // 'simple' | 'advanced'
 
     init() {
       this.checkDisclaimer();
+      // 載入記住的模式偏好
+      try {
+        const m = localStorage.getItem('income_calc_mode');
+        if (m === 'simple' || m === 'advanced') this.displayMode = m;
+      } catch (e) { /* 私密模式 fallback 用 'simple' */ }
+    },
+
+    setDisplayMode(m) {
+      this.displayMode = m;
+      try { localStorage.setItem('income_calc_mode', m); } catch (e) {}
+      // 切到簡化 → force allocMode = 'equal'(避免突然顯示一堆 %)
+      if (m === 'simple') this.allocMode = 'equal';
     },
 
     // === Disclaimer Modal ===
@@ -1009,7 +1211,7 @@ function monthlyIncomePicker() {
       }
     },
     addCode(s) {
-      if (this.codes.length >= 10 || this.isSelected(s.code)) return;
+      if (this.codes.length >= 5 || this.isSelected(s.code)) return;
       this.codes.push({ code: s.code, name: s.name || '', category: s.category || '' });
       this.query = '';
       this.suggestions = [];
@@ -1074,33 +1276,31 @@ function monthlyIncomePicker() {
     // Preview 新增:投入金額 / 分配方式 / 試算
     // ============================================================
 
-    // --- 金額 input ---
+    // --- 金額 input(萬為單位)---
     fmtMoney(n) {
       if (n === null || n === undefined || isNaN(n)) return '0';
       return Math.round(n).toLocaleString('en-US');
     },
     onAmountInput(e) {
-      // 移除非數字
-      const raw = (e.target.value || '').replace(/[^\d]/g, '');
-      if (raw === '') {
+      // 萬為單位 — 接受整數或小數(例:0.5 = 5000 元)
+      const raw = (e.target.value || '').replace(/[^\d.]/g, '');
+      if (raw === '' || raw === '.') {
         this.amount = null;
-        this.amountText = '';
+        this.amountText = raw;
         return;
       }
-      const n = parseInt(raw, 10);
-      this.amount = n;
-      this.amountText = n.toLocaleString('en-US');
-    },
-    formatAmount() {
-      if (this.amount !== null && this.amount > 0) {
-        this.amountText = this.amount.toLocaleString('en-US');
-      } else {
-        this.amountText = '';
+      const wan = parseFloat(raw);
+      if (isNaN(wan) || wan <= 0) {
+        this.amount = null;
+        this.amountText = raw;
+        return;
       }
+      this.amount = Math.round(wan * 10000);
+      this.amountText = raw;
     },
-    setQuickAmount(v) {
-      this.amount = v;
-      this.amountText = v.toLocaleString('en-US');
+    setQuickAmount(wan) {
+      this.amount = wan * 10000;
+      this.amountText = String(wan);
     },
     clearAmount() {
       this.amount = null;
@@ -1140,8 +1340,23 @@ function monthlyIncomePicker() {
       this.weights = newWeights;
     },
     setWeight(code, val) {
-      const n = parseFloat(val);
-      this.weights = { ...this.weights, [code]: isNaN(n) ? 0 : n };
+      let n = parseFloat(val);
+      if (isNaN(n) || n < 0) n = 0;
+      // 100% 上限自動截斷:該支不能超過 (100 - 其他支總和)
+      const otherSum = Object.entries(this.weights)
+        .filter(([k, _]) => k !== code)
+        .reduce((s, [_, v]) => s + (parseFloat(v) || 0), 0);
+      const remaining = Math.max(0, 100 - otherSum);
+      let truncated = false;
+      if (n > remaining) { n = remaining; truncated = true; }
+      this.weights = { ...this.weights, [code]: n };
+      // 黃色閃 0.35s 提示截斷
+      if (truncated) {
+        this.weightFlash = { ...this.weightFlash, [code]: true };
+        setTimeout(() => {
+          this.weightFlash = { ...this.weightFlash, [code]: false };
+        }, 350);
+      }
     },
     distributeEqually() {
       const codes = this.codes.map(c => c.code);
