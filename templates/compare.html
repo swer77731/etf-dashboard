@@ -125,15 +125,20 @@
     outline: none;
   }
   /* 隱藏的 type=date — 只當 picker 觸發,不佔版位
-     ⚠️ 不要 display:none 任何 webkit pseudo!iOS Safari showPicker()
-        會把它當不可互動 input → 拒絕跳 picker。
-        用 opacity:0 + width/height:1px 視覺隱藏即可。 */
+     ⚠️ 規則:
+       1. 不要 display:none 任何 webkit pseudo(iOS showPicker 會拒)
+       2. 不要 pointer-events:none(iOS 26+ 把它當不可互動 → showPicker 失敗)
+       3. 用 opacity:0 + width/height:1px 視覺隱藏即可
+       4. 給 .date-cal-btn 較高 z-index 確保覆在 input 之上,user 點到 button */
+  .date-shell { position: relative; }
   .date-shell input[type="date"] {
     position: absolute; right: 0.6rem; top: 50%; transform: translateY(-50%);
-    width: 1px; height: 1px; opacity: 0; pointer-events: none;
+    width: 1px; height: 1px; opacity: 0;
     background: transparent;
     border: 0;
+    z-index: 1;
   }
+  .date-cal-btn { z-index: 2; }
 
   /* 快速期間 chip */
   .range-chip {
@@ -536,11 +541,16 @@
       },
       openPicker(which) {
         const el = which === 'start' ? this.$refs.startPicker : this.$refs.endPicker;
-        if (el && typeof el.showPicker === 'function') {
-          try { el.showPicker(); return; } catch (e) {}
+        if (!el) return;
+        // iOS 26 雙保險:focus 進去再 showPicker;失敗 fallback click()。
+        // showPicker 必須在 user gesture 同步 frame 內呼叫(button @click 內 OK)。
+        try {
+          el.focus({ preventScroll: true });
+        } catch (e) { /* preventScroll 舊瀏覽器不支援,忽略 */ }
+        if (typeof el.showPicker === 'function') {
+          try { el.showPicker(); return; } catch (e) { /* fall through to click */ }
         }
-        // fallback
-        if (el) el.click();
+        try { el.click(); } catch (e) { /* 最終 fallback,什麼都做不到就算了 */ }
       },
       onPickerChange(which, val) {
         if (!val) return;
