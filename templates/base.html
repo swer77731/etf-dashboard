@@ -568,11 +568,11 @@
 
       <footer class="max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-10 py-6 mt-12 text-xs text-muted border-t border-border">
         <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-center">
-          <a href="/terms" class="hover:text-fg transition">使用條款</a>
+          <a href="/privacy" class="hover:text-fg transition">隱私政策</a>
           <span aria-hidden="true">·</span>
-          <a href="/privacy" class="hover:text-fg transition">隱私權</a>
+          <a href="/terms" class="hover:text-fg transition">服務條款</a>
           <span aria-hidden="true">·</span>
-          <a href="/disclaimer" class="hover:text-fg transition">免責聲明</a>
+          <a href="/disclaimer" class="hover:text-fg transition">投資免責聲明</a>
           <span class="hidden sm:inline" aria-hidden="true">|</span>
           <span class="block sm:inline w-full sm:w-auto">© 2026 {{ brand_full }} · 資料來源:台灣證券交易所</span>
         </div>
@@ -649,6 +649,48 @@
             this.theme = t;
             document.documentElement.setAttribute('data-theme', t);
             try { localStorage.setItem('theme', t); } catch (e) {}
+          },
+        };
+      }
+    </script>
+
+    {# === Cookie Banner(只在第一次訪問顯示;localStorage 'cookie_consent_v1')=== #}
+    <div x-data="cookieBanner()" x-init="init()" x-show="show" x-cloak x-transition.opacity
+         class="fixed bottom-0 left-0 right-0 z-50 lg:left-64"
+         style="background: rgb(15 20 36 / 0.97); border-top: 1px solid rgb(31 41 55); backdrop-filter: blur(8px);">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center gap-3 text-sm">
+        <div class="flex-1 min-w-0 text-fg/90 leading-relaxed" style="min-width: 200px;">
+          🍪 本網站使用 Cookie 提升使用體驗,包含 Google Analytics 流量分析。繼續瀏覽即代表你同意
+          <a href="/privacy" class="text-accent hover:underline">隱私權政策</a>。
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <a href="/privacy"
+             class="px-3 py-1.5 text-sm rounded-md border border-border text-muted hover:text-fg hover:border-accent transition">
+            隱私政策
+          </a>
+          <button type="button" @click="accept()"
+                  class="px-4 py-1.5 text-sm rounded-md bg-accent text-white font-semibold hover:opacity-90 transition shadow-[0_0_12px_var(--c-accent-glow)]">
+            了解
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      function cookieBanner() {
+        return {
+          show: false,
+          init() {
+            try {
+              if (localStorage.getItem('cookie_consent_v1') !== 'accepted') {
+                // 延遲 0.5s 出現,避免進站第一秒就被 banner 干擾
+                setTimeout(() => { this.show = true; }, 500);
+              }
+            } catch (e) { this.show = true; }   // localStorage 不可用也顯示
+          },
+          accept() {
+            try { localStorage.setItem('cookie_consent_v1', 'accepted'); } catch (e) {}
+            this.show = false;
           },
         };
       }

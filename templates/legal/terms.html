@@ -1,105 +1,146 @@
 {% extends "base.html" %}
 
-{% block title %}使用條款 — {{ app_name }}{% endblock %}
+{% block title %}服務條款 — {{ brand_full }}{% endblock %}
+
+{% block head %}
+<style>
+  .legal-page { max-width: 48rem; margin: 0 auto; }
+  .legal-page h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: rgb(var(--c-fg));
+    margin-bottom: 0.5rem;
+  }
+  @media (min-width: 640px) { .legal-page h1 { font-size: 2rem; } }
+  .legal-page h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: rgb(var(--c-fg));
+    margin-top: 2rem;
+    margin-bottom: 0.85rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid rgb(var(--c-border));
+  }
+  .legal-page h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: rgb(var(--c-fg));
+    margin-top: 1.2rem;
+    margin-bottom: 0.5rem;
+  }
+  .legal-page p { margin: 0.7rem 0; line-height: 1.8; color: rgb(var(--c-fg) / 0.9); }
+  .legal-page ul, .legal-page ol {
+    margin: 0.6rem 0 0.8rem 1.4rem;
+    line-height: 1.8;
+    color: rgb(var(--c-fg) / 0.9);
+  }
+  .legal-page ul { list-style: disc; }
+  .legal-page ol { list-style: decimal; }
+  .legal-page li { margin: 0.25rem 0; }
+  .legal-page strong { color: rgb(var(--c-fg)); font-weight: 700; }
+  .legal-page a { color: rgb(var(--c-accent)); text-decoration: underline; }
+  .legal-page a:hover { opacity: 0.85; }
+  .legal-page table { width: 100%; border-collapse: collapse; margin: 0.6rem 0; font-size: 0.95rem; }
+  .legal-page th, .legal-page td {
+    padding: 0.55rem 0.7rem;
+    border: 1px solid rgb(var(--c-border));
+    text-align: left;
+  }
+  .legal-page th { background: rgb(var(--c-bg-soft)); font-weight: 600; }
+  .legal-page .last-updated {
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgb(var(--c-border));
+    color: rgb(var(--c-muted));
+    font-size: 0.9rem;
+    text-align: right;
+  }
+</style>
+{% endblock %}
 
 {% block content %}
-<article class="max-w-3xl mx-auto">
-  <header class="mb-8">
-    <h1 class="text-2xl sm:text-3xl font-semibold mb-2">使用條款</h1>
-    <p class="text-sm text-muted">最後更新:2026-04-26</p>
-  </header>
-
-  <div class="bg-card border border-border rounded-lg p-6 sm:p-8 space-y-6 text-base sm:text-lg leading-relaxed">
-
-    <section>
-      <p>
-        歡迎使用「{{ app_name }}」(以下簡稱「本站」)。
-        當您瀏覽、註冊或使用本站任何功能時,即表示您已閱讀並同意本條款。
-        若您不同意,請立即停止使用本站。
-      </p>
-    </section>
-
-    <section>
-      <h2 class="text-xl font-semibold mb-3">一、智慧財產權</h2>
-      <p>
-        本站之原創內容(包括但不限於版面設計、文字說明、自製圖表、分類規則、UI 元件、程式碼)
-        受著作權法及其他智慧財產權法律保護,著作權歸本站所有。
-      </p>
-      <p class="mt-3">
-        未經本站書面同意,
-        <strong class="text-fg">禁止任何形式之轉載、複製、修改、散布、商業使用</strong>
-        (包含但不限於整站抓取、API 反向工程、UI 抄襲)。
-        違反者本站保留法律追訴權。
-      </p>
-      <p class="mt-3">
-        引用之第三方資料(如台灣證券交易所、櫃買中心),
-        其智慧財產權歸原資料來源所有。
-      </p>
-    </section>
-
-    <section>
-      <h2 class="text-xl font-semibold mb-3">二、禁止行為</h2>
-      <p>使用本站時,您同意不得進行下列行為:</p>
-      <ul class="list-disc ml-6 mt-3 space-y-2">
-        <li>使用爬蟲、機器人、自動化腳本大量抓取本站資料</li>
-        <li>對本站進行壓力測試、阻斷服務攻擊或其他破壞行為</li>
-        <li>嘗試破解、繞過或反向工程本站之技術機制</li>
-        <li>冒用他人身分,或散布不實、違法、侵權之內容</li>
-        <li>將本站資料用於違法、欺詐、洗錢等目的</li>
-      </ul>
-      <p class="mt-3">
-        本站發現上述行為,有權立即終止您之使用權限,並依法追究責任。
-      </p>
-    </section>
-
-    <section>
-      <h2 class="text-xl font-semibold mb-3">三、商業使用須授權</h2>
-      <p>
-        若您欲將本站資料、API 或內容用於商業用途
-        (例如:整合至自家 APP、報告、付費服務、媒體報導),
-        請事先來信取得書面授權,
-        <strong class="text-fg">未經授權不得商業使用</strong>。
-      </p>
-    </section>
-
-    <section>
-      <h2 class="text-xl font-semibold mb-3">四、服務變更與終止</h2>
-      <p>
-        本站保留隨時修改、暫停或終止部分或全部服務之權利,且不負告知義務。
-        因服務變更或終止造成之不便或損失,本站不負賠償責任。
-      </p>
-    </section>
-
-    <section>
-      <h2 class="text-xl font-semibold mb-3">五、免責與責任限制</h2>
-      <p>
-        本站所提供之投資相關資訊僅供參考,
-        詳細風險告知請見
-        <a href="/disclaimer" class="text-accent hover:underline">免責聲明</a>。
-      </p>
-    </section>
-
-    <section>
-      <h2 class="text-xl font-semibold mb-3">六、條款修改</h2>
-      <p>
-        本站保留隨時修改本條款之權利,修改後之內容自公布時起生效。
-        重大修改本站將以網站公告方式通知,請使用者定期回看。
-      </p>
-    </section>
-
-    <section>
-      <h2 class="text-xl font-semibold mb-3">七、準據法與管轄</h2>
-      <p>
-        本條款之解釋與適用,以及與本站有關之爭議,
-        均以中華民國法律為準據法,並以
-        <strong class="text-fg">台灣台北地方法院為第一審管轄法院</strong>。
-      </p>
-    </section>
-
+<article class="legal-page">
+  <div class="text-xs text-muted tracking-widest mb-2">
+    <a href="/" class="hover:text-accent">首頁</a>
+    <span class="mx-1">/</span>
+    <span>服務條款</span>
   </div>
 
-  <div class="mt-8 text-sm text-muted text-center">
-    <a href="/" class="hover:text-fg transition">← 回首頁</a>
+  <h1 class="hero-text">服務條款</h1>
+
+  <div class="bg-card border border-border rounded-xl p-6 sm:p-8 mt-5">
+
+    <p>歡迎使用 ETF 觀察室(<a href="https://etf-watch.com">https://etf-watch.com</a>)。本網站為免費的 ETF 資料整理與試算工具,由站長 Swer 個人開發與維護,<strong>非公司行號、非商業營利機構</strong>。</p>
+
+    <p>當你開始使用本網站時,即表示你已閱讀、瞭解並同意本條款。如不同意,請停止使用本網站。</p>
+
+    <h2>服務性質與免責</h2>
+
+    <h3>現況提供</h3>
+    <p>本網站為個人專案,無法保證:</p>
+    <ul>
+      <li>永遠不中斷、無延遲</li>
+      <li>完全沒有錯誤或 bug</li>
+      <li>24 小時不間斷運作</li>
+    </ul>
+
+    <h3>資料正確性</h3>
+    <p>我會盡力維持資料準確性,但所有資料(股價、配息、殖利率、新聞、持股明細等)均來自第三方或程式自動抓取,<strong>不保證絕對無誤</strong>。</p>
+
+    <p>因使用本網站資料產生的任何損失,本網站不負賠償責任。</p>
+
+    <h2>智慧財產權與資料來源</h2>
+
+    <p>本網站的版面設計、程式碼、自創圖表及文案,智慧財產權均屬站長所有,未經授權請勿重製或商業用途。</p>
+
+    <p>本網站所展示的金融數據,係透過程式技術整合自以下公開資訊源:</p>
+
+    <table>
+      <thead>
+        <tr><th>資料來源</th><th>用途</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>FinMind(已授權使用)</td><td>主要資料源,涵蓋股價、配息、新聞</td></tr>
+        <tr><td>證交所(TWSE)公開資訊</td><td>除權息預告等市場揭露資料</td></tr>
+        <tr><td>其他公開財經資料</td><td>輔助統計與比對</td></tr>
+      </tbody>
+    </table>
+
+    <p>我尊重所有原始資料提供者的權利,本網站僅作彙整與試算呈現,不主張原始數據版權。<strong>如資料提供方認為內容有不妥之處,請來信聯繫,我會立即配合處理。</strong></p>
+
+    <h2>你的義務與禁止行為</h2>
+    <p>絕不從事以下行為:</p>
+    <ul>
+      <li>使用爬蟲、Bot 等惡意或高頻率抓取本網站資料</li>
+      <li>DDoS 攻擊、植入病毒、破解安全機制</li>
+      <li>散播違法、暴力、色情、誹謗、歧視或侵權內容</li>
+      <li>假冒站長或其他使用者</li>
+      <li>利用本網站資料從事證券投顧服務、推薦個股、收費喊單</li>
+    </ul>
+
+    <h2>服務拒絕與帳號終止</h2>
+    <p>我保留以下權利,不經事先通知:</p>
+    <ul>
+      <li>拒絕為違規 IP 提供服務</li>
+      <li>封鎖存取權限</li>
+      <li>刪除違規會員帳號</li>
+      <li>動態調整流量限制</li>
+      <li>違反法律時將紀錄提供主管機關</li>
+    </ul>
+
+    <h2>服務終止</h2>
+    <p>我保留隨時調整、暫停、終止任何功能的權利,不需事先通知。若終止全站服務,將提前 30 天於首頁公告。</p>
+
+    <h2>法律管轄</h2>
+    <p>以中華民國(台灣)法律為準據法。法律爭議以<strong>臺灣臺北地方法院</strong>為第一審管轄法院。</p>
+
+    <h2>條款更新</h2>
+    <p>重大更新會在網站公告 7 天。繼續使用即視為接受新版條款。</p>
+
+    <h2>聯絡方式</h2>
+    <p><a href="mailto:swer77731@gmail.com">swer77731@gmail.com</a></p>
+
+    <p class="last-updated">最後更新日期:2026-04-30</p>
   </div>
 </article>
 {% endblock %}

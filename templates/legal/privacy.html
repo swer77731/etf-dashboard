@@ -2,94 +2,154 @@
 
 {% block title %}隱私權政策 — {{ brand_full }}{% endblock %}
 
+{% block head %}
+<style>
+  .legal-page { max-width: 48rem; margin: 0 auto; }
+  .legal-page h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: rgb(var(--c-fg));
+    margin-bottom: 0.5rem;
+  }
+  @media (min-width: 640px) { .legal-page h1 { font-size: 2rem; } }
+  .legal-page h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: rgb(var(--c-fg));
+    margin-top: 2rem;
+    margin-bottom: 0.85rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid rgb(var(--c-border));
+  }
+  .legal-page h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: rgb(var(--c-fg));
+    margin-top: 1.2rem;
+    margin-bottom: 0.5rem;
+  }
+  .legal-page p { margin: 0.7rem 0; line-height: 1.8; color: rgb(var(--c-fg) / 0.9); }
+  .legal-page ul, .legal-page ol {
+    margin: 0.6rem 0 0.8rem 1.4rem;
+    line-height: 1.8;
+    color: rgb(var(--c-fg) / 0.9);
+  }
+  .legal-page ul { list-style: disc; }
+  .legal-page ol { list-style: decimal; }
+  .legal-page li { margin: 0.25rem 0; }
+  .legal-page strong { color: rgb(var(--c-fg)); font-weight: 700; }
+  .legal-page a { color: rgb(var(--c-accent)); text-decoration: underline; }
+  .legal-page a:hover { opacity: 0.85; }
+  .legal-page table { width: 100%; border-collapse: collapse; margin: 0.6rem 0; }
+  .legal-page th, .legal-page td {
+    padding: 0.5rem 0.7rem;
+    border: 1px solid rgb(var(--c-border));
+    text-align: left;
+    font-size: 0.95rem;
+  }
+  .legal-page th { background: rgb(var(--c-bg-soft)); font-weight: 600; }
+  .legal-page .last-updated {
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgb(var(--c-border));
+    color: rgb(var(--c-muted));
+    font-size: 0.9rem;
+    text-align: right;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<article class="max-w-3xl mx-auto">
-  <header class="mb-8">
-    <h1 class="text-2xl sm:text-3xl font-semibold mb-2">隱私權政策</h1>
-    <p class="text-sm text-muted">最後更新:2026-04-26</p>
-  </header>
-
-  <div class="bg-card border border-border rounded-lg p-6 sm:p-8 space-y-6 text-base sm:text-lg leading-relaxed">
-
-    <section>
-      <p>
-        「{{ brand_zh }}」(以下簡稱「本站」)十分重視您的隱私權。
-        本政策說明本站如何蒐集、使用及保護您的資料。
-        當您使用本站,即表示您已同意本政策之內容。
-      </p>
-    </section>
-
-    <section>
-      <h2 class="text-xl font-semibold mb-3">一、Cookie 與追蹤工具</h2>
-      <p>本站使用 Cookie 與類似技術,目的限於以下用途:</p>
-      <ul class="list-disc ml-6 mt-3 space-y-2">
-        <li>記住您的使用偏好(例如夜間模式、語言、已選 ETF 清單)</li>
-        <li>網站流量分析(例如 Google Analytics),協助本站改善體驗</li>
-        <li>系統運作必要(例如登入狀態,未來會員系統推出後使用)</li>
-      </ul>
-      <p class="mt-3">
-        您可以在瀏覽器設定中關閉 Cookie,但部分功能可能因此無法使用。
-      </p>
-    </section>
-
-    <section>
-      <h2 class="text-xl font-semibold mb-3">二、本站不販售您的個人資料</h2>
-      <p>
-        本站<strong class="text-fg">絕不販售、出租、或交換您的個人資料</strong>給任何第三方。
-        例外情況僅限:
-      </p>
-      <ul class="list-disc ml-6 mt-3 space-y-2">
-        <li>取得您事前明確同意</li>
-        <li>司法機關依法定程序要求(例如法院命令)</li>
-        <li>為保護本站、其他使用者或公眾之合法權益所必需</li>
-      </ul>
-    </section>
-
-    <section>
-      <h2 class="text-xl font-semibold mb-3">三、會員資料(未來功能)</h2>
-      <p>
-        若本站日後推出會員系統,所蒐集之資料(如電子郵件、暱稱)將僅用於:
-      </p>
-      <ul class="list-disc ml-6 mt-3 space-y-2">
-        <li>提供您所申請之服務(例如電子郵件提醒、訂閱推播)</li>
-        <li>客戶服務與技術支援</li>
-        <li>本站重大公告通知</li>
-      </ul>
-      <p class="mt-3">
-        密碼一律以單向加密(bcrypt 或同等強度演算法)儲存,
-        本站員工亦無法以明文方式取得您的密碼。
-      </p>
-    </section>
-
-    <section>
-      <h2 class="text-xl font-semibold mb-3">四、資料保留與刪除</h2>
-      <p>
-        若您日後成為會員並要求刪除帳號,本站將於合理期間內刪除可識別您身分之個資。
-        匿名化之統計資料(例如「總瀏覽次數」)可能繼續保留供分析用。
-      </p>
-    </section>
-
-    <section>
-      <h2 class="text-xl font-semibold mb-3">五、第三方連結</h2>
-      <p>
-        本站可能含有指向第三方網站之連結。
-        當您點擊離開本站,即受該第三方之隱私權政策規範,
-        本站對該等網站之資料蒐集行為不負責任。
-      </p>
-    </section>
-
-    <section>
-      <h2 class="text-xl font-semibold mb-3">六、政策修改</h2>
-      <p>
-        本站保留隨時修改本政策之權利,修改後之內容自公布時起生效。
-        重大修改將以網站公告通知。
-      </p>
-    </section>
-
+<article class="legal-page">
+  <div class="text-xs text-muted tracking-widest mb-2">
+    <a href="/" class="hover:text-accent">首頁</a>
+    <span class="mx-1">/</span>
+    <span>隱私權政策</span>
   </div>
 
-  <div class="mt-8 text-sm text-muted text-center">
-    <a href="/" class="hover:text-fg transition">← 回首頁</a>
+  <h1 class="hero-text">隱私權政策</h1>
+
+  <div class="bg-card border border-border rounded-xl p-6 sm:p-8 mt-5">
+
+    <p>歡迎來到 ETF 觀察室(以下簡稱「本網站」)。本網站由 Swer(以下簡稱「站長」或「我」)個人經營,非公司行號。我會遵循中華民國《個人資料保護法》規定,妥善保護你的個人資料。</p>
+
+    <h2>我會收集哪些資料</h2>
+
+    <h3>1. 自動收集的系統資料(目前運作中)</h3>
+    <ul>
+      <li>訪客 IP 位址 — 末段已遮罩處理(例如 192.168.1.xxx),僅用於流量統計、容量監控與防範惡意攻擊</li>
+      <li>裝置與瀏覽器資訊 — 包含作業系統、瀏覽器種類與版本</li>
+      <li>瀏覽紀錄與 Session ID — 紀錄你在本網站訪問的頁面與停留時間。Session ID 為隨機產生,無法識別真實身分</li>
+      <li>Google Analytics(GA4)數據 — ID:G-QEL342G95B</li>
+    </ul>
+
+    <h3>2. 未來會收集的會員資料(Google OAuth 上線後)</h3>
+    <ul>
+      <li>Email 電子郵件信箱</li>
+      <li>Google 帳號 ID</li>
+      <li>暱稱(顯示名稱)</li>
+    </ul>
+    <p><strong>不會</strong>收集 Google 帳號的密碼。</p>
+
+    <h2>資料的使用方式</h2>
+    <ul>
+      <li>改善網站體驗(分析熱門功能)</li>
+      <li>資訊安全與系統監控(防 bot、防 DDoS)</li>
+      <li>會員服務(未來功能,如自選清單)</li>
+    </ul>
+
+    <p><strong>我承諾不會做的事:</strong></p>
+    <ul>
+      <li>不會出售、交換或出租給第三方</li>
+      <li>不會用於商業廣告投放</li>
+      <li>不會分享給未經你同意的合作夥伴</li>
+    </ul>
+
+    <h2>資料的保護與第三方服務</h2>
+
+    <p>本網站全程使用 HTTPS 加密傳輸,並透過 Cloudflare 提供安全防護。</p>
+
+    <p><strong>第三方服務:</strong></p>
+    <ul>
+      <li>Zeabur(伺服器代管)</li>
+      <li>Cloudflare(防火牆、CDN)</li>
+      <li>Google Analytics(匿名流量分析)</li>
+    </ul>
+
+    <h2>Cookie 政策</h2>
+    <p>本網站使用 Cookie 來:</p>
+    <ul>
+      <li>維持 Session 狀態</li>
+      <li>Google Analytics 匿名流量分析</li>
+      <li>記住主題偏好(深色 / 亮色)</li>
+    </ul>
+    <p>可隨時透過瀏覽器設定拒絕或清除。</p>
+
+    <h2>你的個人資料權利</h2>
+    <p>依《個人資料保護法》第 3 條:</p>
+    <ol>
+      <li>查詢或請求閱覽</li>
+      <li>請求製給複製本</li>
+      <li>請求補充或更正</li>
+      <li>請求停止蒐集、處理或利用</li>
+      <li>請求刪除</li>
+    </ol>
+    <p>來信至 <a href="mailto:swer77731@gmail.com">swer77731@gmail.com</a> 即可行使。</p>
+
+    <h2>帳號刪除流程</h2>
+    <p>會員系統上線後:</p>
+    <ul>
+      <li><strong>自助刪除:</strong>登入後到「帳號設定」點「刪除我的帳號」</li>
+      <li><strong>來信刪除:</strong>寫信到 <a href="mailto:swer77731@gmail.com?subject=刪除帳號">swer77731@gmail.com</a>,主旨「刪除帳號」+ 註冊 Email,7 個工作天內處理</li>
+    </ul>
+
+    <h2>政策更新</h2>
+    <p>重大更新會在網站公告 7 天,並更新最後更新日期。</p>
+
+    <h2>聯絡方式</h2>
+    <p><a href="mailto:swer77731@gmail.com">swer77731@gmail.com</a></p>
+
+    <p class="last-updated">最後更新日期:2026-04-30</p>
   </div>
 </article>
 {% endblock %}
