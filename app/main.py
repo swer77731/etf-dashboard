@@ -35,6 +35,62 @@ class CachedStaticFiles(StaticFiles):
         return response
 
 
+class HostRedirectMiddleware:
+    """301 redirect 舊網域 → 新網域(SEO 權重轉移)。
+
+    紀律 #16:
+    - swer-etf.zeabur.app/<path> → https://etf-watch.com/<path>(保留 query)
+    - 用 301 Permanent,Google 會把舊網域 backlink 權重轉到新網域
+    - 純 ASGI(輕量,排在最前面 — request 進來第一站就決定要不要 redirect)
+    - etf-watch.com、localhost、Zeabur 內部健康檢查 IP host 都不匹配 → pass through
+    - max-age=3600(短 cache):若日後想回滾,1 小時內就能放掉舊瀏覽器 cache
+    """
+    OLD_HOST = "swer-etf.zeabur.app"
+    NEW_ORIGIN = "https://etf-watch.com"
+
+    def __init__(self, app: ASGIApp):
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        # Host header 可能是 'swer-etf.zeabur.app' 或 'swer-etf.zeabur.app:443'
+        host_raw = b""
+        for k, v in scope.get("headers", []):
+            if k == b"host":
+                host_raw = v
+                break
+        host = host_raw.decode("latin-1", errors="ignore").split(":")[0].lower()
+
+        if host == self.OLD_HOST:
+            path = scope.get("path", "/")
+            qs = scope.get("query_string", b"").decode("latin-1", errors="ignore")
+            target = f"{self.NEW_ORIGIN}{path}"
+            if qs:
+                target += f"?{qs}"
+            body = (
+                "<!doctype html><meta charset='utf-8'>"
+                f"<title>301 Moved Permanently</title>"
+                f"<p>Moved to <a href=\"{target}\">{target}</a></p>"
+            ).encode("utf-8")
+            await send({
+                "type": "http.response.start",
+                "status": 301,
+                "headers": [
+                    (b"location", target.encode("utf-8")),
+                    (b"cache-control", b"public, max-age=3600"),
+                    (b"content-type", b"text/html; charset=utf-8"),
+                    (b"content-length", str(len(body)).encode("ascii")),
+                ],
+            })
+            await send({"type": "http.response.body", "body": body})
+            return
+
+        await self.app(scope, receive, send)
+
+
 class ServerTimingMiddleware:
     """每個 response 加 Server-Timing: total;dur=X.X header。
 
@@ -129,6 +185,10 @@ app.add_middleware(ServerTimingMiddleware)
 # 排除清單:/static、/admin/*、/api/etf/search、/healthz、/favicon.ico。
 # Session cookie 7 天、IP 末段遮、5 秒去重。
 app.add_middleware(AnalyticsMiddleware)
+
+# 紀律 #16 — swer-etf.zeabur.app → etf-watch.com 301 全站重導(SEO 權重轉移)。
+# 註冊順序最後 = request 進來第一站,redirect 不浪費下游 middleware 計算。
+app.add_middleware(HostRedirectMiddleware)
 
 app.mount(
     "/static",

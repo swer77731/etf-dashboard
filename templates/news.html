@@ -126,6 +126,42 @@
   /* 隱藏 row(filter / pagination 都用這個 class) */
   .news-row.is-hidden { display: none; }
 
+  /* 紀律 #16 + #19「字級寧可大」— 手機(<768px)切 2 行版面:
+     第 1 行 [代號 + 標題最多 2 行 line-clamp] / 第 2 行 [來源 · 時間 縮小]。
+     舊版 nowrap 把標題截到 4-5 字「主動安聯…」「主動野村…」,看不出差別。 */
+  @media (max-width: 767px) {
+    .news-row { padding: 0.55rem 0.7rem; }
+    .news-row-flex {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.25rem;
+    }
+    .news-row-main {
+      width: 100%;
+      flex-wrap: wrap;
+      overflow: visible;
+      align-items: baseline;
+      row-gap: 0.2rem;
+    }
+    .news-title-link { overflow: visible; }
+    .news-title {
+      white-space: normal;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.4;
+      font-size: 0.95rem;
+    }
+    .news-meta {
+      font-size: 0.72rem;
+      margin-top: 0.1rem;
+      padding-left: 0.05rem;
+    }
+  }
+
   /* Filter input(tabs row 右側) */
   .news-filter-input {
     flex: 1;
