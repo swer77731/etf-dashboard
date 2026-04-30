@@ -600,6 +600,17 @@ async def monthly_income_page(request: Request) -> HTMLResponse:
     )
 
 
+@router.get("/monthly-income-preview", response_class=HTMLResponse)
+async def monthly_income_preview_page(request: Request) -> HTMLResponse:
+    """月月配試算器預覽版 — 加投入金額 / 自訂比例 / 強化警語。
+
+    與 /monthly-income 完全獨立,共用 /api/monthly-income/analyze 後端 API。
+    """
+    return templates.TemplateResponse(
+        request, "monthly_income_preview.html", _common_ctx(),
+    )
+
+
 def _build_holdings_initial_codes(code_list: tuple[str, ...]) -> list[dict]:
     """Heavy part of /holdings — ETF lookup for initial_codes(只在 ?codes= 帶值時跑)。"""
     if not code_list:

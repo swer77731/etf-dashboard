@@ -1,0 +1,1222 @@
+{% extends "base.html" %}
+
+{% block title %}月月配試算器(預覽版)— {{ brand_full }}{% endblock %}
+
+{% block head %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700;800;900&family=Noto+Serif+TC:wght@600;700;900&display=swap" rel="stylesheet">
+<style>
+  /* === ETF chip(picker)=== */
+  .mi-chip {
+    display: inline-flex; align-items: center; gap: 0.45rem;
+    padding: 0.4rem 0.75rem; border-radius: 0.45rem;
+    font-size: 1rem;
+    background: rgb(var(--c-accent) / 0.13);
+    border: 1px solid rgb(var(--c-accent) / 0.45);
+    color: rgb(var(--c-accent));
+  }
+  .mi-chip-x {
+    width: 1.15rem; height: 1.15rem;
+    border-radius: 9999px;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background 0.15s ease;
+  }
+  .mi-chip-x:hover { background: rgb(var(--c-accent) / 0.35); }
+
+  .picker-shell { position: relative; }
+  .picker-suggest {
+    position: absolute; top: 100%; left: 0; right: 0;
+    margin-top: 0.5rem;
+    background: rgb(var(--c-card));
+    border: 1px solid rgb(var(--c-border));
+    border-radius: 0.5rem;
+    box-shadow: 0 12px 40px -8px rgba(0,0,0,0.45);
+    max-height: 18rem; overflow-y: auto;
+    z-index: 30;
+  }
+  .picker-row {
+    width: 100%; text-align: left;
+    padding: 0.6rem 0.85rem;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 0.75rem;
+    transition: background 0.1s ease;
+  }
+  .picker-row:hover, .picker-row.is-active { background: rgb(var(--c-accent) / 0.1); }
+  .picker-row:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* === 紅色警語 banner(強化:加大、加粗、SVG 警示)=== */
+  .mi-warning-banner {
+    background: rgb(239 68 68 / 0.1);
+    border: 1px solid rgb(239 68 68 / 0.5);
+    border-radius: 0.55rem;
+    padding: 1rem 1.1rem;
+    color: rgb(254 202 202);
+    font-size: 1rem;
+    line-height: 1.6;
+    display: flex; align-items: flex-start; gap: 0.7rem;
+  }
+  .mi-warning-banner svg {
+    flex-shrink: 0;
+    width: 1.5rem; height: 1.5rem;
+    color: rgb(239 68 68);
+    margin-top: 1px;
+  }
+  .mi-warning-banner strong { color: rgb(252 165 165); font-weight: 700; }
+
+  /* === Modal === */
+  .mi-modal-backdrop {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 1rem;
+  }
+  .mi-modal {
+    background: rgb(var(--c-card));
+    border: 1.5px solid rgb(var(--c-accent) / 0.5);
+    border-radius: 0.75rem;
+    box-shadow: 0 25px 60px -10px rgba(0,0,0,0.6),
+                0 0 0 1px rgb(var(--c-accent) / 0.2);
+    padding: 1.5rem 1.6rem;
+    max-width: 32rem; width: 100%;
+    max-height: 90vh; overflow-y: auto;
+  }
+  @media (min-width: 640px) { .mi-modal { padding: 2rem 2.1rem; } }
+  .mi-modal-icon {
+    color: rgb(239 68 68);
+    width: 2rem; height: 2rem;
+    flex-shrink: 0;
+  }
+  .mi-modal-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: rgb(var(--c-fg));
+    line-height: 1.3;
+  }
+  .mi-modal-body {
+    font-size: 0.95rem;
+    color: rgb(var(--c-fg) / 0.92);
+    line-height: 1.65;
+  }
+  .mi-modal-body strong { color: rgb(252 165 165); font-weight: 700; }
+  .mi-modal-body ul {
+    list-style: disc; padding-left: 1.3rem;
+    margin: 0.4rem 0;
+  }
+  .mi-modal-body li { margin: 0.3rem 0; }
+  .mi-modal-final {
+    color: rgb(252 165 165);
+    font-weight: 600;
+    margin-top: 0.85rem;
+  }
+  .mi-modal-btn {
+    display: block; width: 100%;
+    padding: 0.85rem 1rem;
+    background: rgb(var(--c-accent));
+    color: white;
+    font-size: 1.05rem;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    transition: background 0.2s ease, transform 0.1s ease;
+  }
+  .mi-modal-btn:hover { background: rgb(var(--c-accent) / 0.85); }
+  .mi-modal-btn:active { transform: translateY(1px); }
+
+  /* === 月份覆蓋 12 格 === */
+  .month-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.6rem;
+  }
+  @media (max-width: 640px) {
+    /* 手機 4 欄 × 3 行(原 2×6 太長,user 抱怨要滑半天 → 不要滑動感) */
+    .month-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.35rem; }
+    .month-cell { padding: 0.45rem 0.35rem 0.55rem; min-height: 3.4rem; }
+    .month-cell-num { font-size: 0.85rem; margin-bottom: 0.2rem; }
+    .month-etf-pill {
+      font-size: 0.7rem; padding: 1px 4px; margin: 1px 2px 1px 0;
+    }
+  }
+  .month-cell {
+    background: rgb(var(--c-bg-soft));
+    border: 1px solid rgb(var(--c-border));
+    border-radius: 0.55rem;
+    padding: 0.7rem 0.8rem 0.85rem;
+    min-height: 5rem;
+    transition: border-color 0.2s ease, background 0.2s ease;
+  }
+  .month-cell.is-covered {
+    background: rgb(var(--c-accent) / 0.06);
+    border-color: rgb(var(--c-accent) / 0.4);
+  }
+  .month-cell.is-uncovered {
+    /* 不要紅虛線(像系統警告),改淡灰實線就好 */
+    border-color: rgb(var(--c-border));
+    background: transparent;
+    opacity: 0.55;
+  }
+  .month-cell-num {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: rgb(var(--c-fg));
+    margin-bottom: 0.4rem;
+  }
+  .month-cell-uncovered-tag {
+    /* 不要紅字(像系統警告),用 muted 灰調的「—」就好 */
+    color: rgb(var(--c-muted));
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+  .month-etf-pill {
+    display: inline-block;
+    margin: 2px 3px 2px 0;
+    padding: 1px 6px;
+    border-radius: 0.25rem;
+    background: rgb(var(--c-accent) / 0.18);
+    color: rgb(var(--c-accent));
+    font-size: 0.78rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  /* === Coverage banner === */
+  .cov-fully {
+    background: rgb(34 197 94 / 0.1);
+    border: 1px solid rgb(34 197 94 / 0.4);
+    color: rgb(134 239 172);
+  }
+  .cov-partial {
+    background: rgb(245 158 11 / 0.1);
+    border: 1px solid rgb(245 158 11 / 0.4);
+    color: rgb(252 211 77);
+  }
+  .cov-banner {
+    border-radius: 0.5rem;
+    padding: 0.7rem 1rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+
+  /* === 個別 ETF 卡片 === */
+  .etf-card {
+    background: rgb(var(--c-bg-soft));
+    border: 1px solid rgb(var(--c-border));
+    border-radius: 0.55rem;
+    padding: 1rem 1.1rem;
+  }
+  .etf-card.is-error { border-color: rgb(239 68 68 / 0.4); background: rgb(239 68 68 / 0.06); }
+
+  .pattern-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-left: 0.5rem;
+    vertical-align: 1px;
+  }
+  .pattern-monthly   { background: rgb(34 197 94 / 0.18); color: rgb(134 239 172); border: 1px solid rgb(34 197 94 / 0.4); }
+  .pattern-quarterly { background: rgb(var(--c-accent) / 0.15); color: rgb(var(--c-accent)); border: 1px solid rgb(var(--c-accent) / 0.4); }
+  .pattern-semi      { background: rgb(168 85 247 / 0.15); color: rgb(196 181 253); border: 1px solid rgb(168 85 247 / 0.4); }
+  .pattern-annual    { background: rgb(245 158 11 / 0.15); color: rgb(252 211 77); border: 1px solid rgb(245 158 11 / 0.4); }
+  .pattern-irregular { background: rgb(var(--c-muted) / 0.2); color: rgb(var(--c-muted)); border: 1px solid rgb(var(--c-muted) / 0.4); }
+
+  /* === typical_dividend_months 12 圓點 === */
+  .month-dots {
+    display: flex; gap: 5px;
+    flex-wrap: wrap;
+  }
+  .month-dot {
+    width: 1.6rem; height: 1.6rem;
+    border-radius: 50%;
+    background: rgb(var(--c-border));
+    color: rgb(var(--c-muted));
+    font-size: 0.7rem;
+    font-weight: 600;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background 0.25s ease, color 0.25s ease;
+  }
+  .month-dot.is-on {
+    background: rgb(var(--c-accent));
+    color: white;
+    box-shadow: 0 0 6px rgb(var(--c-accent) / 0.5);
+  }
+
+  /* === 加總大字 === */
+  .summary-yield {
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: rgb(239 68 68);
+    line-height: 1;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+
+  /* ============================================================
+     試水溫雙色系 — B 暗(深紅夜場) / C 亮(奶油橄欖綠)
+     用 page-scope CSS variable 重設,Tailwind utility 自動跟隨。
+     全站 base.html token 不動。
+     ============================================================ */
+
+  /* === 暗色模式:revert 用全站 base.html design token(藍版,不重設)=== */
+
+  /* === 亮色模式:C 風格 奶油橄欖綠 === */
+  :root[data-theme="light"] .mi-page {
+    --c-bg:           250 248 243;    /* #FAF8F3 */
+    --c-bg-soft:      255 255 255;    /* #FFFFFF */
+    --c-card:         255 255 255;    /* #FFFFFF */
+    --c-card-hover:   244 240 230;
+    --c-border:       224 220 208;    /* #E0DCD0 */
+    --c-fg:           26 26 26;       /* #1A1A1A */
+    --c-muted:        90 90 90;       /* #5A5A5A */
+    --c-accent:       107 127 58;     /* #6B7F3A */
+    --c-accent-glow:  rgba(107, 127, 58, 0.35);
+  }
+
+  /* === Page wrapper:確保整片區域套主題色 === */
+  .mi-page {
+    background: rgb(var(--c-bg));
+    color: rgb(var(--c-fg));
+    margin: -1.5rem -1rem;
+    padding: 1.5rem 1rem;
+    border-radius: 0.75rem;
+    transition: background 0.3s ease, color 0.3s ease;
+  }
+  @media (min-width: 640px) {
+    .mi-page { margin: -2.5rem -1.5rem; padding: 2.5rem 1.5rem; }
+  }
+
+  /* === Hero h1 漸層字(僅亮色 override,暗色用全站 .hero-text)=== */
+  :root[data-theme="light"] .mi-page h1 .hero-text {
+    background: linear-gradient(135deg, #6B7F3A 0%, #3B4D1F 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    font-family: 'Noto Sans TC', sans-serif;
+    font-weight: 800;
+  }
+
+  /* === h2 / h3 字體切換(僅亮色)=== */
+  :root[data-theme="light"] .mi-page h2,
+  :root[data-theme="light"] .mi-page h3 {
+    font-family: 'Noto Sans TC', sans-serif;
+    font-weight: 800;
+  }
+
+  /* === 警語 banner(僅亮色 override,暗色用既有 .mi-warning-banner 紅)=== */
+  :root[data-theme="light"] .mi-page .mi-warning-banner {
+    background: rgb(200 16 46 / 0.06);
+    border-color: rgb(200 16 46 / 0.45);
+    color: rgb(139 20 20);
+  }
+  :root[data-theme="light"] .mi-page .mi-warning-banner svg { color: rgb(200 16 46); }
+  :root[data-theme="light"] .mi-page .mi-warning-banner strong { color: rgb(200 16 46); }
+
+  /* === Coverage banner(僅亮色)=== */
+  :root[data-theme="light"] .mi-page .cov-fully {
+    background: rgb(107 127 58 / 0.12);
+    border-color: rgb(107 127 58 / 0.5);
+    color: rgb(59 77 31);
+  }
+  :root[data-theme="light"] .mi-page .cov-partial {
+    background: rgb(244 213 141 / 0.4);
+    border-color: rgb(184 134 11 / 0.5);
+    color: rgb(107 90 31);
+  }
+
+  /* === month-cell.is-uncovered:亮模式也用 muted 灰(統一不再紅) === */
+  /* (拿掉紅虛線 — user 說太搶眼像系統警告) */
+
+  /* === pattern badges === */
+  :root[data-theme="light"] .mi-page .pattern-monthly {
+    background: rgb(107 127 58 / 0.18); color: rgb(59 77 31);
+    border-color: rgb(107 127 58 / 0.5);
+  }
+  :root[data-theme="light"] .mi-page .pattern-quarterly {
+    background: rgb(244 213 141 / 0.5); color: rgb(107 90 31);
+    border-color: rgb(184 134 11 / 0.45);
+  }
+  :root[data-theme="light"] .mi-page .pattern-semi {
+    background: rgb(168 85 247 / 0.12); color: rgb(107 33 168);
+    border-color: rgb(168 85 247 / 0.4);
+  }
+  :root[data-theme="light"] .mi-page .pattern-annual {
+    background: rgb(245 158 11 / 0.18); color: rgb(146 64 14);
+    border-color: rgb(245 158 11 / 0.45);
+  }
+
+  /* === summary-yield 大字(僅亮色)=== */
+  :root[data-theme="light"] .mi-page .summary-yield { color: rgb(59 77 31); }
+
+  /* === Modal(僅亮色)=== */
+  :root[data-theme="light"] .mi-page .mi-modal { border-color: rgb(107 127 58 / 0.5); }
+  :root[data-theme="light"] .mi-page .mi-modal-icon { color: rgb(200 16 46); }
+  :root[data-theme="light"] .mi-page .mi-modal-body strong { color: rgb(200 16 46); }
+  :root[data-theme="light"] .mi-page .mi-modal-final { color: rgb(200 16 46); }
+
+  /* === month-dot is-on(僅亮色,暗色 fallback 用全站 --c-accent)=== */
+  :root[data-theme="light"] .mi-page .month-dot.is-on {
+    background: rgb(107 127 58);
+    box-shadow: 0 0 6px rgba(107, 127, 58, 0.4);
+  }
+
+  /* === month-etf-pill 亮模式深綠 === */
+  :root[data-theme="light"] .mi-page .month-etf-pill {
+    background: rgb(107 127 58 / 0.18);
+    color: rgb(59 77 31);
+    font-weight: 600;
+  }
+
+  /* ============================================================
+     Preview 新增 — 投入金額 + 分配比例 + 試算明細
+     ============================================================ */
+  .mi-prev-card {
+    background: rgb(var(--c-bg-soft));
+    border: 1px solid rgb(var(--c-border));
+    border-radius: 0.6rem;
+    padding: 1rem 1.1rem;
+    margin-bottom: 1rem;
+  }
+  .mi-prev-label {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: rgb(var(--c-fg));
+    margin-bottom: 0.5rem;
+  }
+  .mi-prev-hint {
+    font-size: 0.78rem;
+    color: rgb(var(--c-muted));
+    margin-bottom: 0.65rem;
+  }
+  .mi-amt-input {
+    width: 100%;
+    background: rgb(var(--c-bg));
+    border: 1px solid rgb(var(--c-border));
+    border-radius: 0.4rem;
+    padding: 0.65rem 0.85rem;
+    font-size: 1.15rem;
+    color: rgb(var(--c-fg));
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: 0.02em;
+    transition: border-color 0.15s;
+  }
+  .mi-amt-input:focus { outline: none; border-color: rgb(var(--c-accent)); }
+  .mi-amt-input::placeholder { color: rgb(var(--c-muted) / 0.55); }
+
+  .mi-quick-row {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+    margin-top: 0.7rem;
+  }
+  .mi-quick-btn {
+    padding: 0.4rem 0.85rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    background: transparent;
+    border: 1px solid rgb(var(--c-border));
+    border-radius: 9999px;
+    color: rgb(var(--c-fg));
+    cursor: pointer;
+    transition: all 0.12s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mi-quick-btn:hover {
+    border-color: rgb(var(--c-accent) / 0.6);
+    color: rgb(var(--c-accent));
+  }
+  .mi-quick-btn.is-active {
+    background: rgb(var(--c-accent) / 0.18);
+    border-color: rgb(var(--c-accent));
+    color: rgb(var(--c-accent));
+    font-weight: 700;
+  }
+
+  /* 分配方式 radio */
+  .mi-radio-row {
+    display: flex; flex-wrap: wrap; gap: 1rem;
+    margin-top: 0.4rem;
+  }
+  .mi-radio-row label {
+    display: inline-flex; align-items: center; gap: 0.45rem;
+    cursor: pointer;
+    font-size: 0.95rem;
+    color: rgb(var(--c-fg));
+  }
+  .mi-radio-row input[type="radio"] {
+    accent-color: rgb(var(--c-accent));
+    width: 1.05rem; height: 1.05rem;
+  }
+
+  /* 自訂比例表 */
+  .mi-weight-row {
+    display: grid;
+    grid-template-columns: 1fr 6rem 1.5rem;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid rgb(var(--c-border) / 0.4);
+  }
+  .mi-weight-row:last-of-type { border-bottom: none; }
+  .mi-weight-input {
+    background: rgb(var(--c-bg));
+    border: 1px solid rgb(var(--c-border));
+    border-radius: 0.35rem;
+    padding: 0.35rem 0.55rem;
+    font-size: 0.95rem;
+    text-align: right;
+    color: rgb(var(--c-fg));
+    font-family: ui-monospace, monospace;
+    width: 100%;
+  }
+  .mi-weight-input:focus { outline: none; border-color: rgb(var(--c-accent)); }
+  .mi-weight-total {
+    margin-top: 0.7rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid rgb(var(--c-border));
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 0.95rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .mi-weight-total .total-ok    { color: rgb(34 197 94); font-weight: 700; }
+  .mi-weight-total .total-low   { color: rgb(245 158 11); font-weight: 700; }
+  .mi-weight-total .total-over  { color: rgb(239 68 68); font-weight: 700; }
+  .mi-weight-eq-btn {
+    padding: 0.35rem 0.85rem;
+    font-size: 0.85rem;
+    background: transparent;
+    border: 1px solid rgb(var(--c-accent) / 0.6);
+    border-radius: 9999px;
+    color: rgb(var(--c-accent));
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .mi-weight-eq-btn:hover { background: rgb(var(--c-accent) / 0.12); }
+
+  /* 試算明細(各 ETF 投入金額)*/
+  .mi-breakdown {
+    margin-top: 0.85rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid rgb(var(--c-border));
+    font-size: 0.92rem;
+    color: rgb(var(--c-fg) / 0.92);
+  }
+  .mi-breakdown-row {
+    display: grid;
+    grid-template-columns: 4.5rem 1fr auto;
+    gap: 0.6rem;
+    padding: 0.3rem 0;
+  }
+  .mi-breakdown-row .num { font-family: ui-monospace, monospace; }
+
+  /* 投入金額後的「一年領 / 月均」結果 */
+  .mi-result-line {
+    margin-top: 0.85rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid rgb(var(--c-border));
+    font-size: 1rem;
+    line-height: 1.75;
+    color: rgb(var(--c-fg));
+  }
+  .mi-result-line .num { font-family: ui-monospace, monospace; font-weight: 700; }
+  .mi-result-line .yr  { color: rgb(239 68 68); font-size: 1.2rem; }
+  :root[data-theme="light"] .mi-page .mi-result-line .yr { color: rgb(59 77 31); }
+
+  /* 強化版警語 — 多列項目 */
+  .mi-warning-strong {
+    margin-top: 0.65rem;
+    font-size: 0.92rem;
+    line-height: 1.7;
+  }
+  .mi-warning-strong ul {
+    list-style: disc; padding-left: 1.3rem;
+    margin: 0.4rem 0;
+  }
+  .mi-warning-strong li { margin: 0.2rem 0; }
+  .mi-warning-strong p.final {
+    margin-top: 0.5rem;
+    font-weight: 700;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mi-page">
+
+{# === Hero 區 === #}
+<section class="mb-6 relative">
+  <div class="text-xs text-muted tracking-widest mb-2">
+    <a href="/" class="hover:text-accent">首頁</a>
+    <span class="mx-1">/</span>
+    <a href="/monthly-income" class="hover:text-accent">月月配試算器</a>
+    <span class="mx-1">/</span>
+    <span>預覽版</span>
+  </div>
+
+  <h1 class="text-2xl sm:text-3xl font-bold mb-2 tracking-tight leading-tight">
+    <span class="hero-text">月月配試算器</span>
+    <span class="ml-2 align-middle text-xs px-2 py-0.5 rounded"
+          style="background: rgb(var(--c-accent) / 0.18); border: 1px solid rgb(var(--c-accent) / 0.5); color: rgb(var(--c-accent)); font-weight: 600;">
+      PREVIEW
+    </span>
+  </h1>
+  <p class="text-sm sm:text-base text-muted mb-4">
+    自選 ETF,試算每月幾號可以領到錢、投入金額一年大概領多少
+  </p>
+
+  <div class="mi-warning-banner">
+    <svg fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
+    </svg>
+    <div>
+      <span>⚠️ 本工具為「<strong>歷史配息試算器</strong>」,<strong>非投資建議</strong></span>
+      <div class="mi-warning-strong">
+        <ul>
+          <li>所有數字以 <strong>2025 年實際配息</strong>回推,不代表未來收益</li>
+          <li>ETF 配息會因市場狀況、配息政策變動,實際金額可能不同</li>
+          <li>請勿以此金額作為投資決策依據</li>
+        </ul>
+        <p class="final">投資有風險,請自行判斷,虧損自負。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="relative section-card rounded-xl p-5 sm:p-7 mb-7"
+         x-data="monthlyIncomePicker()" x-init="init()">
+
+  {# === 首次進入 Disclaimer Modal(localStorage 30 日記憶) === #}
+  <div x-show="showDisclaimer" x-cloak x-transition.opacity.duration.150ms
+       class="mi-modal-backdrop" @click.self="ackDisclaimer()" role="dialog" aria-modal="true">
+    <div class="mi-modal">
+      <div class="flex items-start gap-3 mb-4">
+        <svg class="mi-modal-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
+        </svg>
+        <h3 class="mi-modal-title">使用前請務必閱讀</h3>
+      </div>
+
+      <div class="mi-modal-body space-y-3">
+        <p>本工具以「<strong>2025 年實際配息資料</strong>」做歷史試算,<strong>並非投資建議</strong>。</p>
+        <p>你看到的所有數字都是<strong>預估值</strong>:</p>
+        <ul>
+          <li>殖利率是 2025 年實際數字推算,不保證 2026 年配同樣的錢</li>
+          <li>月份覆蓋是 2023-2025 年配息習慣,不保證未來不變</li>
+          <li>平均殖利率假設等權重投入,實際因買進時點而不同</li>
+        </ul>
+        <p class="mi-modal-final">投資有風險,請自行判斷,虧損自負。</p>
+      </div>
+
+      <button type="button" @click="ackDisclaimer()" class="mi-modal-btn mt-6">
+        我了解,進入試算
+      </button>
+    </div>
+  </div>
+
+  {# === A. ETF 多選 === #}
+  <div class="mb-2 flex items-center justify-between">
+    <label class="text-base text-fg font-medium">選擇要組合的 ETF(最多 10 支)</label>
+    <span class="text-sm text-muted num" x-text="`已選 ${codes.length} / 10`"></span>
+  </div>
+
+  <div class="picker-shell bg-bg-soft border border-border rounded-md p-2 transition mb-4"
+       @click.outside="open=false">
+    <div class="flex flex-wrap gap-1.5 items-center">
+      <template x-for="(c, i) in codes" :key="c.code">
+        <span class="mi-chip">
+          <span class="font-mono font-semibold" x-text="c.code"></span>
+          <span class="text-fg/85 hidden sm:inline" x-text="c.name || ''" x-cloak></span>
+          <button type="button" @click.prevent="removeAt(i)" class="mi-chip-x" :aria-label="'移除 '+c.code">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </span>
+      </template>
+      <input type="text"
+             x-model="query"
+             @focus="open=true; ensure()"
+             @input.debounce.180ms="fetch()"
+             @keydown.down.prevent="moveActive(1)"
+             @keydown.up.prevent="moveActive(-1)"
+             @keydown.enter.prevent="onEnter()"
+             @keydown.escape="open=false"
+             @keydown.backspace="onBackspace()"
+             :placeholder="codes.length === 0 ? '輸入 ETF 代號(例:0056)' : (codes.length >= 10 ? '已達 10 支上限' : '繼續加入')"
+             :disabled="codes.length >= 10"
+             class="flex-1 min-w-[180px] bg-transparent px-1.5 py-1 text-base text-fg outline-none placeholder:text-muted/60 disabled:opacity-50">
+    </div>
+
+    <div x-show="open && (suggestions.length > 0 || loading || query)" x-cloak
+         x-transition.opacity.duration.150ms class="picker-suggest">
+      <div x-show="loading" class="px-3 py-3 text-sm text-muted">搜尋中…</div>
+      <ul x-show="!loading && suggestions.length > 0">
+        <template x-for="(s, idx) in suggestions" :key="s.code">
+          <li>
+            <button type="button" @click.prevent="addCode(s)"
+                    @mouseenter="activeIdx=idx"
+                    :class="activeIdx===idx ? 'is-active' : ''"
+                    :disabled="isSelected(s.code) || codes.length >= 10"
+                    class="picker-row">
+              <span class="flex items-baseline gap-2 min-w-0">
+                <span class="font-mono font-semibold text-fg" x-text="s.code"></span>
+                <span class="text-sm text-fg/85 truncate" x-text="s.name"></span>
+                <span x-show="isSelected(s.code)" class="text-[0.65rem] text-muted shrink-0">已選</span>
+              </span>
+              <span class="text-xs text-muted shrink-0" x-text="s.category_label || ''"></span>
+            </button>
+          </li>
+        </template>
+      </ul>
+      <div x-show="!loading && suggestions.length === 0 && query"
+           class="px-3 py-3 text-sm text-muted">找不到符合的 ETF</div>
+    </div>
+  </div>
+
+  {# === Empty / loading / error state === #}
+  <div x-show="codes.length === 0" class="text-center py-10">
+    <div class="text-base sm:text-lg text-fg/85">選 ETF 開始試算 →</div>
+    <div class="text-sm text-muted mt-1">在上方輸入框打代號(例:0056、00878)</div>
+  </div>
+  <div x-show="codes.length > 0 && data_loading" x-cloak class="text-center py-8 text-base text-muted">
+    試算中…
+  </div>
+  <div x-show="error_msg" x-cloak class="cov-banner" style="background: rgb(239 68 68 / 0.1); border: 1px solid rgb(239 68 68 / 0.4); color: rgb(252 165 165);">
+    <span x-text="error_msg"></span>
+  </div>
+
+  <template x-if="api_data && !data_loading">
+    <div>
+
+      {# === Preview 新增 1 — 投入金額 === #}
+      <div class="mi-prev-card">
+        <span class="mi-prev-label">💰 投入金額(可選,留空只看殖利率)</span>
+        <div class="mi-prev-hint">總投資金額(輸入後會用千分位顯示)</div>
+        <input type="text" inputmode="numeric"
+               class="mi-amt-input num"
+               x-model="amountText"
+               @input="onAmountInput($event)"
+               @blur="formatAmount()"
+               placeholder="例:100000">
+        <div class="mi-quick-row">
+          <template x-for="q in quickAmounts" :key="q.value">
+            <button type="button"
+                    class="mi-quick-btn"
+                    :class="amount === q.value ? 'is-active' : ''"
+                    @click="setQuickAmount(q.value)"
+                    x-text="q.label"></button>
+          </template>
+          <button type="button"
+                  class="mi-quick-btn"
+                  x-show="amount !== null && amount !== 0"
+                  @click="clearAmount()">清除</button>
+        </div>
+      </div>
+
+      {# === Preview 新增 2 — 分配方式 === #}
+      <div class="mi-prev-card">
+        <span class="mi-prev-label">⚖️ 分配方式</span>
+        <div class="mi-radio-row">
+          <label>
+            <input type="radio" name="alloc" value="equal" x-model="allocMode" @change="onAllocModeChange()">
+            <span>等權平分(每支一樣多)</span>
+          </label>
+          <label>
+            <input type="radio" name="alloc" value="custom" x-model="allocMode" @change="onAllocModeChange()">
+            <span>自訂比例</span>
+          </label>
+        </div>
+
+        {# 自訂比例展開 #}
+        <div x-show="allocMode === 'custom' && codes.length > 0" x-cloak class="mt-3">
+          <template x-for="c in codes" :key="c.code">
+            <div class="mi-weight-row">
+              <span>
+                <span class="font-mono font-semibold text-accent" x-text="c.code"></span>
+                <span class="text-fg/85 ml-1 text-sm" x-text="c.name || ''"></span>
+              </span>
+              <input type="number" min="0" max="100" step="0.01"
+                     class="mi-weight-input"
+                     :value="weights[c.code] !== undefined ? weights[c.code] : 0"
+                     @input="setWeight(c.code, $event.target.value)">
+              <span class="text-muted">%</span>
+            </div>
+          </template>
+
+          <div class="mi-weight-total">
+            <span>
+              總和:
+              <span class="num"
+                    :class="weightTotalClass()"
+                    x-text="weightTotal().toFixed(2) + '%'"></span>
+              <span class="ml-1 text-sm" x-text="weightHint()"></span>
+            </span>
+            <button type="button" class="mi-weight-eq-btn" @click="distributeEqually()">
+              平均分配
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {# === B. 月份覆蓋區 === #}
+      <div class="mb-3 mt-2"
+           :class="api_data.fully_covered ? 'cov-banner cov-fully' : (api_data.uncovered_months.length > 0 ? 'cov-banner cov-partial' : '')">
+        <span x-show="api_data.fully_covered">預估 12 個月皆有配息</span>
+        <span x-show="!api_data.fully_covered && api_data.uncovered_months.length > 0">
+          預估缺 <span x-text="api_data.uncovered_months.map(m => m + ' 月').join('、')"></span>(這些月沒配息)
+        </span>
+      </div>
+
+      <h2 class="text-xl sm:text-2xl font-semibold mb-3 mt-5">
+        <span class="w-1 h-7 bg-accent rounded-full inline-block align-middle mr-2" style="box-shadow: 0 0 8px var(--c-accent-glow);"></span>
+        月份覆蓋
+      </h2>
+
+      <div class="month-grid">
+        <template x-for="m in 12" :key="m">
+          <div class="month-cell"
+               :class="isMonthCovered(m) ? 'is-covered' : 'is-uncovered'">
+            <div class="month-cell-num" x-text="m + ' 月'"></div>
+            <template x-if="isMonthCovered(m)">
+              <div>
+                <template x-for="code in monthEtfs(m)" :key="code">
+                  <span class="month-etf-pill" x-text="code"></span>
+                </template>
+              </div>
+            </template>
+            <div x-show="!isMonthCovered(m)" class="month-cell-uncovered-tag">—</div>
+          </div>
+        </template>
+      </div>
+
+      {# === C. 個別 ETF 卡片區 === #}
+      <h2 class="text-xl sm:text-2xl font-semibold mb-3 mt-7">
+        <span class="w-1 h-7 bg-accent rounded-full inline-block align-middle mr-2" style="box-shadow: 0 0 8px var(--c-accent-glow);"></span>
+        個別 ETF 配息特性
+      </h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-7">
+        <template x-for="etf in api_data.etfs" :key="etf.code">
+          <div class="etf-card" :class="etf.error ? 'is-error' : ''">
+            <template x-if="etf.error">
+              <div>
+                <div class="font-mono text-base font-semibold text-down" x-text="etf.code"></div>
+                <div class="text-sm text-down mt-1" x-text="'⚠ ' + etf.error"></div>
+              </div>
+            </template>
+            <template x-if="!etf.error">
+              <div>
+                <div class="flex items-baseline flex-wrap gap-1">
+                  <span class="font-mono text-lg font-bold text-accent" x-text="etf.code"></span>
+                  <span class="text-base text-fg ml-1" x-text="etf.name"></span>
+                  <template x-if="etf.dividend_pattern">
+                    <span class="pattern-badge" :class="patternColor(etf.dividend_pattern)"
+                          x-text="'預估' + etf.dividend_pattern"></span>
+                  </template>
+                </div>
+
+                {# 12 圓點月份視覺化 #}
+                <div class="month-dots mt-3">
+                  <template x-for="m in 12" :key="m">
+                    <span class="month-dot"
+                          :class="etf.typical_dividend_months.includes(m) ? 'is-on' : ''"
+                          x-text="m"></span>
+                  </template>
+                </div>
+
+                <template x-if="etf.note">
+                  <div class="text-sm text-muted mt-3" x-text="etf.note"></div>
+                </template>
+
+                <template x-if="!etf.note && etf.last_full_year_yield_pct !== null">
+                  <div class="mt-3">
+                    <div class="text-sm text-muted">預估殖利率</div>
+                    <div class="text-2xl font-bold text-up num"
+                         x-text="etf.last_full_year_yield_pct.toFixed(2) + '%'"></div>
+                    <div class="text-xs text-muted mt-1">
+                      <span x-text="etf.last_full_year"></span> 年實際 · 預估累計配
+                      <span x-text="etf.last_full_year_total_dividend_per_share"></span> 元/股
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+
+      {# === E. 加總區(Preview 擴充:投入金額 + 比例 breakdown)=== #}
+      <div x-show="api_data.weighted_avg_yield_pct !== null" class="bg-bg-soft border border-border rounded-lg p-5 sm:p-6 mb-5">
+        <div class="text-sm text-muted mb-2"
+             x-text="allocMode === 'custom' ? '預估組合加權平均殖利率(按你的比例)' : '預估組合等權平均殖利率'"></div>
+        <div class="summary-yield"
+             x-text="effectiveYieldPct().toFixed(2) + '%'"></div>
+        <div class="text-xs text-muted mt-2">
+          以 <span x-text="(api_data.etfs.find(e => e.last_full_year)?.last_full_year) || ''"></span>
+          年實際配息計算,僅供參考
+        </div>
+
+        {# 投入金額有填 → 顯示一年領 / 月均 #}
+        <template x-if="amount !== null && amount > 0">
+          <div class="mi-result-line">
+            投入 <span class="num" x-text="fmtMoney(amount)"></span> 元,
+            一年預估領 <span class="num yr" x-text="fmtMoney(annualIncome())"></span> 元<br>
+            平均每月約 <span class="num" x-text="fmtMoney(monthlyIncome())"></span> 元
+          </div>
+        </template>
+
+        {# 自訂比例 + 投入金額有填 → 顯示各支試算 #}
+        <template x-if="amount !== null && amount > 0 && allocMode === 'custom' && codes.length > 0">
+          <div class="mi-breakdown">
+            <div class="text-sm text-muted mb-2">各支試算:</div>
+            <template x-for="c in codes" :key="c.code">
+              <div class="mi-breakdown-row">
+                <span class="font-mono font-semibold text-accent" x-text="c.code"></span>
+                <span>
+                  投入 <span class="num" x-text="fmtMoney(amountForCode(c.code))"></span> 元
+                  <span class="text-muted text-xs ml-1" x-text="'(' + (weights[c.code] || 0).toFixed(2) + '%)'"></span>
+                </span>
+                <span class="text-up font-semibold">
+                  領 <span class="num" x-text="fmtMoney(annualForCode(c.code))"></span> 元/年
+                </span>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <div class="text-xs text-muted mt-3 leading-relaxed">
+          <span x-show="allocMode === 'equal'">※ 等權平均 = 假設你各放等量資金到每支 ETF。</span>
+          <span x-show="allocMode === 'custom'">※ 加權平均 = 按你設定的比例算。</span>
+          實際殖利率會因買進時點 / 配息政策變動而不同。
+        </div>
+      </div>
+
+      {# === F. 歷史配息明細(摺疊,Commit 4 才完整實作)=== #}
+      <details class="text-sm">
+        <summary class="cursor-pointer text-muted hover:text-fg py-2">
+          展開:歷史配息明細(過去 5 年)
+        </summary>
+        <div class="mt-3 text-sm text-muted">
+          歷史明細展開細節將在 Phase 5 Commit 4 推出。
+        </div>
+      </details>
+
+    </div>
+  </template>
+</section>
+
+<section class="text-xs text-muted text-center mt-12 mb-6 max-w-2xl mx-auto leading-relaxed px-4">
+  本頁僅呈現 ETF 公開配息資料推估。任何投資判斷請自行評估或諮詢合格之投資顧問。
+</section>
+
+</div>{# end .mi-page #}
+
+<script>
+function monthlyIncomePicker() {
+  return {
+    codes: [],          // [{code, name, category}]
+    query: '',
+    open: false,
+    loading: false,
+    suggestions: [],
+    activeIdx: -1,
+    cache: {},
+    data_loading: false,
+    api_data: null,
+    error_msg: null,
+    _debounceTimer: null,
+
+    // 首次警語 Modal — localStorage 30 日記憶
+    showDisclaimer: false,
+
+    // Preview 新增:投入金額 + 分配方式
+    amount: null,           // number 或 null
+    amountText: '',         // input 顯示文字(含千分位)
+    quickAmounts: [
+      { value: 10000,   label: '1 萬' },
+      { value: 50000,   label: '5 萬' },
+      { value: 100000,  label: '10 萬' },
+      { value: 500000,  label: '50 萬' },
+      { value: 1000000, label: '100 萬' },
+    ],
+    allocMode: 'equal',     // 'equal' | 'custom'
+    weights: {},            // {code: percent} — custom 模式用
+
+    init() {
+      this.checkDisclaimer();
+    },
+
+    // === Disclaimer Modal ===
+    checkDisclaimer() {
+      try {
+        const ts = localStorage.getItem('monthly_income_disclaimer_ack');
+        const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+        if (!ts || (Date.now() - parseInt(ts, 10)) > THIRTY_DAYS_MS) {
+          this.showDisclaimer = true;
+        }
+      } catch (e) {
+        // localStorage 不可用(私密瀏覽某些 mode)→ 安全 fallback:每次都跳
+        this.showDisclaimer = true;
+      }
+    },
+    ackDisclaimer() {
+      try {
+        localStorage.setItem('monthly_income_disclaimer_ack', String(Date.now()));
+      } catch (e) { /* ignore */ }
+      this.showDisclaimer = false;
+    },
+
+    // === picker ===
+    isSelected(code) { return this.codes.some(c => c.code === code); },
+    async ensure() { if (this.suggestions.length === 0) await this.fetch(); },
+    async fetch() {
+      const q = this.query.trim();
+      if (this.cache[q]) {
+        this.suggestions = this.cache[q];
+        this.activeIdx = this.suggestions.length > 0 ? 0 : -1;
+        return;
+      }
+      this.loading = true;
+      try {
+        const r = await window.fetch(`/api/etf/search?q=${encodeURIComponent(q)}&limit=20&code_only=1`);
+        const d = await r.json();
+        this.suggestions = d.items || [];
+        this.cache[q] = this.suggestions;
+        this.activeIdx = this.suggestions.length > 0 ? 0 : -1;
+      } catch (e) {
+        this.suggestions = [];
+      } finally {
+        this.loading = false;
+      }
+    },
+    moveActive(d) {
+      if (!this.suggestions.length) return;
+      const n = this.suggestions.length;
+      this.activeIdx = ((this.activeIdx + d) % n + n) % n;
+    },
+    onEnter() {
+      if (this.activeIdx >= 0 && this.suggestions[this.activeIdx]) {
+        this.addCode(this.suggestions[this.activeIdx]);
+      } else if (this.query.trim()) {
+        this.addCode({ code: this.query.trim().toUpperCase(), name: '' });
+      }
+    },
+    onBackspace() {
+      if (this.query === '' && this.codes.length > 0) {
+        this.codes.pop();
+        this.scheduleAnalyze();
+      }
+    },
+    addCode(s) {
+      if (this.codes.length >= 10 || this.isSelected(s.code)) return;
+      this.codes.push({ code: s.code, name: s.name || '', category: s.category || '' });
+      this.query = '';
+      this.suggestions = [];
+      this.activeIdx = -1;
+      this.open = false;
+      this.syncWeightsToCodes();
+      this.scheduleAnalyze();
+    },
+    removeAt(i) {
+      const removed = this.codes[i];
+      this.codes.splice(i, 1);
+      if (removed) delete this.weights[removed.code];
+      this.syncWeightsToCodes();
+      this.scheduleAnalyze();
+    },
+
+    // === API ===
+    scheduleAnalyze() {
+      if (this._debounceTimer) clearTimeout(this._debounceTimer);
+      if (this.codes.length === 0) {
+        this.api_data = null;
+        this.error_msg = null;
+        return;
+      }
+      this._debounceTimer = setTimeout(() => this.runAnalyze(), 300);
+    },
+    async runAnalyze() {
+      this.data_loading = true;
+      this.error_msg = null;
+      try {
+        const codeList = this.codes.map(c => c.code).join(',');
+        const r = await window.fetch(`/api/monthly-income/analyze?codes=${encodeURIComponent(codeList)}`);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        this.api_data = await r.json();
+      } catch (e) {
+        this.error_msg = '試算失敗,請重試';
+        this.api_data = null;
+      } finally {
+        this.data_loading = false;
+      }
+    },
+
+    // === view helpers ===
+    monthEtfs(m) {
+      if (!this.api_data) return [];
+      return this.api_data.month_coverage[String(m)] || [];
+    },
+    isMonthCovered(m) {
+      return this.monthEtfs(m).length > 0;
+    },
+    patternColor(pattern) {
+      switch (pattern) {
+        case '月配':   return 'pattern-monthly';
+        case '季配':   return 'pattern-quarterly';
+        case '半年配': return 'pattern-semi';
+        case '年配':   return 'pattern-annual';
+        default:       return 'pattern-irregular';
+      }
+    },
+
+    // ============================================================
+    // Preview 新增:投入金額 / 分配方式 / 試算
+    // ============================================================
+
+    // --- 金額 input ---
+    fmtMoney(n) {
+      if (n === null || n === undefined || isNaN(n)) return '0';
+      return Math.round(n).toLocaleString('en-US');
+    },
+    onAmountInput(e) {
+      // 移除非數字
+      const raw = (e.target.value || '').replace(/[^\d]/g, '');
+      if (raw === '') {
+        this.amount = null;
+        this.amountText = '';
+        return;
+      }
+      const n = parseInt(raw, 10);
+      this.amount = n;
+      this.amountText = n.toLocaleString('en-US');
+    },
+    formatAmount() {
+      if (this.amount !== null && this.amount > 0) {
+        this.amountText = this.amount.toLocaleString('en-US');
+      } else {
+        this.amountText = '';
+      }
+    },
+    setQuickAmount(v) {
+      this.amount = v;
+      this.amountText = v.toLocaleString('en-US');
+    },
+    clearAmount() {
+      this.amount = null;
+      this.amountText = '';
+    },
+
+    // --- 分配方式 ---
+    onAllocModeChange() {
+      if (this.allocMode === 'custom') {
+        this.syncWeightsToCodes();
+      }
+    },
+    // 加 / 移 ETF 後同步 weights:沒值的補 0,custom 模式預設平均
+    syncWeightsToCodes() {
+      const codes = this.codes.map(c => c.code);
+      const newWeights = {};
+      let anyExisting = false;
+      codes.forEach(c => {
+        if (this.weights[c] !== undefined) {
+          newWeights[c] = this.weights[c];
+          anyExisting = true;
+        }
+      });
+      // custom 模式 + 沒任何既有值 → 預設平均
+      if (this.allocMode === 'custom' && !anyExisting && codes.length > 0) {
+        const eq = +(100 / codes.length).toFixed(2);
+        const last = +(100 - eq * (codes.length - 1)).toFixed(2);
+        codes.forEach((c, i) => {
+          newWeights[c] = i === codes.length - 1 ? last : eq;
+        });
+      } else {
+        // 補 0 給新加入的 code
+        codes.forEach(c => {
+          if (newWeights[c] === undefined) newWeights[c] = 0;
+        });
+      }
+      this.weights = newWeights;
+    },
+    setWeight(code, val) {
+      const n = parseFloat(val);
+      this.weights = { ...this.weights, [code]: isNaN(n) ? 0 : n };
+    },
+    distributeEqually() {
+      const codes = this.codes.map(c => c.code);
+      if (codes.length === 0) return;
+      const eq = +(100 / codes.length).toFixed(2);
+      const last = +(100 - eq * (codes.length - 1)).toFixed(2);
+      const w = {};
+      codes.forEach((c, i) => {
+        w[c] = i === codes.length - 1 ? last : eq;
+      });
+      this.weights = w;
+    },
+    weightTotal() {
+      return this.codes.reduce((sum, c) => sum + (parseFloat(this.weights[c.code]) || 0), 0);
+    },
+    weightTotalClass() {
+      const t = this.weightTotal();
+      if (Math.abs(t - 100) < 0.01) return 'total-ok';
+      if (t < 100) return 'total-low';
+      return 'total-over';
+    },
+    weightHint() {
+      const t = this.weightTotal();
+      if (Math.abs(t - 100) < 0.01) return '✅';
+      const diff = (100 - t).toFixed(2);
+      if (t < 100) return `,還差 ${diff}%`;
+      return `,超過 ${(t - 100).toFixed(2)}%`;
+    },
+
+    // --- 試算計算 ---
+    // 等權:用 api_data.weighted_avg_yield_pct(server 已算等權)
+    // 自訂:sum(weight × yield) / 100
+    effectiveYieldPct() {
+      if (!this.api_data || this.api_data.weighted_avg_yield_pct === null) return 0;
+      if (this.allocMode === 'equal') {
+        return this.api_data.weighted_avg_yield_pct;
+      }
+      // custom — 用 weights 加權
+      let weightedSum = 0;
+      let totalWeight = 0;
+      for (const etf of this.api_data.etfs) {
+        const w = parseFloat(this.weights[etf.code]) || 0;
+        const y = etf.last_full_year_yield_pct;
+        if (y === null || y === undefined) continue;
+        weightedSum += w * y;
+        totalWeight += w;
+      }
+      if (totalWeight === 0) return 0;
+      return weightedSum / totalWeight;   // weighted by ratio
+    },
+    weightFor(code) {
+      // 等權:100 / N;自訂:weights[code]
+      if (this.allocMode === 'equal') {
+        return this.codes.length > 0 ? 100 / this.codes.length : 0;
+      }
+      return parseFloat(this.weights[code]) || 0;
+    },
+    amountForCode(code) {
+      if (!this.amount) return 0;
+      return this.amount * this.weightFor(code) / 100;
+    },
+    annualForCode(code) {
+      if (!this.api_data) return 0;
+      const etf = this.api_data.etfs.find(e => e.code === code);
+      if (!etf || etf.last_full_year_yield_pct === null) return 0;
+      return this.amountForCode(code) * etf.last_full_year_yield_pct / 100;
+    },
+    annualIncome() {
+      if (!this.amount) return 0;
+      return this.amount * this.effectiveYieldPct() / 100;
+    },
+    monthlyIncome() {
+      return this.annualIncome() / 12;
+    },
+  };
+}
+</script>
+{% endblock %}
