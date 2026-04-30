@@ -74,7 +74,7 @@ PATH_LABELS: list[tuple[str, str]] = [
     ("/etf/", "ETF 詳情"),
     ("/ranking/", "排行榜"),
     ("/dividend-calendar", "配息日曆"),
-    ("/monthly-income", "月配試算"),
+    ("/monthly-income", "配息計算器"),
     ("/holdings", "持股分析"),
     ("/compare", "績效比較"),
     ("/news", "新聞"),
