@@ -24,7 +24,18 @@
   }
   .mi-chip-x:hover { background: rgb(var(--c-accent) / 0.35); }
 
-  .picker-shell { position: relative; }
+  /* 修 3:「繼續加入」picker 視覺加強 */
+  .picker-shell {
+    position: relative;
+    border: 2px dashed rgb(var(--c-accent) / 0.5) !important;
+    background: rgb(var(--c-accent) / 0.06) !important;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .picker-shell:focus-within {
+    border-style: solid !important;
+    border-color: rgb(var(--c-accent)) !important;
+    background: rgb(var(--c-bg-soft)) !important;
+  }
   .picker-suggest {
     position: absolute; top: 100%; left: 0; right: 0;
     margin-top: 0.5rem;
@@ -462,14 +473,20 @@
     background: rgb(var(--c-bg));
     border: 1px solid rgb(var(--c-border));
     border-radius: 0.35rem;
-    padding: 0.35rem 0.55rem;
-    font-size: 0.95rem;
+    padding: 0.4rem 0.6rem;
+    /* 修 1:字體放大 + 右對齊 + caret-color 明顯,游標不擋數字 */
+    font-size: 1.1rem;
     text-align: right;
     color: rgb(var(--c-fg));
     font-family: ui-monospace, monospace;
     width: 100%;
+    caret-color: rgb(var(--c-accent));
   }
-  .mi-weight-input:focus { outline: none; border-color: rgb(var(--c-accent)); }
+  .mi-weight-input:focus {
+    outline: none;
+    border-color: rgb(var(--c-accent));
+    box-shadow: 0 0 0 2px rgb(var(--c-accent) / 0.18);
+  }
   .mi-weight-total {
     margin-top: 0.7rem;
     padding-top: 0.6rem;
@@ -502,13 +519,21 @@
     font-size: 0.92rem;
     color: rgb(var(--c-fg) / 0.92);
   }
+  /* 修 2:breakdown 拆兩行(手機尤其重要)— 第 1 行 code+投入,第 2 行金額 */
   .mi-breakdown-row {
-    display: grid;
-    grid-template-columns: 4.5rem 1fr auto;
-    gap: 0.6rem;
-    padding: 0.3rem 0;
+    padding: 0.55rem 0;
+    border-bottom: 1px dashed rgb(var(--c-border) / 0.5);
   }
+  .mi-breakdown-row:last-child { border-bottom: 0; }
   .mi-breakdown-row .num { font-family: ui-monospace, monospace; }
+  .mi-breakdown-line1 {
+    display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.4rem;
+  }
+  .mi-breakdown-line2 {
+    margin-top: 0.2rem;
+    padding-left: 0.2rem;
+    white-space: nowrap;
+  }
 
   /* 投入金額後的「一年領 / 月均」結果 */
   .mi-result-line {
@@ -571,51 +596,6 @@
   :root[data-theme="light"] .mi-page .mi-top-warning svg { color: rgb(200 16 46); }
   :root[data-theme="light"] .mi-page .mi-top-warning b { color: rgb(200 16 46); }
 
-  /* === 模式切換(toggle)=== */
-  .mi-mode-toggle {
-    display: inline-flex;
-    background: rgb(var(--c-bg-soft));
-    border: 1px solid rgb(var(--c-border));
-    border-radius: 9999px;
-    padding: 3px;
-    margin-bottom: 1.25rem;
-  }
-  .mi-mode-toggle button {
-    padding: 0.4rem 1.1rem;
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: rgb(var(--c-muted));
-    border-radius: 9999px;
-    background: transparent;
-    border: 0;
-    cursor: pointer;
-    transition: all 0.18s ease;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .mi-mode-toggle button.is-active {
-    background: rgb(var(--c-accent));
-    color: white;
-    box-shadow: 0 0 12px rgb(var(--c-accent) / 0.4);
-  }
-  .mi-mode-toggle button:hover:not(.is-active) {
-    color: rgb(var(--c-fg));
-  }
-
-  /* 精細模式區塊滑入動畫 */
-  .mi-advanced-only {
-    transition: opacity 0.2s ease, max-height 0.3s ease;
-    overflow: hidden;
-  }
-  .mi-advanced-only[hidden] {
-    display: block !important;
-    opacity: 0;
-    max-height: 0;
-    margin: 0;
-    padding: 0;
-    border: 0;
-    pointer-events: none;
-  }
-
   /* === 萬為單位 input 後綴 === */
   .mi-amt-wrap {
     position: relative;
@@ -661,6 +641,12 @@
     color: #f59e0b;
     font-weight: 700;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    /* 修 2:防斷行 + 桌面 1.05rem / 手機 0.95rem */
+    white-space: nowrap;
+    font-size: 1.05rem;
+  }
+  @media (max-width: 640px) {
+    .mi-money { font-size: 0.95rem; }
   }
 
   /* === 防線 3:頁尾完整免責聲明 === */
@@ -741,15 +727,6 @@
 <section class="relative section-card rounded-xl p-5 sm:p-7 mb-7"
          x-data="monthlyIncomePicker()" x-init="init()">
 
-  {# === 模式切換 toggle === #}
-  <div class="mi-mode-toggle">
-    <button type="button"
-            :class="displayMode === 'simple' ? 'is-active' : ''"
-            @click="setDisplayMode('simple')">🟢 簡化</button>
-    <button type="button"
-            :class="displayMode === 'advanced' ? 'is-active' : ''"
-            @click="setDisplayMode('advanced')">⚙️ 精細</button>
-  </div>
 
   {# === 首次進入 Disclaimer Modal(localStorage 30 日記憶) === #}
   <div x-show="showDisclaimer" x-cloak x-transition.opacity.duration.150ms
@@ -800,6 +777,9 @@
         </span>
       </template>
       <input type="text"
+             inputmode="numeric"
+             autocapitalize="characters"
+             autocomplete="off"
              x-model="query"
              @focus="open=true; ensure()"
              @input.debounce.180ms="fetch()"
@@ -808,9 +788,9 @@
              @keydown.enter.prevent="onEnter()"
              @keydown.escape="open=false"
              @keydown.backspace="onBackspace()"
-             :placeholder="codes.length === 0 ? '輸入 ETF 代號(例:0056)' : (codes.length >= 5 ? '已達 5 支上限' : '繼續加入')"
+             :placeholder="codes.length === 0 ? '+ 點此加入(輸入代號或名稱)' : (codes.length >= 5 ? '已達 5 支上限' : '+ 繼續加入')"
              :disabled="codes.length >= 5"
-             class="flex-1 min-w-[180px] bg-transparent px-1.5 py-1 text-base text-fg outline-none placeholder:text-muted/60 disabled:opacity-50">
+             class="flex-1 min-w-[180px] bg-transparent px-2 py-1.5 text-base font-medium text-fg outline-none placeholder:text-accent/70 disabled:opacity-50">
     </div>
 
     <div x-show="open && (suggestions.length > 0 || loading || query)" x-cloak
@@ -884,8 +864,8 @@
         </div>
       </div>
 
-      {# === Preview 新增 2 — 分配方式(只在精細模式顯示)=== #}
-      <div class="mi-prev-card mi-advanced-only" :hidden="displayMode !== 'advanced'">
+      {# === Preview 新增 2 — 分配方式(永遠顯示,預設等權)=== #}
+      <div class="mi-prev-card">
         <span class="mi-prev-label">⚖️ 分配方式</span>
         <div class="mi-radio-row">
           <label>
@@ -1041,20 +1021,22 @@
           </div>
         </template>
 
-        {# 自訂比例 + 投入金額有填 + 精細模式 → 顯示各支試算(金額橘色 + 「約」字)#}
-        <template x-if="displayMode === 'advanced' && amount !== null && amount > 0 && allocMode === 'custom' && codes.length > 0">
+        {# 自訂比例 + 投入金額有填 → 顯示各支試算(拆兩行,金額橘色 + 「約」字)#}
+        <template x-if="amount !== null && amount > 0 && allocMode === 'custom' && codes.length > 0">
           <div class="mi-breakdown">
             <div class="text-sm text-muted mb-2">各支試算:</div>
             <template x-for="c in codes" :key="c.code">
               <div class="mi-breakdown-row">
-                <span class="font-mono font-semibold text-accent" x-text="c.code"></span>
-                <span>
-                  投入 <span class="num" x-text="fmtMoney(amountForCode(c.code))"></span> 元
-                  <span class="text-muted text-xs ml-1" x-text="'(' + (weights[c.code] || 0).toFixed(2) + '%)'"></span>
-                </span>
-                <span class="mi-money">
-                  約 <span x-text="fmtMoney(annualForCode(c.code))"></span> 元/年
-                </span>
+                <div class="mi-breakdown-line1">
+                  <span class="font-mono font-semibold text-accent" x-text="c.code"></span>
+                  <span style="white-space: nowrap;">
+                    投入 <span class="num" x-text="fmtMoney(amountForCode(c.code))"></span> 元
+                  </span>
+                  <span class="text-muted text-xs" x-text="'(' + (weights[c.code] || 0).toFixed(2) + '%)'"></span>
+                </div>
+                <div class="mi-breakdown-line2">
+                  一年領 <span class="mi-money">約 <span x-text="fmtMoney(annualForCode(c.code))"></span> 元</span>
+                </div>
               </div>
             </template>
           </div>
@@ -1131,22 +1113,9 @@ function monthlyIncomePicker() {
     allocMode: 'equal',     // 'equal' | 'custom'
     weights: {},            // {code: percent} — custom 模式用
     weightFlash: {},        // {code: bool} — 100% 上限觸發黃色閃
-    displayMode: 'simple',  // 'simple' | 'advanced'
 
     init() {
       this.checkDisclaimer();
-      // 載入記住的模式偏好
-      try {
-        const m = localStorage.getItem('income_calc_mode');
-        if (m === 'simple' || m === 'advanced') this.displayMode = m;
-      } catch (e) { /* 私密模式 fallback 用 'simple' */ }
-    },
-
-    setDisplayMode(m) {
-      this.displayMode = m;
-      try { localStorage.setItem('income_calc_mode', m); } catch (e) {}
-      // 切到簡化 → force allocMode = 'equal'(避免突然顯示一堆 %)
-      if (m === 'simple') this.allocMode = 'equal';
     },
 
     // === Disclaimer Modal ===
