@@ -18,6 +18,60 @@
 
 {% block content %}
 
+{# === 📡 容量監控(同時在線)— 流量爆發時看天花板 === #}
+{% set cap_color_map = {'green': '#10b981', 'yellow': '#eab308', 'orange': '#f97316', 'red': '#ef4444'} %}
+{% set cap_color = cap_color_map.get(capacity.color, '#10b981') %}
+<section class="card p-4 mb-5"
+         style="border-left: 4px solid {{ cap_color }};">
+  <div class="flex items-baseline justify-between flex-wrap gap-2 mb-3">
+    <h2 class="text-base font-semibold flex items-center gap-2">
+      <span>📡 容量監控</span>
+      <span class="text-xs text-muted font-normal">同時在線真人 session(已扣 bot)</span>
+    </h2>
+    {% if capacity.warn_red %}
+    <span class="text-xs px-2 py-1 rounded" style="background:{{ cap_color }}22; color:{{ cap_color }}; border:1px solid {{ cap_color }}66;">
+      ⚠️ 接近 / 已超 Cloudflare Tunnel 免費方案上限,建議升級至 Zeabur 付費或自架反向代理
+    </span>
+    {% endif %}
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+    {# 1. 現在 #}
+    <div class="bg-[#0a0e1a] rounded-lg p-3 border border-[#1f2937]">
+      <div class="text-xs text-muted mb-1">🟢 現在(過去 5 分鐘)</div>
+      <div class="stat-num num" style="color: {{ cap_color }};">{{ capacity.current }}<span class="text-base text-muted ml-1">人</span></div>
+      <div class="text-xs text-muted mt-1">即時查 analytics_log</div>
+    </div>
+
+    {# 2. 今日尖峰 #}
+    <div class="bg-[#0a0e1a] rounded-lg p-3 border border-[#1f2937]">
+      <div class="text-xs text-muted mb-1">📈 今日尖峰</div>
+      <div class="stat-num num">{{ capacity.today_peak.count }}<span class="text-base text-muted ml-1">人</span></div>
+      <div class="text-xs text-muted mt-1">
+        {% if capacity.today_peak.ts_taipei %}於 {{ capacity.today_peak.ts_taipei }}{% else %}—{% endif %}
+      </div>
+    </div>
+
+    {# 3. 30 天尖峰 #}
+    <div class="bg-[#0a0e1a] rounded-lg p-3 border border-[#1f2937]">
+      <div class="text-xs text-muted mb-1">📊 近 30 天尖峰</div>
+      <div class="stat-num num" style="color: {{ cap_color }};">{{ capacity.peak_30d.count }}<span class="text-base text-muted ml-1">人</span></div>
+      <div class="text-xs text-muted mt-1">
+        {% if capacity.peak_30d.ts_taipei %}於 {{ capacity.peak_30d.ts_taipei }}{% else %}—{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="text-xs text-muted mt-3 leading-relaxed">
+    每 1 分鐘 snapshot 一次。警戒線:
+    <span style="color: #10b981;">綠 &lt; 50</span> ·
+    <span style="color: #eab308;">黃 50-79</span> ·
+    <span style="color: #f97316;">橘 80-99</span> ·
+    <span style="color: #ef4444;">紅 ≥ 100</span>
+    (依「近 30 天尖峰」決定)
+  </div>
+</section>
+
 {# === 大字數字卡 — 今日綜合 === #}
 <section class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
   {% set ov = overview %}

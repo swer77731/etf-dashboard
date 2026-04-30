@@ -152,6 +152,7 @@ async def analytics_page(request: Request, range_days: int = 7):
 
     overview = admin_analytics.overview_with_diff(today, yesterday)
     trend = admin_analytics.dau_trend(days=30)
+    capacity = admin_analytics.capacity_overview()
     etfs = admin_analytics.top_etfs(days=range_days, limit=10)
     feats = admin_analytics.top_features(days=range_days, limit=10)
     searches = admin_analytics.top_searches(days=range_days, limit=20)
@@ -167,6 +168,7 @@ async def analytics_page(request: Request, range_days: int = 7):
             range_days=range_days,
             overview=overview,
             trend=trend,
+            capacity=capacity,
             etfs=etfs,
             feats=feats,
             searches=searches,

@@ -66,3 +66,20 @@ class CompareLog(Base):
         Index("ix_compare_ts", "ts"),
         Index("ix_compare_codes", "codes_sorted"),
     )
+
+
+class OnlineSnapshot(Base):
+    """每分鐘記一次「過去 5 分鐘真人活躍 session 數」— 給容量監控用。
+
+    cron: capacity_snapshot_min 每 1 分鐘
+    紀律 #16:已過 bot UA 黑名單 + 高 session IP 排除。
+    """
+    __tablename__ = "online_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ts: Mapped[datetime] = mapped_column(DateTime, nullable=False)   # UTC naive
+    count: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    __table_args__ = (
+        Index("ix_online_ts", "ts"),
+    )

@@ -51,6 +51,7 @@ _locks: dict[str, threading.Lock] = {
     "health": threading.Lock(),
     "daily_report": threading.Lock(),
     "analytics_cleanup": threading.Lock(),
+    "capacity_snapshot": threading.Lock(),
 }
 
 # 5 分鐘後 retry 用 — APScheduler 有 max_instances=1 + coalesce 防併發
@@ -222,8 +223,28 @@ def daily_report_job() -> None:
         _release("daily_report")
 
 
+def capacity_snapshot_job() -> None:
+    """每 1 分鐘記一次「過去 5 分鐘真人活躍 session 數」到 online_snapshots。
+
+    紀律 #16:同 admin_analytics 排除 bot UA + 高 session IP。
+    輕量(1 個 COUNT(DISTINCT) 查詢 + 1 個 INSERT),不上 lock 也 OK
+    但保險起見還是 try_lock,避免 cron 排隊堆積。
+    """
+    if not _try_lock("capacity_snapshot"):
+        return
+    try:
+        n = admin_analytics.take_capacity_snapshot()
+        # 避免 log 太吵 — 只在 n > 0 時記
+        if n > 0:
+            logger.info("[capacity_snapshot] online=%d", n)
+    except Exception:
+        logger.exception("[capacity_snapshot] failed")
+    finally:
+        _release("capacity_snapshot")
+
+
 def analytics_cleanup_job() -> None:
-    """每天 03:00 (Taipei) 刪 90 天前的 analytics / search / compare logs。"""
+    """每天 03:00 (Taipei) 刪 90 天前的 analytics / search / compare / online_snapshots。"""
     if not _try_lock("analytics_cleanup"):
         return
     try:
@@ -319,6 +340,9 @@ def start_scheduler() -> AsyncIOScheduler:
         # async 各自 lock,日報本身只查本地 analytics_log 很輕)
         ("analytics_daily_report", daily_report_job,
          CronTrigger(hour=20, minute=0, timezone=tz)),
+        # 每 1 分鐘 — 容量監控 snapshot(現在/今日尖峰/30天尖峰 用)
+        ("capacity_snapshot_min", capacity_snapshot_job,
+         CronTrigger(minute="*", timezone=tz)),
     ]
 
     for job_id, fn, trig in jobs:

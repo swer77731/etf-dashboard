@@ -20,8 +20,9 @@ from sqlalchemy import distinct, func, select
 
 from app.config import settings
 from app.database import session_scope
-from app.models.analytics import AnalyticsLog, CompareLog, SearchLog
+from app.models.analytics import AnalyticsLog, CompareLog, OnlineSnapshot, SearchLog
 from app.models.etf import ETF
+from app.analytics_middleware import _BOT_UA_PATTERNS
 
 TPE = ZoneInfo("Asia/Taipei")
 
@@ -466,6 +467,14 @@ def build_daily_report(target_date=None) -> str:
         f"【流量】訪客 {ov['dau']} 人 / 瀏覽 {ov['pv']} 頁 / "
         f"平均停留 {_fmt_duration(ov['avg_duration_sec'])}"
     )
+    # 今日同時在線尖峰(容量監控)
+    try:
+        tp = get_today_peak()
+        if tp.get("count", 0) > 0:
+            ts = tp.get("ts_taipei") or "—"
+            lines.append(f"👥 今日尖峰同時在線:{tp['count']} 人({ts})")
+    except Exception:
+        pass
     if etfs:
         parts = [f"{i+1}. {e['code']}({e['count']} 次)" for i, e in enumerate(etfs)]
         lines.append("【熱門 ETF】" + " ".join(parts))
@@ -490,19 +499,143 @@ def build_daily_report(target_date=None) -> str:
 
 
 # ─────────────────────────────────────────────────────────────
+# 容量監控(同時在線)
+# ─────────────────────────────────────────────────────────────
+
+# 警戒線(以「近 30 天尖峰」決定卡片顏色)
+CAPACITY_THRESHOLDS = (
+    (50, "green"),
+    (80, "yellow"),
+    (100, "orange"),
+    (10**9, "red"),    # >= 100 → red
+)
+
+
+def _capacity_color(peak: int) -> str:
+    for limit, color in CAPACITY_THRESHOLDS:
+        if peak < limit:
+            return color
+    return "red"
+
+
+def _bot_ua_sql_clauses():
+    """產生 (clause_sql, params dict)— SQL OR 串接,排除命中 bot UA 的 row。"""
+    clauses = []
+    params = {}
+    for i, pat in enumerate(_BOT_UA_PATTERNS):
+        key = f"bp{i}"
+        clauses.append(f"AnalyticsLog.ua LIKE :{key}")
+        params[key] = f"%{pat}%"
+    # 空 UA 也算 bot
+    clauses.append("AnalyticsLog.ua IS NULL")
+    clauses.append("AnalyticsLog.ua = ''")
+    return " OR ".join(clauses), params
+
+
+def _count_active_sessions(window_min: int = 5) -> int:
+    """過去 N 分鐘 distinct session 數,排除 bot UA + 高 session IP。"""
+    from sqlalchemy import not_, or_
+    cutoff = datetime.now(tz=timezone.utc).replace(tzinfo=None) - timedelta(minutes=window_min)
+    bot_ips = get_high_session_ips()
+
+    # bot UA 排除:not (ua LIKE 任何 bot pattern OR ua 空)
+    bot_ua_or_empty_clauses = []
+    for pat in _BOT_UA_PATTERNS:
+        bot_ua_or_empty_clauses.append(AnalyticsLog.ua.ilike(f"%{pat}%"))
+    bot_ua_or_empty_clauses.append(AnalyticsLog.ua.is_(None))
+    bot_ua_or_empty_clauses.append(AnalyticsLog.ua == "")
+
+    with session_scope() as s:
+        q = (
+            select(func.count(distinct(AnalyticsLog.session_id)))
+            .where(AnalyticsLog.ts >= cutoff)
+            .where(not_(or_(*bot_ua_or_empty_clauses)))
+        )
+        if bot_ips:
+            q = q.where(AnalyticsLog.ip_masked.notin_(bot_ips))
+        return s.scalar(q) or 0
+
+
+def take_capacity_snapshot() -> int:
+    """cron 每 1 分鐘呼叫:寫入過去 5 分鐘真人 active session 數。回該數值。"""
+    n = _count_active_sessions(window_min=5)
+    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    with session_scope() as s:
+        s.add(OnlineSnapshot(ts=now, count=n))
+    return n
+
+
+def get_current_online() -> int:
+    """現在 — 直接查過去 5 分鐘(不靠 snapshot,即時)。"""
+    return _count_active_sessions(window_min=5)
+
+
+def get_today_peak() -> dict:
+    """今日尖峰 — Asia/Taipei 該日 00:00 ~ now 從 online_snapshots 取 max。"""
+    today = today_taipei_date()
+    start_utc, end_utc = day_range_utc(today)
+    with session_scope() as s:
+        row = s.execute(
+            select(OnlineSnapshot.count, OnlineSnapshot.ts)
+            .where(OnlineSnapshot.ts >= start_utc)
+            .where(OnlineSnapshot.ts < end_utc)
+            .order_by(OnlineSnapshot.count.desc(), OnlineSnapshot.ts.asc())
+            .limit(1)
+        ).one_or_none()
+    if not row:
+        return {"count": 0, "ts_taipei": None}
+    ts_tpe = row.ts.replace(tzinfo=timezone.utc).astimezone(TPE)
+    return {"count": row.count, "ts_taipei": ts_tpe.strftime("%H:%M")}
+
+
+def get_30day_peak() -> dict:
+    """近 30 天尖峰 — 含時間戳(用來決定容量警戒色)。"""
+    cutoff = datetime.now(tz=timezone.utc).replace(tzinfo=None) - timedelta(days=30)
+    with session_scope() as s:
+        row = s.execute(
+            select(OnlineSnapshot.count, OnlineSnapshot.ts)
+            .where(OnlineSnapshot.ts >= cutoff)
+            .order_by(OnlineSnapshot.count.desc(), OnlineSnapshot.ts.asc())
+            .limit(1)
+        ).one_or_none()
+    if not row:
+        return {"count": 0, "ts_taipei": None, "color": "green"}
+    ts_tpe = row.ts.replace(tzinfo=timezone.utc).astimezone(TPE)
+    return {
+        "count": row.count,
+        "ts_taipei": ts_tpe.strftime("%Y-%m-%d %H:%M"),
+        "color": _capacity_color(row.count),
+    }
+
+
+def capacity_overview() -> dict:
+    """整合 3 個指標 + 警戒色,給 /admin/analytics 用。"""
+    today_peak = get_today_peak()
+    peak30 = get_30day_peak()
+    return {
+        "current": get_current_online(),
+        "today_peak": today_peak,
+        "peak_30d": peak30,
+        "color": peak30["color"],
+        "warn_red": peak30["color"] == "red",
+    }
+
+
+# ─────────────────────────────────────────────────────────────
 # 90 天清理
 # ─────────────────────────────────────────────────────────────
 
 def cleanup_old_logs(retain_days: int = 90) -> dict:
-    """刪 retain_days 之前的所有紀錄(三張表)。回 stats。"""
+    """刪 retain_days 之前的所有紀錄(4 張表)。回 stats。"""
     cutoff_utc = datetime.now(tz=timezone.utc).replace(tzinfo=None) - timedelta(days=retain_days)
-    deleted = {"analytics_log": 0, "search_log": 0, "compare_log": 0}
+    deleted = {"analytics_log": 0, "search_log": 0, "compare_log": 0, "online_snapshots": 0}
     with session_scope() as s:
         from sqlalchemy import delete
         for tbl, model in (
             ("analytics_log", AnalyticsLog),
             ("search_log", SearchLog),
             ("compare_log", CompareLog),
+            ("online_snapshots", OnlineSnapshot),
         ):
             r = s.execute(delete(model).where(model.ts < cutoff_utc))
             deleted[tbl] = r.rowcount or 0
