@@ -4,10 +4,13 @@
 - 時區 Asia/Taipei(stats 用「該日 00:00 Taipei 起」窗口)
 - DB ts 是 UTC naive,計算前轉成 Asia/Taipei tz-aware 比對
 - 90 天前資料整批 DELETE(避免 SQLite 漲檔)
+- 24h 內同 IP session ≥ HIGH_SESSION_THRESHOLD(預設 15)自動從統計排除
+  (不擋訪問,只 stats 排除;bot-diagnosis 仍看得到原始)
 """
 from __future__ import annotations
 
 import re
+import time as _time
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
@@ -15,11 +18,54 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import distinct, func, select
 
+from app.config import settings
 from app.database import session_scope
 from app.models.analytics import AnalyticsLog, CompareLog, SearchLog
 from app.models.etf import ETF
 
 TPE = ZoneInfo("Asia/Taipei")
+
+
+# 24h 高 session IP 排除清單 — 60s memory cache 避免每張卡重查
+_BOT_IP_CACHE: dict = {"ts": 0.0, "list": [], "window_hours": 24}
+_BOT_IP_CACHE_TTL = 60.0
+
+
+def get_high_session_ips(window_hours: int = 24) -> list[str]:
+    """24h 內同 ip_masked 開 ≥ settings.high_session_threshold 個 session 的清單。
+
+    回 ip_masked list,caller 用 NOT IN 排除。60s cache 命中後 ~0ms。
+    """
+    now_mono = _time.monotonic()
+    if (
+        _BOT_IP_CACHE["list"]
+        and _BOT_IP_CACHE["window_hours"] == window_hours
+        and (now_mono - _BOT_IP_CACHE["ts"]) < _BOT_IP_CACHE_TTL
+    ):
+        return _BOT_IP_CACHE["list"]
+
+    cutoff = datetime.now(tz=timezone.utc).replace(tzinfo=None) - timedelta(hours=window_hours)
+    threshold = settings.high_session_threshold
+    with session_scope() as s:
+        rows = s.execute(
+            select(AnalyticsLog.ip_masked)
+            .where(AnalyticsLog.ts >= cutoff)
+            .where(AnalyticsLog.ip_masked.isnot(None))
+            .group_by(AnalyticsLog.ip_masked)
+            .having(func.count(distinct(AnalyticsLog.session_id)) >= threshold)
+        ).all()
+    ips = [r.ip_masked for r in rows if r.ip_masked]
+    _BOT_IP_CACHE["ts"] = now_mono
+    _BOT_IP_CACHE["list"] = ips
+    _BOT_IP_CACHE["window_hours"] = window_hours
+    return ips
+
+
+def _exclude_high_session_clause(bot_ips: list[str]):
+    """回 SQLAlchemy where clause(可選),caller 用 .where(_exclude(...))"""
+    if not bot_ips:
+        return None
+    return AnalyticsLog.ip_masked.notin_(bot_ips)
 
 
 # Path → 中文功能標籤(prefix match,順序重要 — 長 prefix 先)
@@ -73,22 +119,24 @@ def today_taipei_date():
 # ─────────────────────────────────────────────────────────────
 
 def overview(target_date) -> dict:
-    """單日綜合 — DAU / PV / 平均停留秒數。"""
+    """單日綜合 — DAU / PV / 平均停留秒數。已排除 24h 高 session IP。"""
     start, end = day_range_utc(target_date)
+    bot_ips = get_high_session_ips()
+    excl = _exclude_high_session_clause(bot_ips)
     with session_scope() as s:
-        dau = s.scalar(
-            select(func.count(distinct(AnalyticsLog.session_id)))
-            .where(AnalyticsLog.ts >= start)
-            .where(AnalyticsLog.ts < end)
-        ) or 0
-        pv = s.scalar(
-            select(func.count(AnalyticsLog.id))
-            .where(AnalyticsLog.ts >= start)
-            .where(AnalyticsLog.ts < end)
-        ) or 0
+        dau_q = (select(func.count(distinct(AnalyticsLog.session_id)))
+                 .where(AnalyticsLog.ts >= start)
+                 .where(AnalyticsLog.ts < end))
+        pv_q = (select(func.count(AnalyticsLog.id))
+                .where(AnalyticsLog.ts >= start)
+                .where(AnalyticsLog.ts < end))
+        if excl is not None:
+            dau_q = dau_q.where(excl)
+            pv_q = pv_q.where(excl)
+        dau = s.scalar(dau_q) or 0
+        pv = s.scalar(pv_q) or 0
         # 平均停留 — 每 session 用 max(ts) - min(ts),只計 PV >= 2 的 session
-        rows = s.execute(
-            select(
+        rows_q = (select(
                 AnalyticsLog.session_id,
                 func.min(AnalyticsLog.ts).label("first_ts"),
                 func.max(AnalyticsLog.ts).label("last_ts"),
@@ -96,14 +144,17 @@ def overview(target_date) -> dict:
             )
             .where(AnalyticsLog.ts >= start)
             .where(AnalyticsLog.ts < end)
-            .group_by(AnalyticsLog.session_id)
-        ).all()
+            .group_by(AnalyticsLog.session_id))
+        if excl is not None:
+            rows_q = rows_q.where(excl)
+        rows = s.execute(rows_q).all()
     multi_page = [r for r in rows if r.pv >= 2]
     if multi_page:
         avg_dur = sum((r.last_ts - r.first_ts).total_seconds() for r in multi_page) / len(multi_page)
     else:
         avg_dur = 0.0
-    return {"dau": dau, "pv": pv, "avg_duration_sec": round(avg_dur, 1)}
+    return {"dau": dau, "pv": pv, "avg_duration_sec": round(avg_dur, 1),
+            "excluded_ip_count": len(bot_ips)}
 
 
 def overview_with_diff(target_date, prev_date) -> dict:
@@ -125,41 +176,46 @@ def overview_with_diff(target_date, prev_date) -> dict:
 
 
 def dau_trend(days: int = 30) -> list[dict]:
-    """近 N 天每日 DAU + PV。"""
+    """近 N 天每日 DAU + PV。已排除 24h 高 session IP。"""
     today = today_taipei_date()
+    bot_ips = get_high_session_ips()
+    excl = _exclude_high_session_clause(bot_ips)
     out = []
     with session_scope() as s:
         for i in range(days - 1, -1, -1):
             d = today - timedelta(days=i)
             start, end = day_range_utc(d)
-            dau = s.scalar(
-                select(func.count(distinct(AnalyticsLog.session_id)))
-                .where(AnalyticsLog.ts >= start)
-                .where(AnalyticsLog.ts < end)
-            ) or 0
-            pv = s.scalar(
-                select(func.count(AnalyticsLog.id))
-                .where(AnalyticsLog.ts >= start)
-                .where(AnalyticsLog.ts < end)
-            ) or 0
+            dau_q = (select(func.count(distinct(AnalyticsLog.session_id)))
+                     .where(AnalyticsLog.ts >= start)
+                     .where(AnalyticsLog.ts < end))
+            pv_q = (select(func.count(AnalyticsLog.id))
+                    .where(AnalyticsLog.ts >= start)
+                    .where(AnalyticsLog.ts < end))
+            if excl is not None:
+                dau_q = dau_q.where(excl)
+                pv_q = pv_q.where(excl)
+            dau = s.scalar(dau_q) or 0
+            pv = s.scalar(pv_q) or 0
             out.append({"date": d.isoformat(), "dau": dau, "pv": pv})
     return out
 
 
 def top_etfs(days: int = 7, limit: int = 10) -> list[dict]:
-    """熱門 ETF — 從 /etf/{code} 路徑統計。"""
+    """熱門 ETF — 從 /etf/{code} 路徑統計。已排除 24h 高 session IP。"""
     today = today_taipei_date()
     start, _ = day_range_utc(today - timedelta(days=days - 1))
     end, _ = day_range_utc(today + timedelta(days=1))
     pattern = re.compile(r"^/etf/([A-Za-z0-9]+)$")
+    excl = _exclude_high_session_clause(get_high_session_ips())
     with session_scope() as s:
-        rows = s.execute(
-            select(AnalyticsLog.path, func.count(AnalyticsLog.id).label("cnt"))
+        q = (select(AnalyticsLog.path, func.count(AnalyticsLog.id).label("cnt"))
             .where(AnalyticsLog.ts >= start)
             .where(AnalyticsLog.ts < end)
             .where(AnalyticsLog.path.like("/etf/%"))
-            .group_by(AnalyticsLog.path)
-        ).all()
+            .group_by(AnalyticsLog.path))
+        if excl is not None:
+            q = q.where(excl)
+        rows = s.execute(q).all()
         # 從路徑解出 code
         codes_count = Counter()
         for r in rows:
@@ -179,18 +235,20 @@ def top_etfs(days: int = 7, limit: int = 10) -> list[dict]:
 
 
 def top_features(days: int = 7, limit: int = 10) -> list[dict]:
-    """熱門功能 — path 用 label_for_path 對應後再聚合。"""
+    """熱門功能 — path 用 label_for_path 對應後再聚合。已排除 24h 高 session IP。"""
     today = today_taipei_date()
     start, _ = day_range_utc(today - timedelta(days=days - 1))
     end, _ = day_range_utc(today + timedelta(days=1))
+    excl = _exclude_high_session_clause(get_high_session_ips())
     counter = Counter()
     with session_scope() as s:
-        rows = s.execute(
-            select(AnalyticsLog.path, func.count(AnalyticsLog.id).label("cnt"))
+        q = (select(AnalyticsLog.path, func.count(AnalyticsLog.id).label("cnt"))
             .where(AnalyticsLog.ts >= start)
             .where(AnalyticsLog.ts < end)
-            .group_by(AnalyticsLog.path)
-        ).all()
+            .group_by(AnalyticsLog.path))
+        if excl is not None:
+            q = q.where(excl)
+        rows = s.execute(q).all()
     for r in rows:
         counter[label_for_path(r.path)] += r.cnt
     return [{"label": k, "count": v} for k, v in counter.most_common(limit)]
@@ -267,17 +325,19 @@ def _classify_referer(ref: str | None) -> str:
 
 
 def referer_breakdown(days: int = 7) -> list[dict]:
-    """流量來源占比。'站內' 不算對外來源,從統計裡剔除。"""
+    """流量來源占比。'站內' 不算對外來源,從統計裡剔除。已排除 24h 高 session IP。"""
     today = today_taipei_date()
     start, _ = day_range_utc(today - timedelta(days=days - 1))
     end, _ = day_range_utc(today + timedelta(days=1))
+    excl = _exclude_high_session_clause(get_high_session_ips())
     with session_scope() as s:
-        rows = s.execute(
-            select(AnalyticsLog.referer, func.count(AnalyticsLog.id).label("cnt"))
+        q = (select(AnalyticsLog.referer, func.count(AnalyticsLog.id).label("cnt"))
             .where(AnalyticsLog.ts >= start)
             .where(AnalyticsLog.ts < end)
-            .group_by(AnalyticsLog.referer)
-        ).all()
+            .group_by(AnalyticsLog.referer))
+        if excl is not None:
+            q = q.where(excl)
+        rows = s.execute(q).all()
     counter = Counter()
     for r in rows:
         cls = _classify_referer(r.referer)

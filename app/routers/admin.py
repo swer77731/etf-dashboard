@@ -322,7 +322,7 @@ async def bot_diagnosis(request: Request):
             ORDER BY MIN(cnt)
         """)).all()
 
-        # 額外:總 session、總 PV 給 sanity check
+        # 額外:總 session、總 PV 給 sanity check(原始數字,未排除任何 IP)
         totals = s.execute(sql_text("""
             SELECT
                 COUNT(DISTINCT session_id) AS total_sessions,
@@ -330,6 +330,10 @@ async def bot_diagnosis(request: Request):
             FROM analytics_log
             WHERE date(ts) = date('now')
         """)).one()
+
+    # 24h 高 session IP 排除清單(/admin/analytics 真實統計用的)
+    bot_ips = admin_analytics.get_high_session_ips(window_hours=24)
+    threshold = settings.high_session_threshold
 
     # 簡易 inline HTML(不用 Jinja partial,單頁工具)
     def _td(s, num=False, mono=False):
@@ -354,6 +358,10 @@ async def bot_diagnosis(request: Request):
         for r in bucket_rows
     )
 
+    bot_ips_preview = ", ".join(bot_ips[:5]) if bot_ips else "(無)"
+    if len(bot_ips) > 5:
+        bot_ips_preview += f" ...（共 {len(bot_ips)} 個）"
+
     html = f"""<!doctype html>
 <html lang="zh-Hant" data-theme="dark">
 <head>
@@ -372,12 +380,14 @@ async def bot_diagnosis(request: Request):
   tr:hover td {{ background:#1a2138; }}
   .card {{ background:#131829; border:1px solid #1f2937; border-radius:0.75rem; padding:1.25rem; margin-bottom:1.5rem; }}
   h2 {{ font-size:1.1rem; font-weight:600; margin-bottom:0.75rem; }}
+  .banner {{ background:#1f2937; border:1px solid #374151; border-radius:0.5rem;
+             padding:0.75rem 1rem; font-size:0.85rem; color:#fbbf24; margin-bottom:1rem; }}
 </style>
 </head>
 <body class="px-4 sm:px-6 py-6 max-w-6xl mx-auto">
   <header class="mb-6 flex items-center justify-between">
     <div>
-      <h1 class="text-xl font-semibold">Bot 診斷 · 今日</h1>
+      <h1 class="text-xl font-semibold">Bot 診斷 · 今日(原始數字,未排除)</h1>
       <div class="text-sm text-gray-400 mt-1">
         總 session = <span class="num">{totals.total_sessions}</span> ·
         總 PV = <span class="num">{totals.total_pv}</span>
@@ -385,6 +395,12 @@ async def bot_diagnosis(request: Request):
     </div>
     <a href="/admin/analytics" class="text-sm text-gray-400 hover:text-white">← 回 Analytics</a>
   </header>
+
+  <div class="banner">
+    <b>已排除 {len(bot_ips)} 個高 session IP</b>(24h 內 sessions ≥ {threshold},自動視為 bot)<br>
+    <span class="text-xs">/admin/analytics 與 TG 日報的 DAU / PV / 排行皆已排除這些 IP。本頁仍顯示原始數字。</span><br>
+    <span class="text-xs num font-mono text-gray-300">{bot_ips_preview}</span>
+  </div>
 
   <div class="card">
     <h2>1. 同 session 訪問次數分布(快看)</h2>

@@ -52,5 +52,9 @@ class Settings(BaseSettings):
     # 後台 /admin/login 密碼。占位值 — 部署前請改 env。
     admin_password: str = Field(default="CHANGE_ME", description="ADMIN_PASSWORD env var,後台登入用")
 
+    # Analytics 高 session IP 排除門檻 — 24h 內同 IP 開 ≥ N 個 session 視為
+    # 自動化掃描器,從 DAU/PV/排行統計排除(不擋訪問,只排除計算)。
+    high_session_threshold: int = Field(default=15, description="24h 內同 IP session 數上限,超過自動排除統計")
+
 
 settings = Settings()
