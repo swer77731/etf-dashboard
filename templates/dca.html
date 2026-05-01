@@ -347,9 +347,36 @@
   }
   .dca-fadein { animation: dca-fadein-fast 0.18s ease-out; }
 
-  /* === 圖表 container 高度 — mobile 320(legend wrap 也夠)/ desktop 360 === */
+  /* === 圖表 container 高度 === */
   .dca-chart-box { height: 320px; }
   @media (min-width: 768px) { .dca-chart-box { height: 360px; } }
+
+  /* === HTML legend(不靠 ECharts;100% 不會跟 chart 搶空間)=== */
+  .dca-chart-legend {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    padding: 8px 0 12px 0;
+    flex-wrap: wrap;
+  }
+  .dca-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: rgb(var(--c-muted));
+  }
+  .dca-legend-dash {
+    display: inline-block;
+    width: 14px;
+    height: 3px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  @media (max-width: 480px) {
+    .dca-chart-legend { gap: 12px; font-size: 11px; }
+    .dca-legend-dash { width: 12px; }
+  }
 
   /* === 演算法說明 === */
   .dca-algo-summary {
@@ -652,6 +679,21 @@
   {# 區塊 5:圖表 #}
   <div x-show="result" x-cloak class="dca-card dca-fadein">
     <div class="dca-card-title" x-text="'這 ' + years + ' 年可能怎麼走'"></div>
+    {# HTML legend — 不用 ECharts 內建,避免手機版直立堆疊吃 Y 軸 #}
+    <div class="dca-chart-legend" aria-hidden="true">
+      <span class="dca-legend-item">
+        <span class="dca-legend-dash" style="background: #10b981;"></span>較好
+      </span>
+      <span class="dca-legend-item">
+        <span class="dca-legend-dash" style="background: #3b82f6;"></span>中位
+      </span>
+      <span class="dca-legend-item">
+        <span class="dca-legend-dash" style="background: #ef4444;"></span>較差
+      </span>
+      <span class="dca-legend-item">
+        <span class="dca-legend-dash" style="background: rgba(148, 163, 184, 0.6);"></span>投入
+      </span>
+    </div>
     <div id="dca-chart" class="dca-chart-box"></div>
   </div>
 
@@ -1047,8 +1089,8 @@ function dcaApp() {
 
       const option = {
         backgroundColor: 'transparent',
-        // grid.top: 50 給 legend 留空間(允許 wrap 也夠);grid.left: 56 給 Y 軸標籤
-        grid: { left: 56, right: 15, top: 50, bottom: 30, containLabel: false },
+        // legend 改用 HTML(.dca-chart-legend),這裡不留 legend 空間
+        grid: { left: 56, right: 15, top: 12, bottom: 30, containLabel: false },
         tooltip: {
           trigger: 'axis',
           axisPointer: {
@@ -1076,17 +1118,7 @@ function dcaApp() {
             return lines.join('<br/>');
           },
         },
-        legend: {
-          data: ['較好', '中位', '較差', '投入'],
-          textStyle: { color: mutedCol, fontSize: 11 },
-          top: 8,
-          left: 'center',
-          orient: 'horizontal',
-          itemWidth: 12,
-          itemHeight: 8,
-          itemGap: 10,
-          padding: [0, 0, 0, 0],
-        },
+        legend: { show: false },   // 改用 HTML legend,參見 .dca-chart-legend
         xAxis: {
           type: 'category',
           data: xLabels,
