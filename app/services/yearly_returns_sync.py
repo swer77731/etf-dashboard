@@ -40,7 +40,9 @@ _FALLBACK_CODES = (
     "0050",   "0052",   "009816", "0056",   "00878",  "00713",
     "006208", "00919",
 )
-_CSV_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "etf_universe_top80.csv"
+# 注意:CSV 必須放在 volume 之外(不是 /app/data),否則 Zeabur volume mount 會 shadow
+# COPYed 過來的 CSV → production 永遠拿不到。改放 /app/etf_universe/top80.csv。
+_CSV_PATH = Path(__file__).resolve().parent.parent.parent / "etf_universe" / "top80.csv"
 
 
 def load_tracked_codes() -> tuple[str, ...]:

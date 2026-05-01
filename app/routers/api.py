@@ -517,7 +517,9 @@ async def get_ranking(
 import csv as _csv
 from pathlib import Path as _Path
 
-_DCA_CSV_PATH = _Path(__file__).resolve().parent.parent.parent / "data" / "etf_universe_top80.csv"
+# 注意:CSV 必須放在 volume 之外(不是 /app/data),否則 Zeabur volume mount 會 shadow
+# COPYed 過來的 CSV → production 永遠拿不到。改放 /app/etf_universe/top80.csv。
+_DCA_CSV_PATH = _Path(__file__).resolve().parent.parent.parent / "etf_universe" / "top80.csv"
 _DCA_ETF_CACHE: list[dict] = []          # CSV 內容(啟動讀一次,5 分鐘 refresh)
 _DCA_ETF_EXPIRES: float = 0.0
 _DCA_ETF_TTL = 300.0
