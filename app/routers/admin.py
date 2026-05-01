@@ -191,12 +191,15 @@ async def trigger_daily_report(request: Request):
 
 
 @router.get("/yearly_returns/backfill")
-async def trigger_yearly_returns_backfill(request: Request):
+def trigger_yearly_returns_backfill(request: Request):
     """手動觸發 etf_yearly_returns 全 80 支 backfill(免等 04:00 cron)。
 
     Zeabur 部署後第一次,或 CSV 變動後重灌名單時用。
-    跑 5-10 分鐘(throttle 1s/call,80 calls)→ 直接 await,呼叫端可能 timeout
-    但 server 端會繼續跑完(APScheduler lock 防併發)。
+    跑 5-10 分鐘(throttle 1s/call,80 calls)。
+
+    重要:寫成 `def`(非 async)讓 FastAPI 把同步 blocking 邏輯
+    丟 threadpool 跑,避免吃掉 asyncio event loop 害整站 stalled。
+    呼叫端瀏覽器可能 504 timeout,但 server 端會繼續跑完。
     """
     if not _is_authed(request):
         raise HTTPException(403, "not admin")
