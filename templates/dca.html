@@ -1033,26 +1033,38 @@ function dcaApp() {
       const mutedCol  = isDark ? '#9ca3af' : '#5a5a5a';
       const gridCol   = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
 
+      // 白話金額格式(Y 軸標籤 + tooltip 共用)
+      // 例:1,005,000 → 100 萬;905,000 → 90.5 萬;100,500,000 → 1.0 億
       const fmtMoneyLocal = (v) => {
-        if (v >= 1e8) return (v / 1e8).toFixed(2) + ' 億';
-        if (v >= 1e4) return (v / 1e4).toFixed(1) + ' 萬';
+        if (v >= 1e8) return (v / 1e8).toFixed(1) + ' 億';
+        if (v >= 1e7) return Math.round(v / 1e4) + ' 萬';
+        if (v >= 1e4) {
+          const w = v / 1e4;
+          return (w >= 100 ? Math.round(w) : w.toFixed(1)) + ' 萬';
+        }
         return Math.round(v).toLocaleString();
       };
 
       const option = {
         backgroundColor: 'transparent',
-        // grid.top: 35 給 legend 留 35px,不擠 Y 軸
-        grid: { left: 50, right: 15, top: 35, bottom: 30, containLabel: false },
+        // grid.top: 50 給 legend 留空間(允許 wrap 也夠);grid.left: 56 給 Y 軸標籤
+        grid: { left: 56, right: 15, top: 50, bottom: 30, containLabel: false },
         tooltip: {
           trigger: 'axis',
-          axisPointer: { type: 'cross' },
+          axisPointer: {
+            type: 'line',                                  // 單條垂直虛線,不留殘影
+            lineStyle: {
+              color: 'rgba(255, 255, 255, 0.3)',
+              width: 1,
+              type: 'dashed',
+            },
+          },
           confine: true,
           backgroundColor: 'rgba(20, 20, 20, 0.92)',
           borderColor: 'rgba(255, 255, 255, 0.15)',
           borderWidth: 1,
           textStyle: { color: '#fff', fontSize: 12 },
           formatter: (params) => {
-            // axisValueLabel 才會自動帶「開始 / 第 N 年」label;axisValue 在空 label 月份是空字串
             const yearLabel = params[0].axisValueLabel || params[0].name || '';
             const visible = params.filter(p =>
               ['較好', '中位', '較差', '投入'].includes(p.seriesName)
@@ -1067,12 +1079,12 @@ function dcaApp() {
         legend: {
           data: ['較好', '中位', '較差', '投入'],
           textStyle: { color: mutedCol, fontSize: 11 },
-          top: 5,
+          top: 8,
           left: 'center',
           orient: 'horizontal',
-          itemWidth: 14,
+          itemWidth: 12,
           itemHeight: 8,
-          itemGap: 12,
+          itemGap: 10,
           padding: [0, 0, 0, 0],
         },
         xAxis: {
@@ -1088,12 +1100,8 @@ function dcaApp() {
           axisLine: { show: false },
           splitLine: { lineStyle: { color: gridCol } },
           axisLabel: {
-            color: mutedCol, fontSize: 10,
-            formatter: (v) => {
-              if (v >= 1e8) return (v / 1e8).toFixed(1) + ' 億';
-              if (v >= 1e4) return (v / 1e4).toFixed(0) + ' 萬';
-              return v;
-            },
+            color: mutedCol, fontSize: 11,
+            formatter: (v) => fmtMoneyLocal(v),
           },
         },
         series: [
