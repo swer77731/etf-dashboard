@@ -415,67 +415,84 @@ def _log_search(q: str, hits: int, ua: str | None = None) -> None:
 @router.get("/etf/search")
 async def search_etf(
     request: Request,
-    q: str = Query("", description="代號或名稱關鍵字"),
-    limit: int = Query(20, ge=1, le=80),
+    q: str = Query("", description="代號或名稱關鍵字(< MIN_CHARS 字回空 list)"),
+    limit: int = Query(8, ge=1, le=80),
     code_only: bool = Query(False, description="True 時只比對代號,不做名稱模糊搜尋"),
 ) -> dict:
-    """ETF autocomplete 搜尋 — sidebar 全站搜尋 + compare 頁 chip 選擇器共用。
+    """ETF autocomplete 搜尋 — 全站統一規範(2026-05-01 鎖)。
 
-    純記憶體 list filter(_get_etf_list 5 分鐘 refresh)— 不打 DB,
-    server time < 1ms。
+    規範:
+    - 觸發條件:q 字元數 ≥ 2(中/英/數字都算 1 字元),不到回 []
+    - 比對:代號 ilike substring + 名稱 substring(code_only=1 略過名稱)
+    - 預設 limit=8(可覆寫,le=80 不變)
+    - 多筆排序優先級:
+        1. 代號完全相等(打 0050 → 0050 第一)
+        2. 代號開頭(打 005 → 0050、0052、0056)
+        3. 名稱開頭(打元大 → 元大開頭 ETF 優先)
+        4. 代號 / 名稱包含(打股息 → 名稱含股息)
+    - 回傳 truncated 旗標(總命中 > limit 表示被截 → 前端顯示提示)
 
-    排序優先級:
-    1. 代號完全相等(打 0050 → 0050 第一)
-    2. 代號開頭配對(0050 → 0050B、00500;00981 → 009810~9 + 00981A/T)
-    3. (預設)名稱子字串配對 — 但 code_only=1 時略過
-
-    code_only=1 用途:compare 頁(user 要求純代號數字關聯,不要名稱模糊搜尋)。
-    code_only=0 預設:sidebar 全站搜尋(可打「高股息」之類找 ETF)。
-    排除 index 類別(TAIEX 大盤不該被當 ETF 選)。
+    純記憶體 list filter(_get_etf_list 5 分鐘 refresh),不打 DB,server <1ms。
+    排除 index 類別(TAIEX 不當 ETF 選)。
     """
-    etfs = _get_etf_list()
-    keyword = (q or "").strip().upper()
+    MIN_CHARS = 2
 
-    if not keyword:
-        # 空字串 → 回固定熱門幾支(同舊 SQL 邏輯),不寫 search_log
-        chosen = [e for e in etfs if e["code"] in _DEFAULT_EMPTY_CODES][:limit]
+    etfs = _get_etf_list()
+    keyword_raw = (q or "").strip()
+    keyword = keyword_raw.upper()
+
+    # 不到 MIN_CHARS 字 → 空 list(規範 1)
+    if len(keyword_raw) < MIN_CHARS:
         return {
             "q": q,
-            "items": [{"code": e["code"], "name": e["name"],
-                       "category": e["category"], "category_label": e["category_label"]}
-                      for e in chosen],
+            "items": [],
+            "total": 0,
+            "truncated": False,
+            "min_chars": MIN_CHARS,
+            "hint": f"請輸入至少 {MIN_CHARS} 個字" if keyword_raw else None,
         }
 
-    # 不分大小寫 substring 比對(SQL 用 ilike 可不分大小寫)
+    # 不分大小寫 substring 比對
     matched = []
     for e in etfs:
         code_u = e["code_upper"]
         if keyword in code_u:
             matched.append(e)
         elif (not code_only) and (keyword in e["name"]):
-            # name 不轉 upper 因為中文 .upper() 是 noop;舊 SQL 用 like(case-sensitive)
             matched.append(e)
 
-    # 三層排序(stable sort):
-    # 1. 完全相等最前
-    # 2. prefix 配對次之
-    # 3. 字母順
+    # 4 層排序(stable sort by tuple)
+    # tier 1:code 完全相等最前
+    # tier 2:code 開頭
+    # tier 3:name 開頭(code_only=1 時 name 不會匹配,本層自然失效)
+    # tier 4:contains catch-all(已被前 3 層吃掉的不會到這)
+    # 末層:字母順
     def _sort_key(e):
         code_u = e["code_upper"]
-        return (0 if code_u == keyword else 1,
-                0 if code_u.startswith(keyword) else 1,
-                code_u)
+        name = e["name"] or ""
+        return (
+            0 if code_u == keyword else 1,
+            0 if code_u.startswith(keyword) else 1,
+            0 if name.startswith(keyword_raw) else 1,
+            code_u,
+        )
     matched.sort(key=_sort_key)
+    total = len(matched)
     chosen = matched[:limit]
+    truncated = total > limit
 
-    # 紀律 #16 — search_log: 紀錄真實搜尋(非空 q)+ 命中筆數,bot 過濾
-    _log_search(q.strip(), len(chosen), ua=request.headers.get("user-agent"))
+    # 紀律 #16 — search_log: 紀錄真實搜尋(non-empty q)+ 命中筆數,bot 過濾
+    _log_search(keyword_raw, total, ua=request.headers.get("user-agent"))
 
     return {
         "q": q,
         "items": [{"code": e["code"], "name": e["name"],
                    "category": e["category"], "category_label": e["category_label"]}
                   for e in chosen],
+        "total": total,
+        "truncated": truncated,
+        "min_chars": MIN_CHARS,
+        "hint": "找不到?請輸入更多字縮小範圍" if truncated else None,
     }
 
 

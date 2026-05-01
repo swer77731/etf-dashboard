@@ -581,6 +581,7 @@
 
     <script>
       // 全站 ETF 搜尋 — sidebar / mobile bar 共用
+      // 統一規範(2026-05-01):≥ 2 字觸發、limit 8、debounce 150ms、truncated hint
       function globalEtfSearch() {
         return {
           query: '',
@@ -589,26 +590,38 @@
           suggestions: [],
           activeIdx: -1,
           cache: {},
+          truncated: false,
+          minCharsHint: '',
           init() {},
           async ensure() {
-            if (this.suggestions.length === 0) await this.fetch();
+            if (this.suggestions.length === 0 && this.query.trim().length >= 2) await this.fetch();
           },
           async fetch() {
             const q = this.query.trim();
+            // 統一規範:< 2 字不打 API,前端直接清 + 提示
+            if (q.length < 2) {
+              this.suggestions = []; this.activeIdx = -1; this.truncated = false;
+              this.minCharsHint = q.length > 0 ? '請輸入至少 2 個字' : '';
+              return;
+            }
+            this.minCharsHint = '';
             if (this.cache[q]) {
-              this.suggestions = this.cache[q];
+              const cached = this.cache[q];
+              this.suggestions = cached.items;
+              this.truncated = cached.truncated;
               this.activeIdx = this.suggestions.length > 0 ? 0 : -1;
               return;
             }
             this.loading = true;
             try {
-              const r = await fetch(`/api/etf/search?q=${encodeURIComponent(q)}&limit=20`);
+              const r = await fetch(`/api/etf/search?q=${encodeURIComponent(q)}&limit=8`);
               const d = await r.json();
               this.suggestions = d.items || [];
-              this.cache[q] = this.suggestions;
+              this.truncated = !!d.truncated;
+              this.cache[q] = { items: this.suggestions, truncated: this.truncated };
               this.activeIdx = this.suggestions.length > 0 ? 0 : -1;
             } catch (e) {
-              this.suggestions = []; this.activeIdx = -1;
+              this.suggestions = []; this.activeIdx = -1; this.truncated = false;
             } finally {
               this.loading = false;
             }

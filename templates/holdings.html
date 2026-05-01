@@ -178,13 +178,13 @@
       <input type="text"
              x-model="query"
              @focus="open=true; ensure()"
-             @input.debounce.180ms="fetch()"
+             @input.debounce.150ms="fetch()"
              @keydown.down.prevent="moveActive(1)"
              @keydown.up.prevent="moveActive(-1)"
              @keydown.enter.prevent="onEnter()"
              @keydown.escape="open=false"
              @keydown.backspace="onBackspace()"
-             :placeholder="codes.length === 0 ? '輸入 ETF 代號(例:0050)' : '繼續加入'"
+             :placeholder="codes.length === 0 ? '輸入代號或名稱(例:0050、元大)' : '繼續加入'"
              :disabled="codes.length >= 3"
              class="flex-1 min-w-[180px] bg-transparent px-1.5 py-1 text-base text-fg outline-none placeholder:text-muted/60 disabled:opacity-50">
     </div>
@@ -192,6 +192,7 @@
     <div x-show="open && (suggestions.length > 0 || loading || query)" x-cloak
          x-transition.opacity.duration.150ms class="picker-suggest">
       <div x-show="loading" class="px-3 py-3 text-sm text-muted">搜尋中…</div>
+      <div x-show="!loading && minCharsHint" class="px-3 py-3 text-sm text-muted" x-text="minCharsHint"></div>
       <ul x-show="!loading && suggestions.length > 0">
         <template x-for="(s, idx) in suggestions" :key="s.code">
           <li>
@@ -210,8 +211,12 @@
           </li>
         </template>
       </ul>
-      <div x-show="!loading && suggestions.length === 0 && query"
-           class="px-3 py-3 text-sm text-muted">找不到符合的 ETF</div>
+      <div x-show="!loading && truncated"
+           class="px-3 py-2 text-xs text-muted border-t border-border bg-bg-soft/50">
+        找不到?請輸入更多字縮小範圍
+      </div>
+      <div x-show="!loading && !minCharsHint && suggestions.length === 0 && query.trim().length >= 2"
+           class="px-3 py-3 text-sm text-muted">找不到符合「<span x-text="query"></span>」的 ETF</div>
     </div>
   </div>
 
@@ -400,6 +405,8 @@ function holdingsPicker(opts) {
     suggestions: [],
     activeIdx: -1,
     cache: {},
+    truncated: false,
+    minCharsHint: '',
     holdings: [],     // [{code, name, holdings: [{rank, stock_code, stock_name, weight, sector}]}]
     changes: [],      // [{code, name, latest_date, previous_date, days, buy: [...], sell: [...], new: [...]}]
     data_loading: false,
@@ -414,25 +421,36 @@ function holdingsPicker(opts) {
       window.location = `/holdings?codes=${codesParam}&days=${d}`;
     },
 
-    // === picker ===
+    // === picker(統一規範:≥ 2 字、limit 8、debounce 150ms、truncated hint)===
     isSelected(code) { return this.codes.some(c => c.code === code); },
-    async ensure() { if (this.suggestions.length === 0) await this.fetch(); },
+    async ensure() {
+      if (this.suggestions.length === 0 && this.query.trim().length >= 2) await this.fetch();
+    },
     async fetch() {
       const q = this.query.trim();
+      if (q.length < 2) {
+        this.suggestions = []; this.activeIdx = -1; this.truncated = false;
+        this.minCharsHint = q.length > 0 ? '請輸入至少 2 個字' : '';
+        return;
+      }
+      this.minCharsHint = '';
       if (this.cache[q]) {
-        this.suggestions = this.cache[q];
+        const cached = this.cache[q];
+        this.suggestions = cached.items;
+        this.truncated = cached.truncated;
         this.activeIdx = this.suggestions.length > 0 ? 0 : -1;
         return;
       }
       this.loading = true;
       try {
-        const r = await window.fetch(`/api/etf/search?q=${encodeURIComponent(q)}&limit=20&code_only=1`);
+        const r = await window.fetch(`/api/etf/search?q=${encodeURIComponent(q)}&limit=8`);
         const d = await r.json();
         this.suggestions = d.items || [];
-        this.cache[q] = this.suggestions;
+        this.truncated = !!d.truncated;
+        this.cache[q] = { items: this.suggestions, truncated: this.truncated };
         this.activeIdx = this.suggestions.length > 0 ? 0 : -1;
       } catch (e) {
-        this.suggestions = [];
+        this.suggestions = []; this.activeIdx = -1; this.truncated = false;
       } finally {
         this.loading = false;
       }

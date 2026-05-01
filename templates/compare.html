@@ -224,23 +224,24 @@
           <input type="text"
                  x-model="query"
                  @focus="open=true; ensureSuggestions()"
-                 @input.debounce.180ms="fetchSuggestions()"
+                 @input.debounce.150ms="fetchSuggestions()"
                  @keydown.down.prevent="moveActive(1)"
                  @keydown.up.prevent="moveActive(-1)"
                  @keydown.enter.prevent="onEnter()"
                  @keydown.escape="open=false"
                  @keydown.backspace="onBackspace()"
-                 :placeholder="codes.length === 0 ? '輸入 ETF 代號數字,例如 0050、00878' : '繼續加入(輸入代號數字)'"
+                 :placeholder="codes.length === 0 ? '輸入代號或名稱(例如 0050、元大)' : '繼續加入'"
                  :disabled="codes.length >= 6"
                  class="flex-1 min-w-[180px] bg-transparent px-1.5 py-1 text-base text-fg outline-none placeholder:text-muted/60 disabled:opacity-50" />
         </div>
 
-        {# 建議下拉(@click.outside 不放這,放父層 picker-shell 上)#}
-        <div x-show="open && (suggestions.length > 0 || loading)" x-cloak
+        {# 建議下拉 #}
+        <div x-show="open && (suggestions.length > 0 || loading || query)" x-cloak
              x-transition.opacity.duration.150ms
              class="picker-suggest">
           <div x-show="loading" class="px-3 py-3 text-sm text-muted">搜尋中…</div>
-          <ul x-show="!loading">
+          <div x-show="!loading && minCharsHint" class="px-3 py-3 text-sm text-muted" x-text="minCharsHint"></div>
+          <ul x-show="!loading && suggestions.length > 0">
             <template x-for="(s, idx) in suggestions" :key="s.code">
               <li>
                 <button type="button"
@@ -259,7 +260,11 @@
               </li>
             </template>
           </ul>
-          <div x-show="!loading && suggestions.length === 0 && query"
+          <div x-show="!loading && truncated"
+               class="px-3 py-2 text-xs text-muted border-t border-border bg-bg-soft/50">
+            找不到?請輸入更多字縮小範圍
+          </div>
+          <div x-show="!loading && !minCharsHint && suggestions.length === 0 && query.trim().length >= 2"
                class="px-3 py-3 text-sm text-muted">找不到符合「<span x-text="query"></span>」的 ETF</div>
         </div>
       </div>
@@ -497,6 +502,8 @@
       suggestions: [],
       activeIdx: -1,
       cache: {},
+      truncated: false,         // 規範:命中 > 8 顯示 hint
+      minCharsHint: '',         // 規範:< 2 字提示
       // dates
       startISO: opts.initialStart,
       endISO:   opts.initialEnd,
@@ -599,22 +606,31 @@
 
       async fetchSuggestions() {
         const q = this.query.trim();
+        // 統一規範(2026-05-01):< 2 字不打 API
+        if (q.length < 2) {
+          this.suggestions = []; this.activeIdx = -1; this.truncated = false;
+          this.minCharsHint = q.length > 0 ? '請輸入至少 2 個字' : '';
+          return;
+        }
+        this.minCharsHint = '';
         if (this.cache[q]) {
-          this.suggestions = this.cache[q];
+          const cached = this.cache[q];
+          this.suggestions = cached.items;
+          this.truncated = cached.truncated;
           this.activeIdx = this.suggestions.length > 0 ? 0 : -1;
           return;
         }
         this.loading = true;
         try {
-          // code_only=1 → 只比對代號數字,排除名稱模糊搜尋(user 紀律)
-          const res = await fetch(`/api/etf/search?q=${encodeURIComponent(q)}&limit=20&code_only=1`);
+          // 統一規範:limit=8,代號 + 名稱都搜(不再傳 code_only=1)
+          const res = await fetch(`/api/etf/search?q=${encodeURIComponent(q)}&limit=8`);
           const data = await res.json();
           this.suggestions = data.items || [];
-          this.cache[q] = this.suggestions;
+          this.truncated = !!data.truncated;
+          this.cache[q] = { items: this.suggestions, truncated: this.truncated };
           this.activeIdx = this.suggestions.length > 0 ? 0 : -1;
         } catch (e) {
-          this.suggestions = [];
-          this.activeIdx = -1;
+          this.suggestions = []; this.activeIdx = -1; this.truncated = false;
         } finally {
           this.loading = false;
         }
