@@ -347,8 +347,12 @@
   }
   .dca-fadein { animation: dca-fadein-fast 0.18s ease-out; }
 
-  /* === 圖表 container 高度 === */
-  .dca-chart-box { height: 320px; }
+  /* === 圖表 container 高度 + 強制寬度 === */
+  .dca-chart-box {
+    height: 320px;
+    width: 100%;          /* 防 ECharts init 時 container 寬度未定 */
+    min-width: 0;
+  }
   @media (min-width: 768px) { .dca-chart-box { height: 360px; } }
 
   /* === HTML legend(不靠 ECharts;100% 不會跟 chart 搶空間)=== */
@@ -1075,9 +1079,6 @@ function dcaApp() {
         investedSeries.push(Math.round(monthlyInvest * i));
       }
 
-      const cloudBaseSeries = p5Series;
-      const cloudDiffSeries = p95Series.map((v, i) => Math.max(0, v - p5Series[i]));
-
       const isDark = document.documentElement.dataset.theme !== 'light';
       const fgColor   = isDark ? '#e5e7eb' : '#1a1a1a';
       const mutedCol  = isDark ? '#9ca3af' : '#5a5a5a';
@@ -1153,30 +1154,21 @@ function dcaApp() {
           },
         },
         series: [
-          // 拿掉 silent: true(會擋 zrender axisPointer 觸發,讓 hover tooltip 不 fire)
-          // tooltip.show: false 仍會把這兩個 series 從 formatter params 過濾掉
-          { name: '__cloud_base', type: 'line', stack: 'cloud',
-            data: cloudBaseSeries,
-            symbol: 'none', lineStyle: { opacity: 0 },
-            tooltip: { show: false },
-          },
-          { name: '__cloud_diff', type: 'line', stack: 'cloud',
-            data: cloudDiffSeries,
-            symbol: 'none', lineStyle: { opacity: 0 },
-            areaStyle: { color: 'rgba(148, 163, 184, 0.18)' },
-            tooltip: { show: false },
-          },
-          { name: '較差', type: 'line', data: p5Series,
+          // Plan B:廢掉雲區 stack 系列(stack 機制 + 透明線會擋 axisPointer 觸發),
+          // 只留 4 條線。3 條情境線就足以視覺區分,fan band 視覺由 P5/P95 圍出來
+          { name: '較好', type: 'line', data: p95Series,
             symbol: 'none', smooth: true,
-            lineStyle: { color: '#ef4444', width: 1.2, type: 'dashed' },
+            lineStyle: { color: '#10b981', width: 1.6, type: 'dashed' },
+            // areaStyle 連到 P5 形成 fan band 視覺替代
+            areaStyle: { color: 'rgba(148, 163, 184, 0.12)', origin: 'start' },
           },
           { name: '中位', type: 'line', data: p50Series,
             symbol: 'none', smooth: true,
             lineStyle: { color: '#3b82f6', width: 2.4 },
           },
-          { name: '較好', type: 'line', data: p95Series,
+          { name: '較差', type: 'line', data: p5Series,
             symbol: 'none', smooth: true,
-            lineStyle: { color: '#10b981', width: 1.2, type: 'dashed' },
+            lineStyle: { color: '#ef4444', width: 1.6, type: 'dashed' },
           },
           { name: '投入', type: 'line', data: investedSeries,
             symbol: 'none', smooth: false,
