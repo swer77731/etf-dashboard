@@ -1050,7 +1050,11 @@ function dcaApp() {
       // 第一次:init;之後 setOption 重用
       if (!this.chart) {
         this.chart = echarts.init(el, null, { renderer: 'canvas' });
+        // 三層 resize 防護(手機版第一次 render container 寬度還沒 layout 完整)
         window.addEventListener('resize', () => this.chart && this.chart.resize());
+        if (typeof ResizeObserver !== 'undefined') {
+          new ResizeObserver(() => this.chart && this.chart.resize()).observe(el);
+        }
       } else {
         this.chart.clear();
       }
@@ -1149,14 +1153,16 @@ function dcaApp() {
           },
         },
         series: [
+          // 拿掉 silent: true(會擋 zrender axisPointer 觸發,讓 hover tooltip 不 fire)
+          // tooltip.show: false 仍會把這兩個 series 從 formatter params 過濾掉
           { name: '__cloud_base', type: 'line', stack: 'cloud',
             data: cloudBaseSeries,
-            symbol: 'none', lineStyle: { opacity: 0 }, silent: true,
+            symbol: 'none', lineStyle: { opacity: 0 },
             tooltip: { show: false },
           },
           { name: '__cloud_diff', type: 'line', stack: 'cloud',
             data: cloudDiffSeries,
-            symbol: 'none', lineStyle: { opacity: 0 }, silent: true,
+            symbol: 'none', lineStyle: { opacity: 0 },
             areaStyle: { color: 'rgba(148, 163, 184, 0.18)' },
             tooltip: { show: false },
           },
@@ -1180,6 +1186,8 @@ function dcaApp() {
       };
 
       this.chart.setOption(option, { notMerge: true });
+      // 兜底:200ms 後再 resize 一次,防 mobile container 第一次 layout 寬度不對
+      setTimeout(() => this.chart && this.chart.resize(), 200);
     },
 
     // === 格式化 ===
