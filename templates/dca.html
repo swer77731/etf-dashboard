@@ -1054,11 +1054,6 @@ function dcaApp() {
       // 第一次:init;之後 setOption 重用
       if (!this.chart) {
         this.chart = echarts.init(el, null, { renderer: 'canvas' });
-        // 三層 resize 防護(手機版第一次 render container 寬度還沒 layout 完整)
-        window.addEventListener('resize', () => this.chart && this.chart.resize());
-        if (typeof ResizeObserver !== 'undefined') {
-          new ResizeObserver(() => this.chart && this.chart.resize()).observe(el);
-        }
       } else {
         this.chart.clear();
       }
@@ -1178,8 +1173,23 @@ function dcaApp() {
       };
 
       this.chart.setOption(option, { notMerge: true });
-      // 兜底:200ms 後再 resize 一次,防 mobile container 第一次 layout 寬度不對
-      setTimeout(() => this.chart && this.chart.resize(), 200);
+
+      // === 強制重算尺寸 — 多重保險 ===
+      const chart = this.chart;
+      setTimeout(() => chart.resize(), 50);
+      setTimeout(() => chart.resize(), 200);
+      setTimeout(() => chart.resize(), 500);
+
+      // 視窗變化監聽
+      if (!this._resizeBound) {
+        window.addEventListener('resize', () => chart.resize());
+        // 容器尺寸變化監聽(最關鍵 — 處理初始 layout 抖動)
+        if (window.ResizeObserver) {
+          const ro = new ResizeObserver(() => chart.resize());
+          ro.observe(document.getElementById('dca-chart'));
+        }
+        this._resizeBound = true;
+      }
     },
 
     // === 格式化 ===
