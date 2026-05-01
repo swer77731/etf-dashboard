@@ -1267,6 +1267,22 @@ etf_dashboard/
 
 # 🌟 未來規劃(優先級排序)
 
+## 📌 TODO(2026-05-01 收工)
+
+### Tooltip hover bug — 桌面 hover chart 沒觸發 formatter
+- 現象:`/dca` 桌面 hover chart 線條,tooltip DOM 有 render(`display:block`、空字串)但 formatter 沒被呼叫
+- playwright probe 確認:`dispatchAction({type:'showTip'})` 能成功 fire formatter,**只有 mouse hover 不 fire**
+- 候選 root cause:雲區兩個 `__cloud_*` series 加 `silent: true` + stack 機制干擾 zrender axisPointer
+- 已 attempt:Plan A(拿掉 silent)、Plan B(廢雲區改 areaStyle.origin:'start')— 都未解
+- 下次切點:檢查 `series` 順序與 `tooltip.show:false` per-series 是否仍干擾、或試完全不同的 chart 結構
+
+### 整站瘦身計畫 ⭐ 優先做(解 race condition 根源)
+- **Tailwind CDN 本地化**(改用 npm build 出 CSS,避免運行時 fetch + flash)
+- **ECharts 按需引入**(只 import 需要的 chart type 模組,目前用全包 ~900KB)
+- 解掉:Tailwind CDN 太晚 load → 容器 width 還沒 layout 完整 → ECharts init 抓錯尺寸 → 圖表變形
+- 連帶解:整站 first paint 速度、Lighthouse 分數
+- 工程量 ~1 天,值得做(踩坑 2026-05-01 user 連續抱怨手機 chart init 變形)
+
 ## 🥇 一級殺手鐧:ETF 穿透鏡(Look-Through Analysis)
 
 > 「鎮店之寶,別人懶得做我們做。台灣首家穿透分析,SEO + 口碑載體價值極高。」— user 原話

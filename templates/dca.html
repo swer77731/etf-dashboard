@@ -1051,6 +1051,13 @@ function dcaApp() {
       const el = document.getElementById('dca-chart');
       if (!el || typeof echarts === 'undefined') return;
 
+      // race condition 防護:容器寬度還沒 layout 完成 → 100ms 後 retry
+      // (手機版 + Tailwind CDN + Alpine x-show 切 display 共同造成)
+      if (el.clientWidth < 100) {
+        setTimeout(() => this.renderChart(totalMonths, invested, p95End, p50End, p5End), 100);
+        return;
+      }
+
       // 第一次:init;之後 setOption 重用
       if (!this.chart) {
         this.chart = echarts.init(el, null, { renderer: 'canvas' });
