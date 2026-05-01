@@ -615,6 +615,10 @@
             :disabled="!canSimulate() || metaLoading"
             @click="runSimulation()"
             x-text="metaLoading ? '讀取 ETF 資料…' : '開始模擬'"></button>
+    <div x-show="!canSimulate() && !metaLoading" x-cloak
+         class="text-center mt-2"
+         style="font-size: 12px; color: rgb(var(--c-muted));"
+         x-text="!selectedEtf ? '請先選擇 ETF 與模擬期間' : (!years ? '請先選擇模擬期間' : '請完成所有欄位')"></div>
   </div>
 
   {# 區塊 4:試算結果 #}
@@ -829,8 +833,8 @@ function dcaApp() {
     payDays: [15],
     dateModalOpen: false,
 
-    // 期間 / 股息
-    years: 5,
+    // 期間 / 股息(years 預設 null,user 必須主動點才能模擬)
+    years: null,
     dividendMode: 'reinvest',
 
     // 結果
@@ -1092,23 +1096,28 @@ function dcaApp() {
         // legend 改用 HTML(.dca-chart-legend),這裡不留 legend 空間
         grid: { left: 56, right: 15, top: 12, bottom: 30, containLabel: false },
         tooltip: {
+          // TODO(2026-05-01):桌面 hover chart 沒觸發 formatter 被呼叫,probe 確認:
+          //   - tooltip option 設定全對(show:true / trigger:axis / 5.5.1 支援)
+          //   - tooltip DOM 容器有 render(display:block)但 innerText=''
+          //   - formatter calls=0 during mouse hover,但 dispatchAction({type:'showTip'}) 能 work
+          // 推測 silent: true on cloud series 或 series 順序讓 zrender axisPointer
+          // 不 fire on canvas hover。明天再 dig。
+          show: true,
           trigger: 'axis',
           axisPointer: {
-            type: 'line',                                  // 單條垂直虛線,不留殘影
+            type: 'line',
             lineStyle: {
               color: 'rgba(255, 255, 255, 0.3)',
               width: 1,
               type: 'dashed',
             },
           },
-          // 拿掉 confine: true(會在某些佈局下讓桌面 tooltip 不顯示)
-          appendToBody: true,                              // tooltip 跳出 chart container,不被遮
           backgroundColor: 'rgba(20, 20, 20, 0.95)',
           borderColor: 'rgba(255, 255, 255, 0.2)',
           borderWidth: 1,
           padding: [8, 12],
           textStyle: { color: '#fff', fontSize: 12 },
-          extraCssText: 'box-shadow: 0 4px 16px rgba(0,0,0,0.4); z-index: 9999;',
+          extraCssText: 'box-shadow: 0 4px 16px rgba(0,0,0,0.4);',
           formatter: (params) => {
             const yearLabel = params[0].axisValueLabel || params[0].name || '';
             const visible = params.filter(p =>
