@@ -14,9 +14,11 @@
 """
 from __future__ import annotations
 
+import csv
 import logging
 from collections import defaultdict
 from datetime import date, datetime, timezone
+from pathlib import Path
 from typing import Iterable
 
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -31,12 +33,42 @@ SYNC_SOURCE = "yearly_returns_sync"
 logger = logging.getLogger(__name__)
 
 
-# 14 支 user 指定追蹤(對齊 perf_bot 名單)
-TRACKED_ETF_CODES = (
+# 80 支熱門名單從 data/etf_universe_top80.csv 讀(由 build_etf_universe.py 產出)
+# CSV missing → fallback 14 支精選(避免冷啟動爆 cron)
+_FALLBACK_CODES = (
     "00981A", "00992A", "00985A", "00982A", "00984A", "00935",
     "0050",   "0052",   "009816", "0056",   "00878",  "00713",
     "006208", "00919",
 )
+_CSV_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "etf_universe_top80.csv"
+
+
+def load_tracked_codes() -> tuple[str, ...]:
+    """從 data/etf_universe_top80.csv 載入 stock_id 清單。
+
+    CSV 不存在 / 讀失敗 → 回 fallback 14 支精選。
+    """
+    if not _CSV_PATH.exists():
+        logger.warning(
+            "[yearly_returns] CSV not found (%s) — using fallback 14 codes",
+            _CSV_PATH,
+        )
+        return _FALLBACK_CODES
+    try:
+        with _CSV_PATH.open(encoding="utf-8-sig") as f:
+            rows = list(csv.DictReader(f))
+        codes = tuple(r["stock_id"].strip() for r in rows if r.get("stock_id"))
+        if not codes:
+            logger.warning("[yearly_returns] CSV empty — using fallback")
+            return _FALLBACK_CODES
+        return codes
+    except Exception:
+        logger.exception("[yearly_returns] CSV load failed — using fallback")
+        return _FALLBACK_CODES
+
+
+# 兼容舊呼叫 — 保留 TRACKED_ETF_CODES 屬性
+TRACKED_ETF_CODES = load_tracked_codes()
 
 HISTORY_YEARS = 10   # 最多回看 10 年
 
@@ -159,7 +191,8 @@ def sync_all(codes: Iterable[str] | None = None, today: date | None = None) -> d
     """
     finmind.log_quota("before yearly_returns sync_all")
 
-    codes = list(codes) if codes is not None else list(TRACKED_ETF_CODES)
+    # 每次呼叫動態讀 CSV(scheduler / cron 才能即時拿到新增 ETF)
+    codes = list(codes) if codes is not None else list(load_tracked_codes())
     expected = len(codes)
     actual = 0
     missing: list[str] = []

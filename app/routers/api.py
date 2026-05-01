@@ -509,3 +509,126 @@ async def get_ranking(
     # dataclass 不能直接 JSON serialize → 轉 dict
     result["rows"] = [r.__dict__ for r in result["rows"]]
     return result
+
+
+# ============================================================
+# DCA 試算器 — etf_list / etf_meta API
+# ============================================================
+import csv as _csv
+from pathlib import Path as _Path
+
+_DCA_CSV_PATH = _Path(__file__).resolve().parent.parent.parent / "data" / "etf_universe_top80.csv"
+_DCA_ETF_CACHE: list[dict] = []          # CSV 內容(啟動讀一次,5 分鐘 refresh)
+_DCA_ETF_EXPIRES: float = 0.0
+_DCA_ETF_TTL = 300.0
+_DCA_META_CACHE: dict[str, tuple[float, dict]] = {}   # code → (expires, payload)
+_DCA_META_TTL = 300.0
+
+
+def _load_dca_etf_list() -> list[dict]:
+    """讀 etf_universe_top80.csv,5 分鐘 in-memory cache。"""
+    global _DCA_ETF_EXPIRES
+    now = _time.monotonic()
+    if _DCA_ETF_CACHE and now < _DCA_ETF_EXPIRES:
+        return _DCA_ETF_CACHE
+    if not _DCA_CSV_PATH.exists():
+        return []
+    rows: list[dict] = []
+    with _DCA_CSV_PATH.open(encoding="utf-8-sig") as f:
+        for r in _csv.DictReader(f):
+            rows.append({
+                "stock_id": (r.get("stock_id") or "").strip(),
+                "stock_name": (r.get("stock_name") or "").strip(),
+                "etf_type": (r.get("etf_type") or "equity").strip(),
+            })
+    _DCA_ETF_CACHE.clear()
+    _DCA_ETF_CACHE.extend(rows)
+    _DCA_ETF_EXPIRES = now + _DCA_ETF_TTL
+    return _DCA_ETF_CACHE
+
+
+@router.get("/dca/etf_list")
+async def dca_etf_list(
+    q: str = Query("", description="搜尋字串(代號或名稱),空字串 = 回前 8 支熱門"),
+    limit: int = Query(8, ge=1, le=20),
+) -> dict:
+    """DCA 試算器 ETF picker 用 — 服務端搜尋,只回前 N 筆。
+
+    輸入 < 2 字 → 回 hint,不查
+    搜尋 case-insensitive,代號 prefix 優先於名稱 contains
+    回傳每筆只含 stock_id / stock_name / etf_type(精簡 DOM)
+    """
+    full = _load_dca_etf_list()
+    qstr = (q or "").strip()
+    if not qstr:
+        # 空 query → 回前 N 支熱門(CSV 已按股東人數排序)
+        rows = full[:limit]
+        return {"rows": rows, "truncated": len(full) > limit, "total": len(full), "hint": ""}
+    if len(qstr) < 2:
+        return {"rows": [], "truncated": False, "total": 0, "hint": "請輸入至少 2 個字"}
+
+    qu = qstr.upper()
+    code_prefix: list[dict] = []
+    code_contains: list[dict] = []
+    name_contains: list[dict] = []
+    for e in full:
+        sid = e["stock_id"].upper()
+        nm = e["stock_name"]
+        if sid.startswith(qu):
+            code_prefix.append(e)
+        elif qu in sid:
+            code_contains.append(e)
+        elif qstr in nm:
+            name_contains.append(e)
+    merged = code_prefix + code_contains + name_contains
+    rows = merged[:limit]
+    if not rows:
+        return {"rows": [], "truncated": False, "total": 0,
+                "hint": f"找不到符合「{qstr}」的 ETF"}
+    return {
+        "rows": rows,
+        "truncated": len(merged) > limit,
+        "total": len(merged),
+        "hint": "",
+    }
+
+
+@router.get("/dca/etf_meta")
+async def dca_etf_meta(code: str = Query(..., min_length=1)) -> dict:
+    """DCA 試算器選中 ETF 後 — 取完整元資訊(complete_years / 警示 flag)。
+
+    5 分鐘 in-memory cache(SQL 重複查回 cached payload)。
+    """
+    code = code.strip()
+    now = _time.monotonic()
+    cached = _DCA_META_CACHE.get(code)
+    if cached and cached[0] > now:
+        return cached[1]
+
+    full = _load_dca_etf_list()
+    entry = next((e for e in full if e["stock_id"] == code), None)
+    if not entry:
+        raise HTTPException(404, f"ETF {code} not in DCA whitelist")
+
+    # 查 etf_yearly_returns complete_years(is_partial=0)
+    with session_scope() as s:
+        n = s.execute(
+            text(
+                "SELECT COUNT(*) FROM etf_yearly_returns "
+                "WHERE etf_code = :c AND is_partial = 0"
+            ),
+            {"c": code},
+        ).scalar() or 0
+    cy = int(n)
+    etype = entry["etf_type"]
+    payload = {
+        "stock_id": entry["stock_id"],
+        "stock_name": entry["stock_name"],
+        "etf_type": etype,
+        "complete_years": cy,
+        "is_data_insufficient": cy < 3,
+        "has_leverage_warning": etype == "leverage",
+        "has_commodity_warning": etype == "commodity",
+    }
+    _DCA_META_CACHE[code] = (now + _DCA_META_TTL, payload)
+    return payload

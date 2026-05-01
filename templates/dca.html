@@ -4,38 +4,39 @@
 
 {% block head %}
 <style>
-  /* === DCA 頁專屬主色:橘 #EF9F27(對齊配息計算器)=== */
+  /* === DCA 頁專屬主色 === */
   .dca-page {
-    --c-orange: 239 159 39;        /* #EF9F27 */
+    --c-orange: 239 159 39;
     --c-orange-deep: 180 110 12;
-    --c-cloud-fill: 148 163 184;   /* slate-400(雲填充)*/
-    --c-warn-bg: 245 158 11;       /* amber-500 */
+    --c-cloud-fill: 148 163 184;
+    --c-warn-bg: 245 158 11;
+    --c-danger: 239 68 68;
   }
 
-  /* === 頂部警示橫條 === */
+  /* === 頂部警示 === */
   .dca-top-warn {
     background: rgb(var(--c-warn-bg) / 0.12);
     border: 1px solid rgb(var(--c-warn-bg) / 0.45);
     border-radius: 0.55rem;
-    padding: 0.75rem 1rem;
+    padding: 0.7rem 0.95rem;
     color: rgb(252 211 77);
-    font-size: 0.85rem;
-    line-height: 1.6;
-    display: flex; align-items: flex-start; gap: 0.6rem;
-    margin-bottom: 1.25rem;
+    font-size: 13px;
+    line-height: 1.55;
+    display: flex; align-items: flex-start; gap: 0.5rem;
+    margin-bottom: 1rem;
   }
-  @media (min-width: 640px) { .dca-top-warn { font-size: 0.9rem; } }
-  .dca-top-warn svg { width: 1.1rem; height: 1.1rem; flex-shrink: 0; margin-top: 2px; color: rgb(245 158 11); }
+  @media (min-width: 768px) { .dca-top-warn { font-size: 14px; padding: 0.75rem 1rem; } }
+  .dca-top-warn svg { width: 1.05rem; height: 1.05rem; flex-shrink: 0; margin-top: 2px; color: rgb(245 158 11); }
 
   /* === 卡片 === */
   .dca-card {
     background: rgb(var(--c-card));
     border: 1px solid rgb(var(--c-border));
-    border-radius: 0.7rem;
-    padding: 1.1rem 1.2rem;
+    border-radius: 0.6rem;
+    padding: 0.95rem 1rem;
     margin-bottom: 1rem;
   }
-  @media (min-width: 640px) { .dca-card { padding: 1.4rem 1.5rem; } }
+  @media (min-width: 768px) { .dca-card { padding: 1.4rem 1.5rem; } }
   .dca-card-title {
     font-size: 1rem;
     font-weight: 700;
@@ -46,34 +47,36 @@
   .dca-card-title::before {
     content: "";
     display: inline-block;
-    width: 3px; height: 1.1rem;
+    width: 3px; height: 1.05rem;
     background: rgb(var(--c-orange));
     border-radius: 1.5px;
   }
-  .dca-field { margin-bottom: 1.2rem; }
+  .dca-field { margin-bottom: 1rem; }
   .dca-field:last-child { margin-bottom: 0; }
   .dca-label {
     display: block;
-    font-size: 0.88rem;
+    font-size: 14px;
     font-weight: 600;
     color: rgb(var(--c-fg) / 0.95);
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.45rem;
   }
   .dca-hint {
-    font-size: 0.75rem;
+    font-size: 12px;
     color: rgb(var(--c-muted));
-    margin-top: 0.35rem;
-    line-height: 1.5;
+    margin-top: 0.3rem;
+    line-height: 1.45;
   }
 
-  /* === ETF picker(內建,白名單前端過濾)=== */
+  /* === ETF picker === */
   .dca-etf-shell {
     position: relative;
     background: rgb(var(--c-bg-soft));
     border: 2px dashed rgb(var(--c-orange) / 0.5);
     border-radius: 0.5rem;
-    padding: 0.5rem 0.6rem;
-    transition: border 0.15s;
+    padding: 0.45rem 0.55rem;
+  }
+  @media (min-width: 768px) {
+    .dca-etf-shell { transition: border-color 0.12s; }
   }
   .dca-etf-shell:focus-within {
     border-style: solid;
@@ -86,49 +89,61 @@
     border: 0;
     outline: none;
     color: rgb(var(--c-fg));
-    font-size: 1rem;
+    font-size: 16px;       /* iOS 不 zoom */
     padding: 0.35rem 0.3rem;
   }
   .dca-etf-chip {
-    display: inline-flex; align-items: center; gap: 0.45rem;
+    display: inline-flex; align-items: center; gap: 0.4rem;
     padding: 0.4rem 0.7rem;
     border-radius: 0.45rem;
     background: rgb(var(--c-orange) / 0.18);
     border: 1px solid rgb(var(--c-orange) / 0.55);
     color: rgb(var(--c-orange));
-    font-size: 0.95rem;
+    font-size: 15px;
+    max-width: 100%;
   }
   .dca-etf-chip-x {
     width: 1.05rem; height: 1.05rem;
     border-radius: 9999px;
     display: inline-flex; align-items: center; justify-content: center;
     cursor: pointer;
-    transition: background 0.12s;
+    flex-shrink: 0;
   }
-  .dca-etf-chip-x:hover { background: rgb(var(--c-orange) / 0.35); }
   .dca-etf-suggest {
     position: absolute; top: 100%; left: 0; right: 0;
-    margin-top: 0.5rem;
+    margin-top: 0.4rem;
     background: rgb(var(--c-card));
     border: 1px solid rgb(var(--c-border));
     border-radius: 0.45rem;
-    box-shadow: 0 12px 36px -8px rgba(0,0,0,0.5);
-    max-height: 18rem; overflow-y: auto;
+    box-shadow: 0 12px 36px -8px rgba(0,0,0,0.4);
+    max-height: 17rem; overflow-y: auto;
     z-index: 30;
   }
   .dca-etf-row {
     width: 100%; text-align: left;
-    padding: 0.6rem 0.85rem;
-    display: flex; justify-content: space-between; gap: 0.75rem;
-    transition: background 0.1s;
+    min-height: 44px;            /* mobile tap target */
+    padding: 0.55rem 0.85rem;
+    display: flex; flex-direction: column; gap: 0.15rem;
     cursor: pointer; background: transparent; border: 0;
   }
   .dca-etf-row:hover, .dca-etf-row.is-active { background: rgb(var(--c-orange) / 0.1); }
-
-  /* === 金額 input + ± === */
-  .dca-amt-row {
-    display: flex; align-items: stretch; gap: 0.4rem;
+  .dca-etf-row-main {
+    display: flex; align-items: baseline; gap: 0.55rem;
+    flex-wrap: wrap;
   }
+  .dca-etf-row-warn {
+    font-size: 11px;
+    color: rgb(var(--c-danger));
+  }
+  .dca-chip-insufficient {
+    margin-top: 0.5rem;
+    font-size: 13px;
+    color: rgb(var(--c-danger));
+    line-height: 1.5;
+  }
+
+  /* === 金額 === */
+  .dca-amt-row { display: flex; align-items: stretch; gap: 0.4rem; }
   .dca-amt-btn {
     width: 2.6rem; height: 2.6rem;
     background: rgb(var(--c-bg-soft));
@@ -137,12 +152,7 @@
     color: rgb(var(--c-fg));
     font-size: 1.3rem; font-weight: 700;
     cursor: pointer;
-    transition: all 0.12s;
     -webkit-tap-highlight-color: transparent;
-  }
-  .dca-amt-btn:hover {
-    border-color: rgb(var(--c-orange));
-    color: rgb(var(--c-orange));
   }
   .dca-amt-btn:active { transform: translateY(1px); }
   .dca-amt-input {
@@ -152,15 +162,14 @@
     border-radius: 0.4rem;
     padding: 0 0.85rem;
     text-align: center;
-    font-size: 1.15rem;
+    font-size: 1.1rem;
     font-weight: 600;
     color: rgb(var(--c-fg));
     font-family: ui-monospace, monospace;
-    caret-color: rgb(var(--c-orange));
   }
   .dca-amt-input:focus { outline: none; border-color: rgb(var(--c-orange)); }
 
-  /* === 日期 input + 日曆 modal === */
+  /* === 日期 picker === */
   .dca-date-display {
     width: 100%;
     background: rgb(var(--c-bg-soft));
@@ -168,21 +177,15 @@
     border-radius: 0.4rem;
     padding: 0.65rem 0.85rem;
     color: rgb(var(--c-fg));
-    font-size: 1rem;
+    font-size: 15px;
     cursor: pointer;
     display: flex; justify-content: space-between; align-items: center;
-    transition: border 0.12s;
   }
-  .dca-date-display:hover { border-color: rgb(var(--c-orange)); }
-  .dca-date-display svg {
-    width: 1.15rem; height: 1.15rem;
-    color: rgb(var(--c-orange));
-  }
+  .dca-date-display svg { width: 1.1rem; height: 1.1rem; color: rgb(var(--c-orange)); }
 
   .dca-modal-bg {
     position: fixed; inset: 0; z-index: 60;
     background: rgba(0,0,0,0.7);
-    backdrop-filter: blur(4px);
     display: flex; align-items: center; justify-content: center;
     padding: 1rem;
   }
@@ -190,15 +193,17 @@
     background: rgb(var(--c-card));
     border: 1px solid rgb(var(--c-orange) / 0.4);
     border-radius: 0.7rem;
-    padding: 1.25rem;
-    max-width: 26rem; width: 100%;
+    padding: 1.1rem 1.15rem;
+    max-width: min(26rem, 90vw);
+    width: 100%;
     max-height: 90vh; overflow-y: auto;
   }
+  .dca-modal.is-danger { border-color: rgb(var(--c-danger) / 0.5); }
   .dca-day-grid {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 0.35rem;
-    margin: 0.6rem 0 0.85rem;
+    gap: 0.32rem;
+    margin: 0.5rem 0 0.7rem;
   }
   .dca-day-cell {
     aspect-ratio: 1;
@@ -206,34 +211,26 @@
     border: 1px solid rgb(var(--c-border));
     border-radius: 0.35rem;
     color: rgb(var(--c-fg));
-    font-size: 0.85rem;
+    font-size: 14px;
     font-weight: 600;
     display: flex; align-items: center; justify-content: center;
     cursor: pointer;
-    transition: all 0.12s;
     -webkit-tap-highlight-color: transparent;
   }
-  .dca-day-cell:hover { border-color: rgb(var(--c-orange) / 0.5); }
   .dca-day-cell.is-on {
     background: rgb(var(--c-orange));
     border-color: rgb(var(--c-orange));
     color: white;
-    box-shadow: 0 0 8px rgb(var(--c-orange) / 0.4);
   }
-  .dca-day-eom {
-    grid-column: span 4;
-    aspect-ratio: auto;
-    padding: 0.5rem 0.6rem;
-    font-size: 0.85rem;
-  }
+  .dca-day-eom { grid-column: span 4; aspect-ratio: auto; padding: 0.5rem 0.6rem; }
 
-  /* === 期間 / 股息處理 方塊按鈕 === */
+  /* === chip 按鈕(期間 / 股息)=== */
   .dca-chip-row {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.45rem;
+    gap: 0.4rem;
   }
-  @media (min-width: 640px) { .dca-chip-row.cols-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+  @media (min-width: 768px) { .dca-chip-row.cols-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
   .dca-chip-row.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dca-chip-btn {
     padding: 0.65rem 0.5rem;
@@ -241,13 +238,11 @@
     border: 1px solid rgb(var(--c-border));
     border-radius: 0.4rem;
     color: rgb(var(--c-fg));
-    font-size: 0.95rem;
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.12s;
     -webkit-tap-highlight-color: transparent;
   }
-  .dca-chip-btn:hover { border-color: rgb(var(--c-orange) / 0.5); }
   .dca-chip-btn.is-on {
     background: rgb(var(--c-orange) / 0.18);
     border-color: rgb(var(--c-orange));
@@ -264,142 +259,132 @@
     border: 2px solid rgb(var(--c-orange));
     border-radius: 0.55rem;
     color: rgb(var(--c-orange));
-    font-size: 1.1rem;
+    font-size: 1.05rem;
     font-weight: 800;
     letter-spacing: 0.05em;
     cursor: pointer;
-    transition: all 0.18s;
-    box-shadow: 0 0 16px rgb(var(--c-orange) / 0.25);
     -webkit-tap-highlight-color: transparent;
-  }
-  .dca-go-btn:hover:not(:disabled) {
-    background: rgb(var(--c-orange));
-    color: white;
-    box-shadow: 0 0 28px rgb(var(--c-orange) / 0.5);
   }
   .dca-go-btn:disabled {
     opacity: 0.55; cursor: not-allowed;
     background: rgb(var(--c-bg-soft));
     color: rgb(var(--c-muted));
     border-color: rgb(var(--c-border));
-    box-shadow: none;
   }
 
-  /* === 結果區 === */
+  /* === 結果頁紅 banner === */
+  .dca-banner-danger {
+    background: rgb(var(--c-danger) / 0.10);
+    border: 1px solid rgb(var(--c-danger) / 0.45);
+    border-radius: 0.5rem;
+    padding: 0.7rem 0.85rem;
+    color: rgb(var(--c-danger));
+    font-size: 13px;
+    line-height: 1.55;
+    margin-bottom: 0.7rem;
+    display: flex; align-items: flex-start; gap: 0.5rem;
+  }
+  .dca-banner-danger svg { width: 1rem; height: 1rem; flex-shrink: 0; margin-top: 2px; }
+
+  /* === 結果區 6 大格 — mobile 1 欄 / desktop 2x3 === */
   .dca-result-title {
-    font-size: 1.05rem;
+    font-size: 15px;
     font-weight: 700;
     color: rgb(var(--c-fg));
-    margin-bottom: 0.85rem;
+    margin-bottom: 0.7rem;
     text-align: center;
   }
-  .dca-result-block {
-    padding: 0.95rem 1rem;
+  @media (min-width: 768px) { .dca-result-title { font-size: 17px; } }
+  .dca-result-grid {
+    display: grid;
+    grid-template-columns: 1fr;          /* mobile: 單欄 */
+    gap: 0;
+    border-top: 1px solid rgb(var(--c-border));
+    border-left: 1px solid rgb(var(--c-border));
+    border-radius: 0.5rem;
+    overflow: hidden;
+  }
+  @media (min-width: 768px) {
+    .dca-result-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  .dca-result-cell {
+    background: rgb(var(--c-card));
+    border-right: 1px solid rgb(var(--c-border));
     border-bottom: 1px solid rgb(var(--c-border));
+    padding: 0.85rem 0.95rem;
+    text-align: left;
+    display: flex; flex-direction: column; gap: 0.25rem;
   }
-  .dca-result-block:last-child { border-bottom: 0; }
-  .dca-result-label {
-    font-size: 0.82rem;
+  @media (min-width: 768px) { .dca-result-cell { padding: 1rem 1.1rem; text-align: center; align-items: center; } }
+  .dca-result-cell-label {
+    font-size: 12px;
     color: rgb(var(--c-muted));
-    margin-bottom: 0.4rem;
+    line-height: 1.4;
   }
-  .dca-result-money {
-    font-size: 1.7rem;
+  .dca-result-cell-money {
+    font-size: 19px;
     font-weight: 800;
     color: rgb(var(--c-orange));
     font-family: ui-monospace, monospace;
-    line-height: 1.2;
+    line-height: 1.15;
+    word-break: keep-all;
   }
-  .dca-result-money.is-base {
-    color: rgb(var(--c-fg));
-  }
-  .dca-scenario-row {
-    display: flex; align-items: baseline; gap: 0.6rem;
-    padding: 0.45rem 0;
-    flex-wrap: wrap;
-  }
-  .dca-scenario-dot { font-size: 1rem; }
-  .dca-scenario-name {
-    font-size: 0.92rem;
-    color: rgb(var(--c-fg) / 0.9);
-    flex: 1; min-width: 9rem;
-  }
-  .dca-scenario-money {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: rgb(var(--c-orange));
-    font-family: ui-monospace, monospace;
-  }
-  .dca-scenario-pct {
-    font-size: 0.95rem;
+  @media (min-width: 768px) { .dca-result-cell-money { font-size: 22px; } }
+  .dca-result-cell-money.is-base { color: rgb(var(--c-fg)); }
+  .dca-result-cell-money.is-mdd  { color: rgb(var(--c-danger)); }
+  .dca-result-cell-pct {
+    font-size: 13px;
     font-weight: 700;
     font-family: ui-monospace, monospace;
-    margin-left: 0.3rem;
   }
   .dca-pct-up   { color: rgb(34 197 94); }
-  .dca-pct-mid  { color: rgb(96 165 250); }
   .dca-pct-down { color: rgb(239 68 68); }
-  .dca-mdd-row {
-    display: flex; justify-content: space-between; align-items: baseline;
-    padding: 0.35rem 0;
-  }
-  .dca-mdd-name { font-size: 0.92rem; color: rgb(var(--c-fg) / 0.9); }
-  .dca-mdd-val {
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: rgb(239 68 68);
-    font-family: ui-monospace, monospace;
-  }
 
-  /* === fade-in 動畫 === */
-  @keyframes dca-fadein {
-    from { opacity: 0; transform: translateY(8px); }
+  /* === fade-in(短)=== */
+  @keyframes dca-fadein-fast {
+    from { opacity: 0; transform: translateY(4px); }
     to   { opacity: 1; transform: translateY(0); }
   }
-  .dca-fadein { animation: dca-fadein 0.4s ease-out; }
+  .dca-fadein { animation: dca-fadein-fast 0.18s ease-out; }
 
-  /* === 演算法說明卡(預設收合)=== */
+  /* === 圖表 container 高度 — mobile 280 / desktop 360 === */
+  .dca-chart-box { height: 280px; }
+  @media (min-width: 768px) { .dca-chart-box { height: 360px; } }
+
+  /* === 演算法說明 === */
   .dca-algo-summary {
     cursor: pointer;
     list-style: none;
     display: flex; justify-content: space-between; align-items: center;
-    padding: 0.65rem 0;
+    padding: 0.55rem 0;
     -webkit-tap-highlight-color: transparent;
   }
   .dca-algo-summary::-webkit-details-marker { display: none; }
-  .dca-algo-summary-text {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: rgb(var(--c-fg));
-  }
-  .dca-algo-summary-arrow {
-    font-size: 1rem;
-    color: rgb(var(--c-muted));
-    transition: transform 0.2s;
-  }
+  .dca-algo-summary-text { font-size: 15px; font-weight: 700; color: rgb(var(--c-fg)); }
+  .dca-algo-summary-arrow { font-size: 1rem; color: rgb(var(--c-muted)); }
   details[open] .dca-algo-summary-arrow { transform: rotate(180deg); }
   .dca-algo-body {
     padding-top: 0.85rem;
     border-top: 1px solid rgb(var(--c-border));
     margin-top: 0.4rem;
-    font-size: 0.88rem;
-    line-height: 1.85;
+    font-size: 14px;
+    line-height: 1.8;
     color: rgb(var(--c-fg) / 0.9);
   }
-  .dca-algo-body p { margin: 0.6rem 0; }
-  .dca-algo-body ol { padding-left: 1.4rem; margin: 0.6rem 0; list-style: decimal; }
+  .dca-algo-body p { margin: 0.55rem 0; }
+  .dca-algo-body ol { padding-left: 1.4rem; margin: 0.55rem 0; list-style: decimal; }
   .dca-algo-body ol li { margin: 0.3rem 0; }
-  .dca-algo-body .dca-algo-h3 {
-    font-size: 0.95rem;
+  .dca-algo-h3 {
+    font-size: 14px;
     font-weight: 700;
     color: rgb(var(--c-fg));
-    margin-top: 1rem; margin-bottom: 0.3rem;
+    margin-top: 0.95rem; margin-bottom: 0.25rem;
   }
   .dca-algo-source {
     margin-top: 0.85rem;
     padding-top: 0.7rem;
     border-top: 1px dashed rgb(var(--c-border));
-    font-size: 0.78rem;
+    font-size: 12px;
     color: rgb(var(--c-muted));
   }
 
@@ -408,32 +393,69 @@
     background: rgb(var(--c-warn-bg) / 0.07);
     border: 1px solid rgb(var(--c-warn-bg) / 0.35);
     border-radius: 0.55rem;
-    padding: 1rem 1.1rem;
-    font-size: 0.85rem;
-    line-height: 1.85;
+    padding: 0.95rem 1rem;
+    font-size: 13px;
+    line-height: 1.8;
     color: rgb(var(--c-fg) / 0.9);
   }
-  .dca-disc ol { padding-left: 1.4rem; list-style: decimal; }
-  .dca-disc ol li { margin: 0.4rem 0; }
+  .dca-disc ol { padding-left: 1.3rem; list-style: decimal; }
+  .dca-disc ol li { margin: 0.35rem 0; }
   .dca-disc-title {
-    font-size: 0.95rem; font-weight: 700;
+    font-size: 14px; font-weight: 700;
     color: rgb(252 211 77);
-    margin-bottom: 0.6rem;
+    margin-bottom: 0.55rem;
   }
   :root[data-theme="light"] .dca-disc-title { color: rgb(146 64 14); }
 
   /* === Hero === */
   .dca-hero h1 {
-    font-size: 1.6rem;
+    font-size: 1.5rem;
     font-weight: 800;
     color: rgb(var(--c-fg));
     line-height: 1.25;
   }
-  @media (min-width: 640px) { .dca-hero h1 { font-size: 2rem; } }
+  @media (min-width: 768px) { .dca-hero h1 { font-size: 1.95rem; } }
   .dca-hero p {
-    font-size: 0.95rem;
+    font-size: 14px;
     color: rgb(var(--c-muted));
-    margin-top: 0.4rem;
+    margin-top: 0.35rem;
+  }
+
+  /* === 警告 modal === */
+  .dca-warn-modal-title {
+    font-size: 16px;
+    font-weight: 800;
+    color: rgb(var(--c-danger));
+    margin-bottom: 0.6rem;
+    display: flex; align-items: center; gap: 0.4rem;
+  }
+  .dca-warn-modal-title svg { width: 1.15rem; height: 1.15rem; }
+  .dca-warn-modal-body {
+    font-size: 14px;
+    line-height: 1.7;
+    color: rgb(var(--c-fg) / 0.92);
+    margin-bottom: 0.95rem;
+  }
+  .dca-warn-modal-actions { display: flex; gap: 0.5rem; }
+  .dca-warn-modal-cancel,
+  .dca-warn-modal-confirm {
+    flex: 1;
+    padding: 0.65rem 0.85rem;
+    border-radius: 0.4rem;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .dca-warn-modal-cancel {
+    background: rgb(var(--c-bg-soft));
+    border: 1px solid rgb(var(--c-border));
+    color: rgb(var(--c-fg));
+  }
+  .dca-warn-modal-confirm {
+    background: rgb(var(--c-danger) / 0.18);
+    border: 1px solid rgb(var(--c-danger));
+    color: rgb(var(--c-danger));
   }
 </style>
 {% endblock %}
@@ -441,7 +463,7 @@
 {% block content %}
 <div class="dca-page max-w-3xl mx-auto" x-data="dcaApp()" x-init="init()">
 
-  {# === 區塊 0:頂部警示橫條 === #}
+  {# 區塊 0:頂部警示 #}
   <div class="dca-top-warn">
     <svg fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true">
       <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
@@ -449,8 +471,8 @@
     <div>本工具為歷史資料模擬,非投資建議,亦不構成投資招攬。實際投資結果可能與模擬結果有重大差異。</div>
   </div>
 
-  {# === 區塊 1:標題 === #}
-  <section class="dca-hero mb-5">
+  {# 區塊 1:Hero #}
+  <section class="dca-hero mb-4">
     <div class="text-xs text-muted tracking-widest mb-1">
       <a href="/" class="hover:text-accent">首頁</a>
       <span class="mx-1">/</span>
@@ -460,18 +482,17 @@
     <p>看看單支 ETF 長期下來可能變多少</p>
   </section>
 
-  {# === 區塊 2:輸入區 === #}
+  {# 區塊 2:輸入區 #}
   <div class="dca-card">
     <div class="dca-card-title">試算條件</div>
 
-    {# 2.1 ETF 單選 #}
     <div class="dca-field">
       <label class="dca-label">標的 ETF</label>
       <div class="dca-etf-shell" @click.outside="etfOpen=false">
         <template x-if="selectedEtf">
           <span class="dca-etf-chip">
-            <span class="font-mono font-bold" x-text="selectedEtf.code"></span>
-            <span x-text="selectedEtf.name"></span>
+            <span class="font-mono font-bold" x-text="selectedEtf.stock_id"></span>
+            <span x-text="selectedEtf.stock_name"></span>
             <span class="dca-etf-chip-x" @click="clearEtf()" aria-label="清除">
               <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
@@ -480,29 +501,34 @@
           </span>
         </template>
         <input x-show="!selectedEtf" x-cloak
-               type="text" inputmode="numeric"
+               type="text"
                class="dca-etf-input"
                x-model="etfQuery"
-               @focus="etfOpen=true"
-               @input="etfFilter()"
+               @focus="onEtfFocus()"
+               @input.debounce.150ms="fetchEtfList()"
                placeholder="輸入代號或名稱(2 字以上)">
         <div x-show="etfOpen && !selectedEtf && (etfMatches.length > 0 || etfHint)" x-cloak
              class="dca-etf-suggest">
           <div x-show="etfHint" class="px-3 py-3 text-sm text-muted" x-text="etfHint"></div>
-          <template x-for="(e, idx) in etfMatches" :key="e.code">
-            <button type="button" class="dca-etf-row" @click="pickEtf(e)">
-              <span>
-                <span class="font-mono font-bold text-accent" x-text="e.code"></span>
-                <span class="ml-2 text-fg/85 text-sm" x-text="e.name"></span>
+          <template x-for="e in etfMatches" :key="e.stock_id">
+            <button type="button" class="dca-etf-row" @click="tryPickEtf(e)">
+              <span class="dca-etf-row-main">
+                <span class="font-mono font-bold text-accent" x-text="e.stock_id"></span>
+                <span class="text-fg/85 text-sm" x-text="e.stock_name"></span>
               </span>
+              <template x-if="e._meta && e._meta.is_data_insufficient">
+                <span class="dca-etf-row-warn">資料不足 3 年</span>
+              </template>
             </button>
           </template>
         </div>
       </div>
-      <div class="dca-hint">支援的 ETF:0050 / 0052 / 0056 / 006208 / 00713 / 00878 / 00919 / 00935</div>
+      <div x-show="selectedEtf && selectedEtf.is_data_insufficient" x-cloak
+           class="dca-chip-insufficient">
+        此 ETF 資料不足 3 年,模擬結果可能不穩定
+      </div>
     </div>
 
-    {# 2.2 每次扣款金額 #}
     <div class="dca-field">
       <label class="dca-label">每次扣款金額</label>
       <div class="dca-amt-row">
@@ -517,7 +543,6 @@
       <div class="dca-hint">最低 1,000、最高 1,000,000,以 100 元為級距</div>
     </div>
 
-    {# 2.3 模擬扣款日 #}
     <div class="dca-field">
       <label class="dca-label">模擬扣款日</label>
       <button type="button" class="dca-date-display" @click="dateModalOpen=true">
@@ -529,7 +554,6 @@
       <div class="dca-hint">※ 實際扣款規則以券商為準,本試算每月皆假設扣款成功</div>
     </div>
 
-    {# 2.4 模擬期間 #}
     <div class="dca-field">
       <label class="dca-label">模擬期間</label>
       <div class="dca-chip-row cols-6">
@@ -543,7 +567,6 @@
       </div>
     </div>
 
-    {# 2.5 股息處理 #}
     <div class="dca-field">
       <label class="dca-label">股息處理</label>
       <div class="dca-chip-row cols-2">
@@ -559,68 +582,80 @@
     </div>
   </div>
 
-  {# === 區塊 3:開始模擬按鈕 === #}
-  <div class="mb-5">
+  {# 區塊 3:開始模擬按鈕 #}
+  <div class="mb-4">
     <button type="button" class="dca-go-btn"
-            :disabled="simulating || !canSimulate()"
+            :disabled="!canSimulate() || metaLoading"
             @click="runSimulation()"
-            x-text="simulating ? '模擬中…' : '開始模擬'"></button>
+            x-text="metaLoading ? '讀取 ETF 資料…' : '開始模擬'"></button>
   </div>
 
-  {# === 區塊 4:試算結果 === #}
+  {# 區塊 4:試算結果 #}
   <div x-show="result" x-cloak class="dca-card dca-fadein">
     <div class="dca-result-title" x-text="result ? (years + ' 年後 · ' + result.etfCode + ' ' + result.etfName + ' 試算結果') : ''"></div>
 
-    <div class="dca-result-block">
-      <div class="dca-result-label">你總共投入</div>
-      <div class="dca-result-money is-base" x-text="result ? fmtMoney(result.invested) + ' 元' : ''"></div>
-    </div>
-
-    <div class="dca-result-block">
-      <div class="dca-result-label" x-text="years + ' 年後可能的結果'"></div>
-
-      <div class="dca-scenario-row">
-        <span class="dca-scenario-dot">🟢</span>
-        <span class="dca-scenario-name">較好情境(前 5%)</span>
-        <span class="dca-scenario-money" x-text="result ? '約 ' + fmtMoneyShort(result.p95) : ''"></span>
-        <span class="dca-scenario-pct dca-pct-up" x-text="result ? fmtPct(result.p95Pct, true) : ''"></span>
+    <template x-if="result && result.dataInsufficient">
+      <div class="dca-banner-danger">
+        <svg fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
+        </svg>
+        <div x-text="'此 ETF 僅 ' + result.completeYears + ' 年完整年資料,模擬結果僅供參考。'"></div>
       </div>
-
-      <div class="dca-scenario-row">
-        <span class="dca-scenario-dot">🔵</span>
-        <span class="dca-scenario-name">中位情境</span>
-        <span class="dca-scenario-money" x-text="result ? '約 ' + fmtMoneyShort(result.p50) : ''"></span>
-        <span class="dca-scenario-pct dca-pct-mid" x-text="result ? fmtPct(result.p50Pct, true) : ''"></span>
+    </template>
+    <template x-if="result && result.isLeverage">
+      <div class="dca-banner-danger">
+        <svg fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
+        </svg>
+        <div>此 ETF 為槓桿型商品,長期持有有耗損,實際表現通常比模擬結果差。</div>
       </div>
-
-      <div class="dca-scenario-row">
-        <span class="dca-scenario-dot">🔴</span>
-        <span class="dca-scenario-name">較差情境(後 5%)</span>
-        <span class="dca-scenario-money" x-text="result ? '約 ' + fmtMoneyShort(result.p5) : ''"></span>
-        <span class="dca-scenario-pct dca-pct-down" x-text="result ? fmtPct(result.p5Pct, true) : ''"></span>
+    </template>
+    <template x-if="result && result.isCommodity">
+      <div class="dca-banner-danger">
+        <svg fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
+        </svg>
+        <div>此 ETF 為商品型,長期持有有轉倉成本,實際表現可能與模擬有重大差異。</div>
       </div>
-    </div>
+    </template>
 
-    <div class="dca-result-block">
-      <div class="dca-result-label">最大策略虧損程度(MDD)</div>
-      <div class="dca-mdd-row">
-        <span class="dca-mdd-name">中位情境</span>
-        <span class="dca-mdd-val" x-text="result ? fmtPct(result.mdd50, false) : ''"></span>
+    <div class="dca-result-grid">
+      <div class="dca-result-cell">
+        <div class="dca-result-cell-label">你總共投入</div>
+        <div class="dca-result-cell-money is-base" x-text="result ? fmtMoneyShort(result.invested) : ''"></div>
       </div>
-      <div class="dca-mdd-row">
-        <span class="dca-mdd-name">較差情境</span>
-        <span class="dca-mdd-val" x-text="result ? fmtPct(result.mdd5, false) : ''"></span>
+      <div class="dca-result-cell">
+        <div class="dca-result-cell-label">中位估值</div>
+        <div class="dca-result-cell-money" x-text="result ? fmtMoneyShort(result.p50) : ''"></div>
+      </div>
+      <div class="dca-result-cell">
+        <div class="dca-result-cell-label">較好(前 5%)</div>
+        <div class="dca-result-cell-money" x-text="result ? fmtMoneyShort(result.p95) : ''"></div>
+        <div class="dca-result-cell-pct dca-pct-up" x-text="result ? fmtPct(result.p95Pct, true) : ''"></div>
+      </div>
+      <div class="dca-result-cell">
+        <div class="dca-result-cell-label">較差(後 5%)</div>
+        <div class="dca-result-cell-money" x-text="result ? fmtMoneyShort(result.p5) : ''"></div>
+        <div class="dca-result-cell-pct dca-pct-down" x-text="result ? fmtPct(result.p5Pct, true) : ''"></div>
+      </div>
+      <div class="dca-result-cell">
+        <div class="dca-result-cell-label">最大策略虧損程度・中位情境</div>
+        <div class="dca-result-cell-money is-mdd" x-text="result ? fmtPct(result.mdd50, false) : ''"></div>
+      </div>
+      <div class="dca-result-cell">
+        <div class="dca-result-cell-label">最大策略虧損程度・較差情境</div>
+        <div class="dca-result-cell-money is-mdd" x-text="result ? fmtPct(result.mdd5, false) : ''"></div>
       </div>
     </div>
   </div>
 
-  {# === 區塊 5:圖表 === #}
+  {# 區塊 5:圖表 #}
   <div x-show="result" x-cloak class="dca-card dca-fadein">
-    <div class="dca-card-title">資產價值演進(模擬路徑)</div>
-    <div id="dca-chart" style="height: 320px;"></div>
+    <div class="dca-card-title" x-text="'這 ' + years + ' 年可能怎麼走'"></div>
+    <div id="dca-chart" class="dca-chart-box"></div>
   </div>
 
-  {# === 區塊 6:演算法說明(預設收合)=== #}
+  {# 區塊 6:演算法說明(預設收合)#}
   <details class="dca-card">
     <summary class="dca-algo-summary">
       <span class="dca-algo-summary-text">這些數字怎麼來的?</span>
@@ -628,7 +663,6 @@
     </summary>
     <div class="dca-algo-body">
       <p>我們用一種叫「<strong>蒙地卡羅模擬</strong>」的方法,簡單講就是用電腦模擬很多種可能的未來,看你選的組合在不同運氣下會變多少錢。</p>
-
       <div class="dca-algo-h3">步驟拆開來看</div>
       <ol>
         <li>抓出你選的 ETF 過去每一年的漲跌幅(例如 0050 在 2022 年跌 22%、2023 年漲 28%)</li>
@@ -642,20 +676,18 @@
           </ul>
         </li>
       </ol>
-
       <div class="dca-algo-h3">最大策略虧損程度</div>
       <p>每條未來路徑中,帳戶從最高點往下跌最深的那個跌幅。代表「過程中最慘的時候會跌多少」。</p>
-
       <div class="dca-algo-source">
-        資料來源:FinMind 還原股價(含配息)<br>
+        資料來源:還原股價(含配息)<br>
         資料期間:該 ETF 上市以來最多 10 年
       </div>
     </div>
   </details>
 
-  {# === 區塊 7:完整免責聲明 === #}
+  {# 區塊 7:免責 #}
   <section class="dca-disc">
-    <div class="dca-disc-title">⚠️ 完整免責聲明</div>
+    <div class="dca-disc-title">免責聲明</div>
     <ol>
       <li>本工具為歷史資料模擬,僅供教育與參考用途,不構成任何投資建議,亦不構成投資招攬或推介。</li>
       <li>過去績效不代表未來表現。歷史報酬無法保證未來投資結果,實際投資結果可能與模擬結果有重大差異。</li>
@@ -665,7 +697,7 @@
     </ol>
   </section>
 
-  {# === 日曆 modal === #}
+  {# 日曆 modal #}
   <div x-show="dateModalOpen" x-cloak x-transition.opacity
        class="dca-modal-bg" @click.self="dateModalOpen=false">
     <div class="dca-modal">
@@ -677,8 +709,7 @@
           </svg>
         </button>
       </div>
-      <div class="text-sm text-muted mb-2">已選 <span class="text-orange num font-bold" style="color: rgb(var(--c-orange))" x-text="payDays.length"></span> 天</div>
-
+      <div class="text-sm text-muted mb-2">已選 <span class="num font-bold" style="color: rgb(var(--c-orange))" x-text="payDays.length"></span> 天</div>
       <div class="dca-day-grid">
         <template x-for="d in 30" :key="d">
           <button type="button" class="dca-day-cell"
@@ -687,11 +718,9 @@
                   x-text="d"></button>
         </template>
       </div>
-
       <button type="button" class="dca-day-cell dca-day-eom w-full"
               :class="payDays.includes(99) ? 'is-on' : ''"
               @click="togglePayDay(99)">月底(每月最後一天)</button>
-
       <div class="flex gap-2 mt-3">
         <button type="button" @click="payDays = []" class="flex-1 dca-chip-btn">清除全部</button>
         <button type="button" @click="dateModalOpen=false"
@@ -701,42 +730,69 @@
     </div>
   </div>
 
+  {# 警告 modal:槓桿 / 商品 #}
+  <div x-show="warnModalOpen" x-cloak x-transition.opacity
+       class="dca-modal-bg" @click.self="cancelWarnModal()">
+    <div class="dca-modal is-danger">
+      <div class="dca-warn-modal-title">
+        <svg fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
+        </svg>
+        <span x-text="warnModalKind === 'leverage' ? '槓桿型 ETF 警告' : '商品型 ETF 警告'"></span>
+      </div>
+      <div class="dca-warn-modal-body">
+        <template x-if="warnModalKind === 'leverage'">
+          <div>
+            <p>槓桿商品長期持有會有「耗損」問題,實際表現通常比模擬結果差。</p>
+            <p style="margin-top: 0.5rem;">本工具僅供極粗略參考,不適合作為投資決策依據。</p>
+          </div>
+        </template>
+        <template x-if="warnModalKind === 'commodity'">
+          <div>
+            <p>商品 ETF 透過期貨追蹤標的,長期持有會有「轉倉成本」,實際表現通常與現貨價格脫鉤。</p>
+            <p style="margin-top: 0.5rem;">本工具僅供極粗略參考,不適合作為投資決策依據。</p>
+          </div>
+        </template>
+      </div>
+      <div class="dca-warn-modal-actions">
+        <button type="button" class="dca-warn-modal-cancel" @click="cancelWarnModal()">取消</button>
+        <button type="button" class="dca-warn-modal-confirm" @click="confirmWarnModal()">我了解,繼續</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script>
 function dcaApp() {
-  // 前端寫死白名單(示範版,不查 DB)
-  const ETF_WHITELIST = [
-    { code: '0050',   name: '元大台灣 50' },
-    { code: '0052',   name: '富邦科技' },
-    { code: '0056',   name: '元大高股息' },
-    { code: '006208', name: '富邦台 50' },
-    { code: '00713',  name: '元大台灣高息低波' },
-    { code: '00878',  name: '國泰永續高股息' },
-    { code: '00919',  name: '群益台灣精選高息' },
-    { code: '00935',  name: '野村臺灣新科技 50' },
-  ];
-
   return {
-    // === 輸入 state ===
+    // ETF picker
     etfQuery: '',
     etfMatches: [],
     etfOpen: false,
     etfHint: '',
-    selectedEtf: null,
+    selectedEtf: null,        // 含完整 meta(complete_years 等)
+    metaLoading: false,
 
+    // 警告 modal
+    warnModalOpen: false,
+    warnModalKind: '',
+    warnModalPending: null,
+
+    // 金額
     amount: 10000,
     amountText: '10,000',
 
-    payDays: [15],          // 預設 15 號
+    // 扣款日
+    payDays: [15],
     dateModalOpen: false,
 
-    years: 5,                // 預設 5 年
+    // 期間 / 股息
+    years: 5,
     dividendMode: 'reinvest',
 
-    // === 結果 state ===
-    simulating: false,
-    result: null,            // null | { invested, p95, p50, p5, mdd50, mdd5, etfCode, etfName }
+    // 結果
+    result: null,
     chart: null,
 
     init() {
@@ -744,30 +800,85 @@ function dcaApp() {
     },
 
     // === ETF picker ===
-    etfFilter() {
-      const q = (this.etfQuery || '').trim().toUpperCase();
-      if (q.length < 2) {
-        this.etfMatches = [];
-        this.etfHint = q.length > 0 ? '請輸入至少 2 個字' : '';
-        return;
-      }
-      this.etfHint = '';
-      this.etfMatches = ETF_WHITELIST.filter(
-        e => e.code.toUpperCase().includes(q) || e.name.includes(this.etfQuery.trim())
-      );
-      if (this.etfMatches.length === 0) {
-        this.etfHint = `找不到符合「${this.etfQuery}」的支援 ETF`;
+    onEtfFocus() {
+      this.etfOpen = true;
+      // 空輸入也預載前 8 支(空 query → server 回熱門 Top 8)
+      if (!this.etfQuery && this.etfMatches.length === 0) {
+        this.fetchEtfList();
       }
     },
-    pickEtf(e) {
-      this.selectedEtf = e;
+    async fetchEtfList() {
+      const q = (this.etfQuery || '').trim();
+      if (q.length === 1) {
+        this.etfMatches = [];
+        this.etfHint = '請輸入至少 2 個字';
+        return;
+      }
+      try {
+        const url = '/api/dca/etf_list?q=' + encodeURIComponent(q) + '&limit=8';
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error('fetch failed: ' + resp.status);
+        const data = await resp.json();
+        this.etfMatches = (data.rows || []).map(e => ({ ...e, _meta: null }));
+        this.etfHint = data.hint || '';
+      } catch (e) {
+        console.error('etf_list fetch error', e);
+        this.etfMatches = [];
+        this.etfHint = '搜尋失敗,請重試';
+      }
+    },
+    async tryPickEtf(e) {
+      // 先撈 meta(< 100ms,5 分鐘 cache),再決定要不要跳警告 modal
+      this.metaLoading = true;
+      try {
+        const resp = await fetch('/api/dca/etf_meta?code=' + encodeURIComponent(e.stock_id));
+        if (!resp.ok) throw new Error('meta fetch ' + resp.status);
+        const meta = await resp.json();
+        if (meta.has_leverage_warning) {
+          this.warnModalPending = meta;
+          this.warnModalKind = 'leverage';
+          this.warnModalOpen = true;
+          return;
+        }
+        if (meta.has_commodity_warning) {
+          this.warnModalPending = meta;
+          this.warnModalKind = 'commodity';
+          this.warnModalOpen = true;
+          return;
+        }
+        this.pickEtf(meta);
+      } catch (err) {
+        console.error('etf_meta fetch error', err);
+        // 退回沿用 list 資料(沒 complete_years 等)
+        this.pickEtf({ ...e, complete_years: 0, is_data_insufficient: false });
+      } finally {
+        this.metaLoading = false;
+      }
+    },
+    pickEtf(meta) {
+      this.selectedEtf = meta;
       this.etfQuery = '';
       this.etfMatches = [];
       this.etfOpen = false;
+      this.result = null;
+    },
+    cancelWarnModal() {
+      this.warnModalOpen = false;
+      this.warnModalPending = null;
+      this.warnModalKind = '';
+      this.etfQuery = '';
+      this.etfMatches = [];
+    },
+    confirmWarnModal() {
+      const m = this.warnModalPending;
+      this.warnModalOpen = false;
+      this.warnModalPending = null;
+      this.warnModalKind = '';
+      if (m) this.pickEtf(m);
     },
     clearEtf() {
       this.selectedEtf = null;
-      this.result = null;        // 清掉結果讓 user 重選
+      this.result = null;
     },
 
     // === 金額 ===
@@ -781,9 +892,7 @@ function dcaApp() {
     },
     normalizeAmount() {
       let n = this.amount || 0;
-      // 級距 100 取整
       n = Math.round(n / 100) * 100;
-      // 上下限
       if (n < 1000) n = 1000;
       if (n > 1000000) n = 1000000;
       this.amount = n;
@@ -814,77 +923,92 @@ function dcaApp() {
       return !!this.selectedEtf && this.amount >= 1000 && this.payDays.length > 0 && this.years > 0;
     },
 
-    // === 模擬 ===
+    // === 倍率(根據 etf_type)===
+    getMultipliers(etfType) {
+      let m = { p95: 1.75, p50: 1.30, p5: 0.80, mdd50: -0.18, mdd5: -0.42 };
+      if (etfType === 'leverage') {
+        m = { p95: 2.50, p50: 1.40, p5: 0.50, mdd50: -0.35, mdd5: -0.65 };
+      } else if (etfType === 'active') {
+        m = { p95: 1.95, p50: 1.35, p5: 0.70, mdd50: -0.25, mdd5: -0.50 };
+      } else if (etfType === 'commodity') {
+        m = { p95: 1.60, p50: 1.10, p5: 0.65, mdd50: -0.30, mdd5: -0.55 };
+      } else if (etfType === 'bond') {
+        m = { p95: 1.25, p50: 1.10, p5: 0.95, mdd50: -0.08, mdd5: -0.18 };
+      } else if (etfType === 'dividend') {
+        m = { p95: 1.65, p50: 1.32, p5: 0.85, mdd50: -0.15, mdd5: -0.32 };
+      }
+      if (this.dividendMode === 'withdraw') {
+        m.p95 *= 0.85;
+        m.p50 *= 0.88;
+        m.p5  *= 0.92;
+      }
+      return m;
+    },
+
+    // === 模擬 — 同步計算,不假等候 ===
     runSimulation() {
-      if (!this.canSimulate() || this.simulating) return;
-      this.simulating = true;
+      if (!this.canSimulate()) return;
       this.normalizeAmount();
 
-      // 1.5 秒延遲模擬 MC 計算感
-      setTimeout(() => {
-        const monthsPerYear = 12;
-        const drawsPerMonth = this.payDays.length;
-        const totalMonths = this.years * monthsPerYear;
-        const totalDraws = drawsPerMonth * totalMonths;
-        const invested = this.amount * totalDraws;
+      const monthsPerYear = 12;
+      const drawsPerMonth = this.payDays.length;
+      const totalMonths = this.years * monthsPerYear;
+      const totalDraws = drawsPerMonth * totalMonths;
+      const invested = this.amount * totalDraws;
 
-        // 假三情境(根據 dividend mode)
-        const mults = this.dividendMode === 'reinvest'
-          ? { p95: 1.75, p50: 1.30, p5: 0.80 }
-          : { p95: 1.52, p50: 1.21, p5: 0.86 };
+      const m = this.getMultipliers(this.selectedEtf.etf_type);
+      const p95 = Math.round(invested * m.p95);
+      const p50 = Math.round(invested * m.p50);
+      const p5  = Math.round(invested * m.p5);
 
-        const p95 = Math.round(invested * mults.p95);
-        const p50 = Math.round(invested * mults.p50);
-        const p5  = Math.round(invested * mults.p5);
+      this.result = {
+        etfCode: this.selectedEtf.stock_id,
+        etfName: this.selectedEtf.stock_name,
+        etfType: this.selectedEtf.etf_type,
+        dataInsufficient: !!this.selectedEtf.is_data_insufficient,
+        completeYears: this.selectedEtf.complete_years || 0,
+        isLeverage: !!this.selectedEtf.has_leverage_warning,
+        isCommodity: !!this.selectedEtf.has_commodity_warning,
+        invested, p95, p50, p5,
+        p95Pct: m.p95 - 1,
+        p50Pct: m.p50 - 1,
+        p5Pct:  m.p5 - 1,
+        mdd50: m.mdd50,
+        mdd5:  m.mdd5,
+      };
 
-        this.result = {
-          etfCode: this.selectedEtf.code,
-          etfName: this.selectedEtf.name,
-          invested: invested,
-          p95: p95, p50: p50, p5: p5,
-          p95Pct: mults.p95 - 1,
-          p50Pct: mults.p50 - 1,
-          p5Pct:  mults.p5 - 1,
-          mdd50: -0.18,
-          mdd5:  -0.42,
-        };
-
-        // 圖表 — 等 DOM 更新後再 init
-        this.$nextTick(() => this.renderChart(totalMonths, invested, p95, p50, p5));
-
-        this.simulating = false;
-      }, 1500);
+      this.$nextTick(() => this.renderChart(totalMonths, invested, p95, p50, p5));
     },
 
     // === 假時間序列 ===
-    // 用指數 lerp + 小隨機抖動產生看起來像 MC 的曲線
     genPath(months, endValue, jitterPct, seed) {
-      // 簡易 LCG seeded 隨機(讓重新整理結果穩定)
       let s = seed;
       const rand = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
       const arr = new Array(months + 1);
       arr[0] = 0;
       for (let i = 1; i <= months; i++) {
         const t = i / months;
-        // 加速複利感:用 t^1.15 平滑
         const base = endValue * Math.pow(t, 1.15);
         const jitter = (rand() - 0.5) * 2 * jitterPct * endValue * Math.pow(t, 0.6);
         arr[i] = Math.max(0, Math.round(base + jitter));
       }
-      arr[months] = endValue;   // 確保終點對齊
+      arr[months] = endValue;
       return arr;
     },
 
-    // === 圖表 ===
+    // === 圖表 — 重用 instance(只 init 一次)===
     renderChart(totalMonths, invested, p95End, p50End, p5End) {
       const el = document.getElementById('dca-chart');
       if (!el || typeof echarts === 'undefined') return;
 
-      // 釋放舊 instance(每次重新模擬會重 render)
-      if (this.chart) { try { this.chart.dispose(); } catch (e) {} }
-      this.chart = echarts.init(el, null, { renderer: 'canvas' });
+      // 第一次:init;之後 setOption 重用
+      if (!this.chart) {
+        this.chart = echarts.init(el, null, { renderer: 'canvas' });
+        window.addEventListener('resize', () => this.chart && this.chart.resize());
+      } else {
+        this.chart.clear();
+      }
 
-      // X 軸:每月 1 點(0 ~ totalMonths)— label 只顯示「第 N 年」
       const xLabels = [];
       for (let i = 0; i <= totalMonths; i++) {
         if (i === 0) xLabels.push('開始');
@@ -892,23 +1016,18 @@ function dcaApp() {
         else xLabels.push('');
       }
 
-      // 三條 path + 投入線
       const p95Series = this.genPath(totalMonths, p95End, 0.04, 11);
       const p50Series = this.genPath(totalMonths, p50End, 0.025, 7);
       const p5Series  = this.genPath(totalMonths, p5End,  0.05, 13);
-      // 投入線:每個月直線增加 (amount × drawsPerMonth)
       const investedSeries = [];
       const monthlyInvest = invested / totalMonths;
       for (let i = 0; i <= totalMonths; i++) {
         investedSeries.push(Math.round(monthlyInvest * i));
       }
 
-      // 雲填充:P95 - P5 area 用 stack + 透明底邊
-      // ECharts trick:畫 P5 透明線 + 一條從 P5 height 到 P95 的差值 stacked 填色
       const cloudBaseSeries = p5Series;
       const cloudDiffSeries = p95Series.map((v, i) => Math.max(0, v - p5Series[i]));
 
-      // 雙主題色取
       const isDark = document.documentElement.dataset.theme !== 'light';
       const fgColor   = isDark ? '#e5e7eb' : '#1a1a1a';
       const mutedCol  = isDark ? '#9ca3af' : '#5a5a5a';
@@ -916,7 +1035,7 @@ function dcaApp() {
 
       const option = {
         backgroundColor: 'transparent',
-        grid: { left: 64, right: 16, top: 36, bottom: 32 },
+        grid: { left: 56, right: 14, top: 38, bottom: 28 },
         tooltip: {
           trigger: 'axis',
           confine: true,
@@ -924,7 +1043,6 @@ function dcaApp() {
           borderColor: isDark ? '#1f2937' : '#E0DCD0',
           textStyle: { color: fgColor, fontSize: 12 },
           formatter: (params) => {
-            // params 含 5 series,過濾雲(stack base)
             const lines = [params[0].axisValue];
             params.forEach(p => {
               if (p.seriesName === '__cloud_base' || p.seriesName === '__cloud_diff') return;
@@ -938,12 +1056,13 @@ function dcaApp() {
           },
         },
         legend: {
-          data: ['較好情境', '中位情境', '較差情境', '總投入'],
+          data: ['較好', '中位', '較差', '投入'],
           textStyle: { color: mutedCol, fontSize: 11 },
-          top: 4,
-          itemGap: 10,
-          itemWidth: 18,
-          itemHeight: 10,
+          top: 0,
+          left: 'center',
+          itemGap: 12,
+          itemWidth: 14,
+          itemHeight: 8,
         },
         xAxis: {
           type: 'category',
@@ -954,7 +1073,7 @@ function dcaApp() {
         },
         yAxis: {
           type: 'value',
-          min: 0,                // 規範:Y 從 0 開始
+          min: 0,
           axisLine: { show: false },
           splitLine: { lineStyle: { color: gridCol } },
           axisLabel: {
@@ -967,7 +1086,6 @@ function dcaApp() {
           },
         },
         series: [
-          // 雲填充(P5 ~ P95 area):底邊透明 + 差值 stack
           { name: '__cloud_base', type: 'line', stack: 'cloud',
             data: cloudBaseSeries,
             symbol: 'none', lineStyle: { opacity: 0 }, silent: true,
@@ -979,37 +1097,29 @@ function dcaApp() {
             areaStyle: { color: 'rgba(148, 163, 184, 0.18)' },
             tooltip: { show: false },
           },
-          // P5(紅虛線)
-          { name: '較差情境', type: 'line', data: p5Series,
+          { name: '較差', type: 'line', data: p5Series,
             symbol: 'none', smooth: true,
             lineStyle: { color: '#ef4444', width: 1.2, type: 'dashed' },
           },
-          // P50(藍實線粗)
-          { name: '中位情境', type: 'line', data: p50Series,
+          { name: '中位', type: 'line', data: p50Series,
             symbol: 'none', smooth: true,
             lineStyle: { color: '#3b82f6', width: 2.4 },
           },
-          // P95(綠虛線)
-          { name: '較好情境', type: 'line', data: p95Series,
+          { name: '較好', type: 'line', data: p95Series,
             symbol: 'none', smooth: true,
             lineStyle: { color: '#10b981', width: 1.2, type: 'dashed' },
           },
-          // 總投入線(灰虛線)
-          { name: '總投入', type: 'line', data: investedSeries,
+          { name: '投入', type: 'line', data: investedSeries,
             symbol: 'none', smooth: false,
             lineStyle: { color: mutedCol, width: 1, type: 'dashed', opacity: 0.6 },
           },
         ],
       };
 
-      this.chart.setOption(option);
-      window.addEventListener('resize', () => this.chart && this.chart.resize());
+      this.chart.setOption(option, { notMerge: true });
     },
 
     // === 格式化 ===
-    fmtMoney(n) {
-      return Math.round(n).toLocaleString('en-US');
-    },
     fmtMoneyShort(n) {
       const v = Math.round(n);
       if (v >= 1e8) return (v / 1e8).toFixed(2) + ' 億';

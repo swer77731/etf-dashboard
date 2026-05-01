@@ -1,4 +1,5 @@
-"""一次性 backfill — 14 支追蹤 ETF 歷年含息報酬寫進 etf_yearly_returns。
+"""一次性 backfill — 從 data/etf_universe_top80.csv 讀名單(80 支),
+歷年含息報酬寫進 etf_yearly_returns。
 
 用法(專案根目錄跑):
     python scripts/backfill_yearly_returns.py
@@ -9,6 +10,8 @@
 - 跑完 SQL 統計 verification
 
 不必等 cron 半夜跑,馬上就有 DB 資料。重複跑 idempotent(UPSERT)。
+名單來源(動態):data/etf_universe_top80.csv,由 build_etf_universe.py 產出。
+CSV 不存在 → 自動 fallback 14 支精選名單。
 """
 from __future__ import annotations
 
@@ -27,17 +30,19 @@ def main():
     init_db()
 
     from app.services import yearly_returns_sync
+    # 動態 reload(若 CSV 在 import 後才更新,確保拿到最新)
+    codes = yearly_returns_sync.load_tracked_codes()
 
     print("=" * 60)
-    print("ETF Yearly Returns — Backfill 14 ETFs")
-    print(f"Tracked: {yearly_returns_sync.TRACKED_ETF_CODES}")
+    print(f"ETF Yearly Returns — Backfill {len(codes)} ETFs")
     print(f"History years: {yearly_returns_sync.HISTORY_YEARS}")
+    print(f"Source: data/etf_universe_top80.csv")
     print("=" * 60)
 
-    stats = yearly_returns_sync.sync_all()
+    stats = yearly_returns_sync.sync_all(codes=codes)
     print()
     print("=== Per-ETF 寫入年數 ===")
-    for code in yearly_returns_sync.TRACKED_ETF_CODES:
+    for code in codes:
         n = stats["per_code"].get(code, 0)
         flag = "OK" if n > 0 else "MISS"
         print(f"  [{flag}] {code:8} → {n} years")
