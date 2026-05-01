@@ -612,6 +612,18 @@ async def monthly_income_page(request: Request) -> HTMLResponse:
     )
 
 
+@router.get("/dca", response_class=HTMLResponse)
+async def dca_page(request: Request) -> HTMLResponse:
+    """定期定額試算工具 — 示範版(假資料、純前端,0 後端 API)。
+
+    ETF 白名單寫死前端,計算用 mock 公式,圖表用 ECharts fan chart。
+    驗收 OK 才接真 MC 後端。
+    """
+    return templates.TemplateResponse(
+        request, "dca.html", _common_ctx(),
+    )
+
+
 @router.get("/monthly-income-preview")
 async def monthly_income_preview_redirect():
     """舊 preview URL → 301 永久重導到正式版(已合併)。
