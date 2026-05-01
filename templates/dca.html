@@ -1101,11 +1101,14 @@ function dcaApp() {
               type: 'dashed',
             },
           },
-          confine: true,
-          backgroundColor: 'rgba(20, 20, 20, 0.92)',
-          borderColor: 'rgba(255, 255, 255, 0.15)',
+          // 拿掉 confine: true(會在某些佈局下讓桌面 tooltip 不顯示)
+          appendToBody: true,                              // tooltip 跳出 chart container,不被遮
+          backgroundColor: 'rgba(20, 20, 20, 0.95)',
+          borderColor: 'rgba(255, 255, 255, 0.2)',
           borderWidth: 1,
+          padding: [8, 12],
           textStyle: { color: '#fff', fontSize: 12 },
+          extraCssText: 'box-shadow: 0 4px 16px rgba(0,0,0,0.4); z-index: 9999;',
           formatter: (params) => {
             const yearLabel = params[0].axisValueLabel || params[0].name || '';
             const visible = params.filter(p =>
