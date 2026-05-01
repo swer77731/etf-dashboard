@@ -347,8 +347,8 @@
   }
   .dca-fadein { animation: dca-fadein-fast 0.18s ease-out; }
 
-  /* === 圖表 container 高度 — mobile 280 / desktop 360 === */
-  .dca-chart-box { height: 280px; }
+  /* === 圖表 container 高度 — mobile 320(legend wrap 也夠)/ desktop 360 === */
+  .dca-chart-box { height: 320px; }
   @media (min-width: 768px) { .dca-chart-box { height: 360px; } }
 
   /* === 演算法說明 === */
@@ -1033,36 +1033,47 @@ function dcaApp() {
       const mutedCol  = isDark ? '#9ca3af' : '#5a5a5a';
       const gridCol   = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
 
+      const fmtMoneyLocal = (v) => {
+        if (v >= 1e8) return (v / 1e8).toFixed(2) + ' 億';
+        if (v >= 1e4) return (v / 1e4).toFixed(1) + ' 萬';
+        return Math.round(v).toLocaleString();
+      };
+
       const option = {
         backgroundColor: 'transparent',
-        grid: { left: 56, right: 14, top: 38, bottom: 28 },
+        // grid.top: 35 給 legend 留 35px,不擠 Y 軸
+        grid: { left: 50, right: 15, top: 35, bottom: 30, containLabel: false },
         tooltip: {
           trigger: 'axis',
+          axisPointer: { type: 'cross' },
           confine: true,
-          backgroundColor: isDark ? '#0a0e1a' : '#ffffff',
-          borderColor: isDark ? '#1f2937' : '#E0DCD0',
-          textStyle: { color: fgColor, fontSize: 12 },
+          backgroundColor: 'rgba(20, 20, 20, 0.92)',
+          borderColor: 'rgba(255, 255, 255, 0.15)',
+          borderWidth: 1,
+          textStyle: { color: '#fff', fontSize: 12 },
           formatter: (params) => {
-            const lines = [params[0].axisValue];
-            params.forEach(p => {
-              if (p.seriesName === '__cloud_base' || p.seriesName === '__cloud_diff') return;
-              const val = p.data;
-              const fmt = (val >= 1e8) ? (val / 1e8).toFixed(2) + ' 億'
-                       : (val >= 1e4) ? (val / 1e4).toFixed(1) + ' 萬'
-                       : Math.round(val).toLocaleString();
-              lines.push(`${p.marker} ${p.seriesName}: ${fmt} 元`);
+            // axisValueLabel 才會自動帶「開始 / 第 N 年」label;axisValue 在空 label 月份是空字串
+            const yearLabel = params[0].axisValueLabel || params[0].name || '';
+            const visible = params.filter(p =>
+              ['較好', '中位', '較差', '投入'].includes(p.seriesName)
+            );
+            const lines = yearLabel ? [`<b>${yearLabel}</b>`] : [];
+            visible.forEach(p => {
+              lines.push(`${p.marker} ${p.seriesName}: ${fmtMoneyLocal(p.value)} 元`);
             });
-            return lines.join('<br>');
+            return lines.join('<br/>');
           },
         },
         legend: {
           data: ['較好', '中位', '較差', '投入'],
           textStyle: { color: mutedCol, fontSize: 11 },
-          top: 0,
+          top: 5,
           left: 'center',
-          itemGap: 12,
+          orient: 'horizontal',
           itemWidth: 14,
           itemHeight: 8,
+          itemGap: 12,
+          padding: [0, 0, 0, 0],
         },
         xAxis: {
           type: 'category',
