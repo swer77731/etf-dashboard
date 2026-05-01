@@ -1237,9 +1237,13 @@ etf_dashboard/
 不要小功能就 commit 一次。
 
 ### 永遠不能做
-- ❌ `git push`(白名單擋下,user 自己 push)
 - ❌ `git reset --hard`
 - ❌ `git clean`
+
+### 可以做(2026-05-01 by user 解禁)
+- ✅ `git push origin main` — Claude 自決,push 完一句話回報結果。不用問 user。
+  - 例外:force push to main / master 仍要警告 user
+  - 實務需 Claude Code `/permissions` 設定 `Bash(git push:*)` Allow
 
 ---
 
