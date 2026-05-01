@@ -36,6 +36,7 @@ from app.services import (
     kbar_sync,
     news_sync,
     tg_notify,
+    yearly_returns_sync,
 )
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,7 @@ _locks: dict[str, threading.Lock] = {
     "daily_report": threading.Lock(),
     "analytics_cleanup": threading.Lock(),
     "capacity_snapshot": threading.Lock(),
+    "yearly_returns": threading.Lock(),
 }
 
 # 5 分鐘後 retry 用 — APScheduler 有 max_instances=1 + coalesce 防併發
@@ -243,6 +245,32 @@ def capacity_snapshot_job() -> None:
         _release("capacity_snapshot")
 
 
+def yearly_returns_job() -> None:
+    """每天 04:00 (Taipei) 更新 etf_yearly_returns。
+
+    第一次跑(DB 沒資料)→ backfill 14 支 ETF 全 10 年
+    之後每天 → 只重抓今年 + 去年那筆(讓跨年第一天自動把去年 partial 改 0)
+
+    紀律 #16:不動現有 7 個 cron 邏輯,獨立第 8 個 job。
+    """
+    if not _try_lock("yearly_returns"):
+        return
+    try:
+        if not yearly_returns_sync.has_data():
+            logger.info("[yearly_returns_job] first run — full backfill")
+        else:
+            logger.info("[yearly_returns_job] daily update — refresh current year")
+        # sync_all 會把當年 + 歷年都 UPSERT(idempotent),簡化邏輯
+        # 跨年第一天:今年 1/1 之後會把去年那筆抓到的 close_price 自動 update,
+        # is_partial 也照「year != today.year」邏輯設成 0
+        stats = yearly_returns_sync.sync_all()
+        logger.info("[yearly_returns_job] %s", stats)
+    except Exception:
+        logger.exception("[yearly_returns_job] failed")
+    finally:
+        _release("yearly_returns")
+
+
 def analytics_cleanup_job() -> None:
     """每天 03:00 (Taipei) 刪 90 天前的 analytics / search / compare / online_snapshots。"""
     if not _try_lock("analytics_cleanup"):
@@ -343,6 +371,10 @@ def start_scheduler() -> AsyncIOScheduler:
         # 每 1 分鐘 — 容量監控 snapshot(現在/今日尖峰/30天尖峰 用)
         ("capacity_snapshot_min", capacity_snapshot_job,
          CronTrigger(minute="*", timezone=tz)),
+        # 每天 04:00 — ETF 歷年含息報酬(給定期定額試算器查 DB 用)
+        # 03:00 已被 analytics_cleanup_daily 占,挪 04:00 真正避開
+        ("yearly_returns_daily", yearly_returns_job,
+         CronTrigger(hour=4, minute=0, timezone=tz)),
     ]
 
     for job_id, fn, trig in jobs:
