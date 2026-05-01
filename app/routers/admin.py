@@ -190,6 +190,33 @@ async def trigger_daily_report(request: Request):
     return {"sent": ok, "preview": text}
 
 
+@router.get("/yearly_returns/backfill")
+async def trigger_yearly_returns_backfill(request: Request):
+    """手動觸發 etf_yearly_returns 全 80 支 backfill(免等 04:00 cron)。
+
+    Zeabur 部署後第一次,或 CSV 變動後重灌名單時用。
+    跑 5-10 分鐘(throttle 1s/call,80 calls)→ 直接 await,呼叫端可能 timeout
+    但 server 端會繼續跑完(APScheduler lock 防併發)。
+    """
+    if not _is_authed(request):
+        raise HTTPException(403, "not admin")
+    from app.database import init_db
+    from app.services import yearly_returns_sync
+    init_db()
+    codes = yearly_returns_sync.load_tracked_codes()
+    stats = yearly_returns_sync.sync_all(codes=codes)
+    return {
+        "expected": stats["expected"],
+        "actual": stats["actual"],
+        "missing": stats["missing"],
+        "total_years_written": stats["total_years_written"],
+        "per_code_summary": {
+            "with_data": sum(1 for n in stats["per_code"].values() if n > 0),
+            "without_data": sum(1 for n in stats["per_code"].values() if n == 0),
+        },
+    }
+
+
 # Bot 歷史紀錄清理 — 刪 analytics_log 中 UA 命中黑名單的 row
 @router.get("/bot-cleanup", response_class=HTMLResponse)
 async def bot_cleanup(request: Request):
