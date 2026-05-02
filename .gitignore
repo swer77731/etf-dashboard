@@ -46,6 +46,9 @@ Thumbs.db
 # Debug / scratch outputs
 scripts/out/
 
+# One-off probe / scratch scripts(命名慣例:scripts/_*.py 不進 git)
+scripts/_*.py
+
 # Design references / mockups (本地參考用,不進 repo)
 design/
 
