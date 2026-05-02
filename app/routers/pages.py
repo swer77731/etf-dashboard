@@ -851,6 +851,12 @@ async def account_delete(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "legal/account_delete.html", _common_ctx(request))
 
 
+@router.get("/install", response_class=HTMLResponse)
+async def install_guide(request: Request) -> HTMLResponse:
+    """PWA 安裝教學 — iOS / Android 步驟說明 + FAQ。"""
+    return templates.TemplateResponse(request, "install.html", _common_ctx(request))
+
+
 # === PWA 路由(根路徑提供 sw + manifest)===
 # Service Worker 必須從根路徑提供才能控制整個 origin(Service-Worker-Allowed: /)
 # manifest.json 額外從根提供一份,讓 SW pre-cache 清單裡的 /manifest.json 命中

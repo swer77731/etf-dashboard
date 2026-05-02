@@ -685,6 +685,22 @@
       .pwa-ios-actions { display: flex; gap: 0.55rem; }
       .pwa-ios-actions .pwa-install-cta { flex: 1; }
       .pwa-ios-actions .pwa-install-secondary { flex: 0 0 auto; min-width: 80px; }
+      .pwa-ios-more {
+        display: block;
+        margin-top: 0.7rem;
+        padding: 0.55rem 0.7rem;
+        text-align: center;
+        font-size: 0.82rem;
+        color: rgb(var(--c-muted));
+        text-decoration: none;
+        border: 1px solid rgb(var(--c-border));
+        border-radius: 0.4rem;
+        transition: border-color 0.15s, color 0.15s;
+      }
+      .pwa-ios-more:hover {
+        border-color: rgb(var(--c-accent) / 0.5);
+        color: rgb(var(--c-fg));
+      }
 
       /* === Cookie banner === */
       /* 桌面預設 padding(原 px-4 sm:px-6 py-3 sm:py-4 移到 CSS,確保 mobile 有絕對控制權)*/
@@ -958,6 +974,8 @@
         </div>
 
         <div class="px-3 text-[0.7rem] text-muted/80 flex items-center gap-2 flex-wrap">
+          <a href="/install" class="hover:text-fg transition">使用說明</a>
+          <span aria-hidden="true">·</span>
           <a href="/contact" class="hover:text-fg transition">聯絡</a>
           <span aria-hidden="true">·</span>
           <a href="/changelog" class="hover:text-fg transition">更新</a>
@@ -1008,6 +1026,8 @@
 
       <footer class="max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-10 py-6 mt-12 text-xs text-muted border-t border-border">
         <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-center">
+          <a href="/install" class="hover:text-fg transition">使用說明</a>
+          <span aria-hidden="true">·</span>
           <a href="/privacy" class="hover:text-fg transition">隱私政策</a>
           <span aria-hidden="true">·</span>
           <a href="/terms" class="hover:text-fg transition">服務條款</a>
@@ -1171,6 +1191,7 @@
             <button type="button" class="pwa-install-cta" @click="dismiss()">好,我會弄</button>
             <button type="button" class="pwa-install-secondary" @click="dismiss()">不要</button>
           </div>
+          <a href="/install" class="pwa-ios-more" @click="dismiss()">📖 看完整教學</a>
         </div>
       </template>
     </div>

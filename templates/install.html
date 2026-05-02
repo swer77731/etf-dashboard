@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block title %}安裝教學 — {{ brand_full }}{% endblock %}
+
+{% block head %}
+<style>
+  .install-page {
+    max-width: 44rem;
+    margin: 0 auto;
+    font-size: 16px;
+    line-height: 1.7;
+  }
+  .install-page h1 {
+    font-size: 1.7rem;
+    font-weight: 800;
+    color: rgb(var(--c-fg));
+    line-height: 1.3;
+    margin-bottom: 0.4rem;
+  }
+  @media (min-width: 640px) { .install-page h1 { font-size: 2rem; } }
+  .install-subtitle {
+    font-size: 1rem;
+    color: rgb(var(--c-muted));
+    margin-bottom: 2rem;
+    line-height: 1.6;
+  }
+  .install-section {
+    border-radius: 0.75rem;
+    border: 1px solid rgb(var(--c-border));
+    padding: 1.4rem 1.4rem;
+    margin-bottom: 1.5rem;
+  }
+  @media (min-width: 640px) { .install-section { padding: 1.7rem 1.9rem; } }
+  .install-section.is-ios { background: rgba(96, 165, 250, 0.05); border-color: rgba(96, 165, 250, 0.25); }
+  .install-section.is-android { background: rgba(34, 197, 94, 0.05); border-color: rgba(34, 197, 94, 0.25); }
+  .install-section h2 {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: rgb(var(--c-fg));
+    margin-bottom: 1.1rem;
+    line-height: 1.35;
+  }
+  .install-step-block {
+    margin-top: 1.1rem;
+    padding-top: 1rem;
+    border-top: 1px dashed rgb(var(--c-border));
+  }
+  .install-step-block:first-of-type { margin-top: 0; padding-top: 0; border-top: 0; }
+  .install-step-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: rgb(var(--c-fg));
+    margin-bottom: 0.5rem;
+  }
+  .install-warn {
+    background: rgba(245, 158, 11, 0.1);
+    border-left: 3px solid rgb(245 158 11);
+    padding: 0.55rem 0.85rem;
+    border-radius: 0.35rem;
+    margin: 0.6rem 0;
+    font-size: 0.95rem;
+  }
+  .install-step-num {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: rgb(239 159 39);
+    margin-right: 0.55rem;
+    display: inline-block;
+    min-width: 1.5em;
+  }
+  .install-step-row {
+    display: flex; align-items: flex-start;
+    margin-bottom: 0.45rem;
+  }
+  .install-step-row:last-child { margin-bottom: 0; }
+  .install-step-row > span:last-child { flex: 1; min-width: 0; }
+  .install-page p { margin: 0.5rem 0; }
+  .install-page strong { color: rgb(var(--c-fg)); font-weight: 700; }
+  .install-page ul { list-style: disc; padding-left: 1.4rem; margin: 0.5rem 0; }
+  .install-page li { margin: 0.25rem 0; }
+  .install-success {
+    margin-top: 0.85rem;
+    padding: 0.55rem 0.85rem;
+    background: rgba(34, 197, 94, 0.1);
+    border-left: 3px solid rgb(34 197 94);
+    border-radius: 0.35rem;
+    font-weight: 600;
+    color: rgb(34 197 94);
+    font-size: 0.95rem;
+  }
+  .install-copy-btn {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    min-height: 44px;
+    padding: 0 1.2rem;
+    margin-top: 0.6rem;
+    background: rgb(239 159 39);
+    color: white;
+    border: 0;
+    border-radius: 0.45rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .install-copy-btn:hover { background: rgb(220 140 25); }
+  .install-url {
+    display: inline-block;
+    background: rgb(var(--c-bg-soft));
+    border: 1px solid rgb(var(--c-border));
+    border-radius: 0.35rem;
+    padding: 0.25rem 0.55rem;
+    font-family: ui-monospace, monospace;
+    font-size: 0.95rem;
+    color: rgb(var(--c-accent));
+  }
+  .install-faq dt {
+    font-size: 1rem;
+    font-weight: 700;
+    color: rgb(var(--c-fg));
+    margin-top: 1rem;
+    margin-bottom: 0.3rem;
+  }
+  .install-faq dt:first-child { margin-top: 0; }
+  .install-faq dd {
+    margin: 0 0 0.5rem 0;
+    color: rgb(var(--c-fg) / 0.92);
+  }
+  .install-toast {
+    position: fixed;
+    bottom: 1.5rem; left: 50%;
+    transform: translateX(-50%);
+    background: rgb(15 23 42 / 0.97);
+    border: 1px solid rgb(34 197 94 / 0.6);
+    border-radius: 9999px;
+    padding: 0.7rem 1.3rem;
+    color: rgb(74 222 128);
+    font-size: 0.95rem;
+    font-weight: 600;
+    box-shadow: 0 12px 30px -6px rgba(0,0,0,0.6);
+    z-index: 60;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<article class="install-page" x-data="installPage()">
+  <div class="text-xs text-muted tracking-widest mb-2">
+    <a href="/" class="hover:text-accent">首頁</a>
+    <span class="mx-1">/</span>
+    <span>安裝教學</span>
+  </div>
+
+  <h1>📱 把 ETF 觀察室裝到手機桌面</h1>
+  <p class="install-subtitle">把網站變成 app,點一下就開,不用每次打網址</p>
+
+  {# ===== iPhone 區塊 ===== #}
+  <section class="install-section is-ios">
+    <h2>🍎 iPhone 使用者</h2>
+
+    <div class="install-step-block">
+      <div class="install-step-title">第一步:用 Safari 打開</div>
+      <div class="install-warn">
+        ⚠️ <strong>重點</strong>:必須用 Safari,不能用 LINE / FB 內建的瀏覽器
+      </div>
+      <p><strong>怎麼開 Safari?</strong></p>
+      <ul>
+        <li>回到手機桌面</li>
+        <li>找一個藍色指南針 icon 🧭(通常在底部那排)</li>
+        <li>點下去就是 Safari</li>
+      </ul>
+    </div>
+
+    <div class="install-step-block">
+      <div class="install-step-title">第二步:輸入網址</div>
+      <p>在 Safari 上方網址列打:<span class="install-url">swer-etf.zeabur.app</span></p>
+      <p>或點下面按鈕直接複製:</p>
+      <button type="button" class="install-copy-btn" @click="copyUrl()">📋 複製網址</button>
+    </div>
+
+    <div class="install-step-block">
+      <div class="install-step-title">第三步:加到主畫面</div>
+      <div class="install-step-row">
+        <span class="install-step-num">①</span>
+        <span>點手機最下面正中間的 ⬆️(分享鈕)</span>
+      </div>
+      <div class="install-step-row">
+        <span class="install-step-num">②</span>
+        <span>跳出選單後往下滑,找「<strong>加入主畫面</strong>」</span>
+      </div>
+      <div class="install-step-row">
+        <span class="install-step-num">③</span>
+        <span>右上角點「<strong>新增</strong>」</span>
+      </div>
+      <div class="install-success">完成!回到桌面就有 app icon 了</div>
+    </div>
+  </section>
+
+  {# ===== Android 區塊 ===== #}
+  <section class="install-section is-android">
+    <h2>🤖 Android 使用者</h2>
+
+    <div class="install-step-block">
+      <div class="install-step-title">簡單版(推薦)</div>
+      <div class="install-step-row">
+        <span class="install-step-num">①</span>
+        <span>用 Chrome 打開 <span class="install-url">swer-etf.zeabur.app</span></span>
+      </div>
+      <div class="install-step-row">
+        <span class="install-step-num">②</span>
+        <span>進來第二次後,下面會跳「<strong>📱 一鍵變 app</strong>」按鈕</span>
+      </div>
+      <div class="install-step-row">
+        <span class="install-step-num">③</span>
+        <span>點下去 → 系統跳安裝 → 確認</span>
+      </div>
+    </div>
+
+    <div class="install-step-block">
+      <div class="install-step-title">手動版(如果按鈕沒跳出來)</div>
+      <div class="install-step-row">
+        <span class="install-step-num">①</span>
+        <span>用 Chrome 打開網站</span>
+      </div>
+      <div class="install-step-row">
+        <span class="install-step-num">②</span>
+        <span>點右上角 ⋮(三個點)</span>
+      </div>
+      <div class="install-step-row">
+        <span class="install-step-num">③</span>
+        <span>找「<strong>加到主畫面</strong>」或「<strong>安裝應用程式</strong>」</span>
+      </div>
+      <div class="install-step-row">
+        <span class="install-step-num">④</span>
+        <span>點下去確認</span>
+      </div>
+    </div>
+  </section>
+
+  {# ===== FAQ 區塊 ===== #}
+  <section class="install-section">
+    <h2>常見問題</h2>
+    <dl class="install-faq">
+      <dt>Q:我從 LINE 點連結進來能裝嗎?</dt>
+      <dd>A:不行。LINE 自己的瀏覽器不能裝 app(蘋果限制)。請先把網址複製,自己打開 Safari 或 Chrome 貼上。</dd>
+
+      <dt>Q:裝完桌面找不到圖示?</dt>
+      <dd>A:滑到桌面最後一頁找找,或從手機桌面下拉搜尋「ETF 觀察室」。</dd>
+
+      <dt>Q:要錢嗎?</dt>
+      <dd>A:完全免費。</dd>
+    </dl>
+  </section>
+
+  {# ===== Toast(複製成功)===== #}
+  <div x-show="toast" x-cloak x-transition.opacity class="install-toast" x-text="toastMsg"></div>
+</article>
+
+<script>
+  function installPage() {
+    return {
+      toast: false,
+      toastMsg: '',
+      async copyUrl() {
+        const url = 'https://swer-etf.zeabur.app';
+        try {
+          await navigator.clipboard.writeText(url);
+          this.showToast('✅ 網址已複製!打開 Safari 貼上即可');
+        } catch (e) {
+          // Fallback for older browsers
+          try {
+            const ta = document.createElement('textarea');
+            ta.value = url;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            this.showToast('✅ 網址已複製!打開 Safari 貼上即可');
+          } catch (_) {
+            this.showToast('複製失敗,請手動輸入網址');
+          }
+        }
+      },
+      showToast(msg) {
+        this.toastMsg = msg;
+        this.toast = true;
+        setTimeout(() => { this.toast = false; }, 2000);
+      },
+    };
+  }
+</script>
+{% endblock %}
