@@ -61,6 +61,10 @@ class Settings(BaseSettings):
         description="Starlette SessionMiddleware 簽章 key,production 必填 ≥ 32 字元 random",
     )
 
+    # 站長 email — /admin 後台只有這個 email 的 Google 帳號能進
+    # 多個用逗號分隔(站長本人 + 信任的合作開發者)
+    admin_email: str = Field(default="", description="逗號分隔的 admin email 白名單,空 = 後台 Google-admin 入口禁用")
+
     # Analytics 高 session IP 排除門檻 — 24h 內同 IP 開 ≥ N 個 session 視為
     # 自動化掃描器,從 DAU/PV/排行統計排除(不擋訪問,只排除計算)。
     high_session_threshold: int = Field(default=15, description="24h 內同 IP session 數上限,超過自動排除統計")

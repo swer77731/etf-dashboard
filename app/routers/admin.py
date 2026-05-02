@@ -79,11 +79,118 @@ def _is_authed(request: Request) -> bool:
 # /admin → redirect 看狀態
 # ─────────────────────────────────────────────────────────────
 
+def _admin_emails() -> set[str]:
+    """settings.admin_email 解析成 set(逗號分隔,小寫)。空 = set()(沒人能進)。"""
+    raw = (settings.admin_email or "").strip()
+    if not raw:
+        return set()
+    return {e.strip().lower() for e in raw.split(",") if e.strip()}
+
+
+def _is_site_admin(request: Request) -> tuple[bool, dict | None]:
+    """檢查 request.state.user(由 CurrentUserMiddleware 注入)是否為站長。
+
+    回 (is_admin, user_dict | None)
+    - user None → 還沒登入
+    - user.email 不在 admin_email 白名單 → not admin
+    - 在白名單 → admin
+    """
+    user = getattr(request.state, "user", None)
+    if not user or not user.get("email"):
+        return False, None
+    if user["email"].lower() in _admin_emails():
+        return True, user
+    return False, user
+
+
+def _mask_email(email: str) -> str:
+    """sw***@gmail.com 樣式。前 2 字 + *** + @domain。"""
+    if not email or "@" not in email:
+        return email or ""
+    local, _, domain = email.partition("@")
+    if len(local) <= 2:
+        return f"{local}***@{domain}"
+    return f"{local[:2]}***@{domain}"
+
+
+def _member_stats() -> dict:
+    """聚合會員數據 — 跑一次 SQL 查全部需要的數字。
+
+    日期界線用 Asia/Taipei 時區的「今天 / 本週(週一)/ 本月」。
+    """
+    from sqlalchemy import select, func
+    from datetime import date, datetime, timedelta, timezone
+    from app.database import session_scope
+    from app.models.user import User
+
+    # Asia/Taipei 今天的 00:00 換回 UTC naive(User.created_at 是 UTC naive)
+    tz = timezone(timedelta(hours=8))
+    now_taipei = datetime.now(tz=tz)
+    today_start_taipei = now_taipei.replace(hour=0, minute=0, second=0, microsecond=0)
+    # 本週起點:週一 00:00(weekday(): Mon=0, Sun=6)
+    week_start_taipei = today_start_taipei - timedelta(days=now_taipei.weekday())
+    # 本月起點:1 號 00:00
+    month_start_taipei = today_start_taipei.replace(day=1)
+
+    def _to_naive_utc(dt_taipei):
+        return dt_taipei.astimezone(timezone.utc).replace(tzinfo=None)
+
+    today_utc = _to_naive_utc(today_start_taipei)
+    week_utc = _to_naive_utc(week_start_taipei)
+    month_utc = _to_naive_utc(month_start_taipei)
+
+    with session_scope() as s:
+        total = s.scalar(select(func.count()).select_from(User)) or 0
+        today_n = s.scalar(
+            select(func.count()).select_from(User).where(User.created_at >= today_utc)
+        ) or 0
+        week_n = s.scalar(
+            select(func.count()).select_from(User).where(User.created_at >= week_utc)
+        ) or 0
+        month_n = s.scalar(
+            select(func.count()).select_from(User).where(User.created_at >= month_utc)
+        ) or 0
+        recent = s.scalars(
+            select(User).order_by(User.created_at.desc()).limit(10)
+        ).all()
+        recent_list = [
+            {
+                "email_masked": _mask_email(u.email),
+                "display_name": u.display_name or "—",
+                "created_at": u.created_at.isoformat(timespec="minutes") if u.created_at else "—",
+            }
+            for u in recent
+        ]
+
+    return {
+        "total": total,
+        "today": today_n,
+        "this_week": week_n,
+        "this_month": month_n,
+        "recent": recent_list,
+    }
+
+
 @router.get("", response_class=HTMLResponse)
 async def admin_root(request: Request):
-    if _is_authed(request):
-        return RedirectResponse(url="/admin/analytics", status_code=302)
-    return RedirectResponse(url="/admin/login", status_code=302)
+    """站長後台 — 只有 settings.admin_email 白名單的 Google 帳號能進。
+
+    流程:
+    - 未登入 → 跳 Google OAuth 登入
+    - 登入但 email 不在白名單 → 403
+    - 是站長 → 顯示 dashboard(會員數據,未來追加 DAU/PV/TG)
+    """
+    is_admin, user = _is_site_admin(request)
+    if user is None:
+        # 還沒登入 Google → 跳登入,登入後回 /admin
+        return RedirectResponse(url="/auth/google/login", status_code=302)
+    if not is_admin:
+        # 已登入但不是站長
+        raise HTTPException(403, "你不是站長,無權進入後台")
+
+    stats = _member_stats()
+    ctx = _admin_ctx(request, **stats, current_user=user)
+    return templates.TemplateResponse(request, "admin/dashboard.html", ctx)
 
 
 # ─────────────────────────────────────────────────────────────

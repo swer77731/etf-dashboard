@@ -70,7 +70,9 @@
       </div>
       <div class="flex items-center gap-3 text-sm">
         {% block nav %}{% endblock %}
-        <a href="/admin/logout" class="text-muted hover:text-fg transition">登出</a>
+        {% block header_right %}
+          <a href="/admin/logout" class="text-muted hover:text-fg transition">登出</a>
+        {% endblock %}
       </div>
     </div>
   </header>

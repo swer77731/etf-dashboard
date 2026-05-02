@@ -1,0 +1,78 @@
+{% extends "admin/base.html" %}
+
+{% block title %}站長後台 — {{ brand_full }}{% endblock %}
+
+{% block nav %}
+  <span class="text-muted">|</span>
+  <a href="/admin/analytics" class="text-muted hover:text-fg transition">流量分析</a>
+{% endblock %}
+
+{% block header_right %}
+  <span class="text-fg/85 hidden sm:inline text-xs">{{ current_user.email }}</span>
+  <form method="POST" action="/auth/logout" class="inline-block ml-1">
+    <button type="submit" class="text-muted hover:text-fg transition">登出</button>
+  </form>
+{% endblock %}
+
+{% block content %}
+
+<section class="mb-6">
+  <div class="text-xs uppercase tracking-[0.2em] text-muted mb-1">站長後台</div>
+  <h2 class="text-xl sm:text-2xl font-semibold">會員數據</h2>
+  <div class="text-sm text-muted mt-1">未來會追加 訪客數 / 瀏覽次數 / TG 訂閱 / 熱門頁面</div>
+</section>
+
+{# === 4 大數字卡 === #}
+<section class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+  <div class="card p-4">
+    <div class="text-xs text-muted mb-1">總註冊會員</div>
+    <div class="stat-num num">{{ total }}<span class="text-base text-muted ml-1">人</span></div>
+  </div>
+  <div class="card p-4">
+    <div class="text-xs text-muted mb-1">今天新增</div>
+    <div class="stat-num num" style="color: #10b981;">+{{ today }}</div>
+    <div class="text-xs text-muted mt-1">當日 0:00 起</div>
+  </div>
+  <div class="card p-4">
+    <div class="text-xs text-muted mb-1">本週新增</div>
+    <div class="stat-num num">+{{ this_week }}</div>
+    <div class="text-xs text-muted mt-1">週一 0:00 起</div>
+  </div>
+  <div class="card p-4">
+    <div class="text-xs text-muted mb-1">本月新增</div>
+    <div class="stat-num num">+{{ this_month }}</div>
+    <div class="text-xs text-muted mt-1">1 號 0:00 起</div>
+  </div>
+</section>
+
+{# === 最近 10 個註冊 === #}
+<section class="card p-4 mb-6">
+  <h3 class="text-base font-semibold mb-3">最近註冊的 10 個會員</h3>
+
+  {% if recent and recent|length > 0 %}
+  <div class="overflow-x-auto -mx-4 sm:mx-0">
+    <table class="w-full text-sm min-w-[480px]">
+      <thead>
+        <tr class="text-xs text-muted uppercase tracking-wider border-b border-border">
+          <th class="text-left py-2 px-3 sm:px-2">Email</th>
+          <th class="text-left py-2 px-3 sm:px-2">暱稱</th>
+          <th class="text-left py-2 px-3 sm:px-2 whitespace-nowrap">註冊時間 (UTC)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in recent %}
+        <tr class="border-b border-border last:border-b-0">
+          <td class="py-2.5 px-3 sm:px-2 font-mono text-fg/90">{{ u.email_masked }}</td>
+          <td class="py-2.5 px-3 sm:px-2 text-fg/85">{{ u.display_name }}</td>
+          <td class="py-2.5 px-3 sm:px-2 text-muted whitespace-nowrap">{{ u.created_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-muted text-sm py-6 text-center">尚無會員註冊</div>
+  {% endif %}
+</section>
+
+{% endblock %}
