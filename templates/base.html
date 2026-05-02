@@ -436,35 +436,8 @@
         .section-card { padding: 1rem !important; }
       }
 
-      /* === user_menu(登入按鈕 / 已登入頭像 dropdown)=== */
-      .user-login-btn-sidebar {
-        display: flex; align-items: center; justify-content: center; gap: 0.55rem;
-        width: 100%;
-        padding: 0.6rem 0.85rem;
-        background: rgb(var(--c-bg-soft));
-        border: 1px solid rgb(var(--c-border));
-        border-radius: 0.5rem;
-        color: rgb(var(--c-fg));
-        font-size: 0.92rem;
-        font-weight: 600;
-        transition: border-color 0.12s, background 0.12s;
-      }
-      .user-login-btn-sidebar:hover {
-        border-color: rgb(var(--c-accent));
-        background: rgb(var(--c-card));
-      }
-      .user-login-btn-mobile {
-        display: inline-flex; align-items: center;
-        padding: 0.4rem 0.75rem;
-        background: rgb(239 159 39);
-        color: white;
-        border-radius: 0.4rem;
-        font-size: 0.85rem;
-        font-weight: 700;
-        text-decoration: none;
-      }
-      .user-login-btn-mobile:hover { background: rgb(220 140 25); }
-
+      /* === user_menu(已登入頭像 dropdown)=== */
+      /* login button 樣式統一在 .login-btn-unified / .login-btn-mobile(下方 Login Wall 區段)*/
       .user-menu-wrap { position: relative; }
       .user-menu-trigger {
         display: flex; align-items: center; gap: 0.55rem;
@@ -558,6 +531,126 @@
       .user-menu-item svg { flex-shrink: 0; color: rgb(var(--c-muted)); }
       .user-menu-logout { color: rgb(239 68 68); }
       .user-menu-logout svg { color: rgb(239 68 68); }
+
+      /* === Login Wall(遮罩 + 登入卡片)=== */
+      /* 統一登入按鈕(全站 sidebar / wall / mobile 共用視覺)*/
+      .login-btn-unified {
+        display: flex; align-items: center; justify-content: center;
+        gap: 0.55rem;
+        width: 100%;
+        min-height: 44px;          /* 觸控目標 Apple HIG */
+        padding: 0 0.95rem;
+        background: rgb(var(--c-bg-soft));
+        border: 1px solid rgb(var(--c-border));
+        border-radius: 0.5rem;
+        color: rgb(var(--c-fg));
+        font-size: 0.92rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+      }
+      :root[data-theme="light"] .login-btn-unified {
+        background: #ffffff;
+      }
+      .login-btn-unified:hover {
+        border-color: rgb(var(--c-accent));
+        box-shadow: 0 2px 8px rgb(0 0 0 / 0.18);
+      }
+      .login-btn-unified .login-btn-icon {
+        width: 1.1rem; height: 1.1rem; flex-shrink: 0;
+      }
+      .login-btn-unified .login-btn-text {
+        white-space: nowrap;
+      }
+
+      /* mobile top bar 短版 */
+      .login-btn-mobile {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-width: 44px; min-height: 44px;
+        padding: 0 0.85rem;
+        background: rgb(239 159 39);
+        color: white;
+        border-radius: 0.45rem;
+        font-size: 0.9rem;
+        font-weight: 700;
+        text-decoration: none;
+        transition: background 0.15s;
+      }
+      .login-btn-mobile:hover { background: rgb(220 140 25); }
+
+      /* === Locked zone(漸變遮罩)=== */
+      .locked-zone { position: relative; }
+      .locked-zone.is-locked .locked-content {
+        max-height: 280px;
+        overflow: hidden;
+        -webkit-mask-image: linear-gradient(to bottom, black 30%, transparent 100%);
+        mask-image: linear-gradient(to bottom, black 30%, transparent 100%);
+        pointer-events: none;
+        user-select: none;
+      }
+      @media (max-width: 640px) {
+        .locked-zone.is-locked .locked-content {
+          max-height: 220px;
+          -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+          mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+        }
+      }
+
+      /* === Login wall card(遮罩底部浮現的登入卡)=== */
+      .login-wall-card {
+        position: relative;
+        z-index: 5;
+        margin: -120px auto 1.5rem;   /* 負 margin 拉進 fade 區域,但不會覆蓋前段內容 */
+        max-width: min(360px, 90vw);
+        padding: 2rem;
+        background: rgb(var(--c-card));
+        border: 1px solid rgb(var(--c-border));
+        border-radius: 0.75rem;
+        box-shadow: 0 12px 40px -8px rgb(0 0 0 / 0.4);
+        text-align: center;
+      }
+      @media (max-width: 640px) {
+        .login-wall-card {
+          margin: -100px auto 1rem;
+          padding: 1.5rem;            /* mobile 24px,不要 32px 太擠 */
+          max-width: 90vw;
+        }
+      }
+      .login-wall-card-title {
+        font-size: 1.125rem;          /* desktop 18px */
+        font-weight: 600;
+        color: rgb(var(--c-fg));
+        margin-bottom: 1.25rem;
+        line-height: 1.45;
+      }
+      @media (max-width: 640px) {
+        .login-wall-card-title {
+          font-size: 1rem;            /* mobile 16px */
+          margin-bottom: 1rem;
+        }
+      }
+      .login-wall-card-hint {
+        font-size: 0.875rem;
+        color: rgb(var(--c-muted));
+        margin-top: 1rem;
+      }
+
+      /* 登入提示替代 ECharts 圖表(DCA 用)*/
+      .locked-chart-placeholder {
+        position: relative;
+        display: flex; align-items: center; justify-content: center;
+        min-height: 280px;
+        background: rgb(var(--c-bg-soft));
+        border: 1px dashed rgb(var(--c-border));
+        border-radius: 0.5rem;
+        color: rgb(var(--c-muted));
+        font-size: 0.95rem;
+        text-align: center;
+        padding: 2rem 1rem;
+      }
+      @media (min-width: 768px) {
+        .locked-chart-placeholder { min-height: 320px; }
+      }
     </style>
     {% block head %}{% endblock %}
 </head>

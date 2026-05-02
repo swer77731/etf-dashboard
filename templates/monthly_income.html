@@ -909,6 +909,10 @@
         </div>
       </div>
 
+      {# === Login Wall:鎖 月份覆蓋(B) + 個別 ETF 卡片(C) + 歷史明細(F) === #}
+      <div class="locked-zone {% if not current_user %}is-locked{% endif %}">
+        <div class="locked-content">
+
       {# === B. 月份覆蓋區 === #}
       <div class="mb-3 mt-2"
            :class="api_data.fully_covered ? 'cov-banner cov-fully' : (api_data.uncovered_months.length > 0 ? 'cov-banner cov-partial' : '')">
@@ -1057,6 +1061,13 @@
           歷史明細展開細節將在 Phase 5 Commit 4 推出。
         </div>
       </details>
+
+        </div>{# /.locked-content #}
+        {% if not current_user %}
+          {% from "_partials/login_wall.html" import login_wall_card %}
+          {{ login_wall_card() }}
+        {% endif %}
+      </div>{# /.locked-zone #}
 
     </div>
   </template>

@@ -261,6 +261,10 @@
     </ul>
   </div>
 
+  {# === Login Wall:鎖 區塊 2(持股變動) + 區塊 3(共同持股)=== #}
+  <div class="locked-zone {% if not current_user %}is-locked{% endif %}">
+    <div class="locked-content">
+
   {# === 區塊 2:持股變動(可切 1 / 7 / 30 個交易日)=== #}
   <div x-show="codes.length > 0 && !data_loading && changes.length > 0" x-cloak class="mb-7">
     <div class="flex items-baseline justify-between gap-3 flex-wrap mb-3">
@@ -368,6 +372,13 @@
       </template>
     </div>
   </div>
+
+    </div>{# /.locked-content #}
+    {% if not current_user %}
+      {% from "_partials/login_wall.html" import login_wall_card %}
+      {{ login_wall_card() }}
+    {% endif %}
+  </div>{# /.locked-zone #}
 
   {# === 區塊 4:基本資訊(每支 ETF 連到詳情頁)=== #}
   <div x-show="codes.length > 0" x-cloak class="mt-7 pt-5 border-t border-border">

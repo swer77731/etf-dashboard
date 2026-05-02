@@ -684,56 +684,71 @@
     </div>
   </div>
 
-  {# 區塊 5:圖表 #}
-  <div x-show="result" x-cloak class="dca-card dca-fadein">
-    <div class="dca-card-title" x-text="'這 ' + years + ' 年可能怎麼走'"></div>
-    {# HTML legend — 不用 ECharts 內建,避免手機版直立堆疊吃 Y 軸 #}
-    <div class="dca-chart-legend" aria-hidden="true">
-      <span class="dca-legend-item">
-        <span class="dca-legend-dash" style="background: #10b981;"></span>較好
-      </span>
-      <span class="dca-legend-item">
-        <span class="dca-legend-dash" style="background: #3b82f6;"></span>中位
-      </span>
-      <span class="dca-legend-item">
-        <span class="dca-legend-dash" style="background: #ef4444;"></span>較差
-      </span>
-      <span class="dca-legend-item">
-        <span class="dca-legend-dash" style="background: rgba(148, 163, 184, 0.6);"></span>投入
-      </span>
-    </div>
-    <div id="dca-chart" class="dca-chart-box"></div>
-  </div>
-
-  {# 區塊 6:演算法說明(預設收合)#}
-  <details class="dca-card">
-    <summary class="dca-algo-summary">
-      <span class="dca-algo-summary-text">這些數字怎麼來的?</span>
-      <span class="dca-algo-summary-arrow">⌄</span>
-    </summary>
-    <div class="dca-algo-body">
-      <p>我們用一種叫「<strong>蒙地卡羅模擬</strong>」的方法,簡單講就是用電腦模擬很多種可能的未來,看你選的組合在不同運氣下會變多少錢。</p>
-      <div class="dca-algo-h3">步驟拆開來看</div>
-      <ol>
-        <li>抓出你選的 ETF 過去每一年的漲跌幅(例如 0050 在 2022 年跌 22%、2023 年漲 28%)</li>
-        <li>電腦隨機重組這些年度漲跌,變成一條可能的未來路徑</li>
-        <li>重複上面這個動作 <strong>10000 次</strong>,得到 10000 種可能的未來</li>
-        <li>把 10000 個結果從差到好排一排:
-          <ul style="list-style: disc; padding-left: 1.3rem; margin-top: 0.3rem;">
-            <li>排在前面 5%(運氣好)→「較好情境」</li>
-            <li>排在中間 →「中位情境」</li>
-            <li>排在後面 5%(運氣差)→「較差情境」</li>
-          </ul>
-        </li>
-      </ol>
-      <div class="dca-algo-h3">最大策略虧損程度</div>
-      <p>每條未來路徑中,帳戶從最高點往下跌最深的那個跌幅。代表「過程中最慘的時候會跌多少」。</p>
-      <div class="dca-algo-source">
-        計算基準:還原股價(含配息)<br>
-        資料期間:該 ETF 上市以來最多 10 年
+  {# === Login Wall:未登入時鎖 區塊 5(圖表)+ 區塊 6(演算法詳細)=== #}
+  {# 圖表 server-side 條件 render:防 ECharts 在未登入時 init 浪費資源 #}
+  <div class="locked-zone {% if not current_user %}is-locked{% endif %}">
+    <div class="locked-content">
+      {# 區塊 5:圖表 #}
+      <div x-show="result" x-cloak class="dca-card dca-fadein">
+        <div class="dca-card-title" x-text="'這 ' + years + ' 年可能怎麼走'"></div>
+        {% if current_user %}
+          {# HTML legend — 不用 ECharts 內建,避免手機版直立堆疊吃 Y 軸 #}
+          <div class="dca-chart-legend" aria-hidden="true">
+            <span class="dca-legend-item">
+              <span class="dca-legend-dash" style="background: #10b981;"></span>較好
+            </span>
+            <span class="dca-legend-item">
+              <span class="dca-legend-dash" style="background: #3b82f6;"></span>中位
+            </span>
+            <span class="dca-legend-item">
+              <span class="dca-legend-dash" style="background: #ef4444;"></span>較差
+            </span>
+            <span class="dca-legend-item">
+              <span class="dca-legend-dash" style="background: rgba(148, 163, 184, 0.6);"></span>投入
+            </span>
+          </div>
+          <div id="dca-chart" class="dca-chart-box"></div>
+        {% else %}
+          {# 未登入:不 render 圖表 div,ECharts 不會 init #}
+          <div class="locked-chart-placeholder">登入後可查看完整視覺化結果</div>
+        {% endif %}
       </div>
+
+      {# 區塊 6:演算法說明(預設收合)#}
+      <details class="dca-card">
+        <summary class="dca-algo-summary">
+          <span class="dca-algo-summary-text">這些數字怎麼來的?</span>
+          <span class="dca-algo-summary-arrow">⌄</span>
+        </summary>
+        <div class="dca-algo-body">
+          <p>我們用一種叫「<strong>蒙地卡羅模擬</strong>」的方法,簡單講就是用電腦模擬很多種可能的未來,看你選的組合在不同運氣下會變多少錢。</p>
+          <div class="dca-algo-h3">步驟拆開來看</div>
+          <ol>
+            <li>抓出你選的 ETF 過去每一年的漲跌幅(例如 0050 在 2022 年跌 22%、2023 年漲 28%)</li>
+            <li>電腦隨機重組這些年度漲跌,變成一條可能的未來路徑</li>
+            <li>重複上面這個動作 <strong>10000 次</strong>,得到 10000 種可能的未來</li>
+            <li>把 10000 個結果從差到好排一排:
+              <ul style="list-style: disc; padding-left: 1.3rem; margin-top: 0.3rem;">
+                <li>排在前面 5%(運氣好)→「較好情境」</li>
+                <li>排在中間 →「中位情境」</li>
+                <li>排在後面 5%(運氣差)→「較差情境」</li>
+              </ul>
+            </li>
+          </ol>
+          <div class="dca-algo-h3">最大策略虧損程度</div>
+          <p>每條未來路徑中,帳戶從最高點往下跌最深的那個跌幅。代表「過程中最慘的時候會跌多少」。</p>
+          <div class="dca-algo-source">
+            計算基準:還原股價(含配息)<br>
+            資料期間:該 ETF 上市以來最多 10 年
+          </div>
+        </div>
+      </details>
     </div>
-  </details>
+    {% if not current_user %}
+      {% from "_partials/login_wall.html" import login_wall_card %}
+      {{ login_wall_card() }}
+    {% endif %}
+  </div>
 
   {# 區塊 7:免責 #}
   <section class="dca-disc">
