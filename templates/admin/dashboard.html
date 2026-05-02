@@ -22,25 +22,31 @@
   <div class="text-sm text-muted mt-1">未來會追加 訪客數 / 瀏覽次數 / TG 訂閱 / 熱門頁面</div>
 </section>
 
-{# === 4 大數字卡 === #}
-<section class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-  <div class="card p-4">
-    <div class="text-xs text-muted mb-1">總註冊會員</div>
-    <div class="stat-num num">{{ total }}<span class="text-base text-muted ml-1">人</span></div>
+{# === Hero:總註冊會員(跨寬置中,大字橘色高亮)=== #}
+<section class="card mb-4 px-6 py-8 sm:py-10 text-center"
+         style="border: 1px solid rgb(239 159 39 / 0.4); background: linear-gradient(180deg, rgb(239 159 39 / 0.06) 0%, rgb(19 24 41) 100%);">
+  <div class="text-sm uppercase tracking-[0.25em] text-muted mb-2">總註冊會員</div>
+  <div class="num font-bold leading-none"
+       style="font-size: 3.5rem; color: #EF9F27; text-shadow: 0 0 24px rgb(239 159 39 / 0.35);">
+    {{ total }}<span class="text-2xl text-muted ml-2 font-normal">人</span>
   </div>
+</section>
+
+{# === 三張新增卡片並排 === #}
+<section class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
   <div class="card p-4">
     <div class="text-xs text-muted mb-1">今天新增</div>
-    <div class="stat-num num" style="color: #10b981;">+{{ today }}</div>
+    <div class="num font-bold" style="font-size: 1.5rem; color: #10b981;">+{{ today }}</div>
     <div class="text-xs text-muted mt-1">當日 0:00 起</div>
   </div>
   <div class="card p-4">
     <div class="text-xs text-muted mb-1">本週新增</div>
-    <div class="stat-num num">+{{ this_week }}</div>
+    <div class="num font-bold" style="font-size: 1.5rem;">+{{ this_week }}</div>
     <div class="text-xs text-muted mt-1">週一 0:00 起</div>
   </div>
   <div class="card p-4">
     <div class="text-xs text-muted mb-1">本月新增</div>
-    <div class="stat-num num">+{{ this_month }}</div>
+    <div class="num font-bold" style="font-size: 1.5rem;">+{{ this_month }}</div>
     <div class="text-xs text-muted mt-1">1 號 0:00 起</div>
   </div>
 </section>
