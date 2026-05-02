@@ -5,79 +5,74 @@
 {% block head %}
 <style>
   .install-page {
-    max-width: 44rem;
+    max-width: 36rem;
     margin: 0 auto;
     font-size: 16px;
     line-height: 1.7;
   }
   .install-page h1 {
-    font-size: 1.7rem;
+    font-size: 1.6rem;
     font-weight: 800;
     color: rgb(var(--c-fg));
     line-height: 1.3;
     margin-bottom: 0.4rem;
   }
-  @media (min-width: 640px) { .install-page h1 { font-size: 2rem; } }
+  @media (min-width: 640px) { .install-page h1 { font-size: 1.9rem; } }
   .install-subtitle {
-    font-size: 1rem;
+    font-size: 0.95rem;
     color: rgb(var(--c-muted));
-    margin-bottom: 2rem;
-    line-height: 1.6;
+    margin-bottom: 1.8rem;
   }
   .install-section {
     border-radius: 0.75rem;
     border: 1px solid rgb(var(--c-border));
     padding: 1.4rem 1.4rem;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1.25rem;
   }
-  @media (min-width: 640px) { .install-section { padding: 1.7rem 1.9rem; } }
   .install-section.is-ios { background: rgba(96, 165, 250, 0.05); border-color: rgba(96, 165, 250, 0.25); }
   .install-section.is-android { background: rgba(34, 197, 94, 0.05); border-color: rgba(34, 197, 94, 0.25); }
   .install-section h2 {
-    font-size: 1.3rem;
+    font-size: 1.25rem;
     font-weight: 800;
     color: rgb(var(--c-fg));
-    margin-bottom: 1.1rem;
-    line-height: 1.35;
+    margin-bottom: 0.85rem;
   }
-  .install-step-block {
-    margin-top: 1.1rem;
-    padding-top: 1rem;
-    border-top: 1px dashed rgb(var(--c-border));
+
+  .install-qr-caption {
+    font-size: 0.95rem;
+    color: rgb(var(--c-fg) / 0.92);
+    margin-bottom: 0.6rem;
+    font-weight: 600;
   }
-  .install-step-block:first-of-type { margin-top: 0; padding-top: 0; border-top: 0; }
-  .install-step-title {
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: rgb(var(--c-fg));
-    margin-bottom: 0.5rem;
+  .install-qr-wrap {
+    display: flex; justify-content: center;
+    margin: 0.4rem 0 1.1rem;
   }
-  .install-warn {
-    background: rgba(245, 158, 11, 0.1);
-    border-left: 3px solid rgb(245 158 11);
-    padding: 0.55rem 0.85rem;
-    border-radius: 0.35rem;
-    margin: 0.6rem 0;
+  .install-qr {
+    width: 200px; height: 200px;
+    border-radius: 0.5rem;
+    background: #fff;
+    padding: 0.55rem;
+    box-shadow: 0 8px 24px -6px rgba(0,0,0,0.4);
+  }
+
+  .install-step-row {
+    display: flex; align-items: flex-start;
+    margin-bottom: 0.4rem;
     font-size: 0.95rem;
   }
+  .install-step-row:last-child { margin-bottom: 0; }
   .install-step-num {
-    font-size: 1.5rem;
+    flex-shrink: 0;
+    font-size: 1.25rem;
     font-weight: 800;
     color: rgb(239 159 39);
     margin-right: 0.55rem;
-    display: inline-block;
-    min-width: 1.5em;
+    min-width: 1.4em;
+    line-height: 1.45;
   }
-  .install-step-row {
-    display: flex; align-items: flex-start;
-    margin-bottom: 0.45rem;
-  }
-  .install-step-row:last-child { margin-bottom: 0; }
   .install-step-row > span:last-child { flex: 1; min-width: 0; }
-  .install-page p { margin: 0.5rem 0; }
   .install-page strong { color: rgb(var(--c-fg)); font-weight: 700; }
-  .install-page ul { list-style: disc; padding-left: 1.4rem; margin: 0.5rem 0; }
-  .install-page li { margin: 0.25rem 0; }
   .install-success {
     margin-top: 0.85rem;
     padding: 0.55rem 0.85rem;
@@ -88,230 +83,55 @@
     color: rgb(34 197 94);
     font-size: 0.95rem;
   }
-  .install-copy-btn {
-    display: inline-flex; align-items: center; gap: 0.5rem;
-    min-height: 44px;
-    padding: 0 1.2rem;
-    margin-top: 0.6rem;
-    background: rgb(239 159 39);
-    color: white;
-    border: 0;
-    border-radius: 0.45rem;
-    font-size: 0.95rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: background 0.15s;
-  }
-  .install-copy-btn:hover { background: rgb(220 140 25); }
 
-  /* QR Code 顯示區 */
-  .install-qr-wrap {
-    display: flex; justify-content: center;
-    margin: 0.85rem 0 1.1rem;
-  }
-  .install-qr {
-    width: 200px; height: 200px;
-    border-radius: 0.5rem;
-    background: #fff;
-    padding: 0.6rem;
-    box-shadow: 0 8px 24px -6px rgba(0,0,0,0.4);
-  }
-  .install-qr-tagline {
-    margin-top: 0.85rem !important;
-    text-align: center;
-    color: rgb(96 165 250);
+  .install-android-line {
     font-size: 0.95rem;
-  }
-  .install-url {
-    display: inline-block;
-    background: rgb(var(--c-bg-soft));
-    border: 1px solid rgb(var(--c-border));
-    border-radius: 0.35rem;
-    padding: 0.25rem 0.55rem;
-    font-family: ui-monospace, monospace;
-    font-size: 0.95rem;
-    color: rgb(var(--c-accent));
-  }
-  .install-faq dt {
-    font-size: 1rem;
-    font-weight: 700;
-    color: rgb(var(--c-fg));
-    margin-top: 1rem;
-    margin-bottom: 0.3rem;
-  }
-  .install-faq dt:first-child { margin-top: 0; }
-  .install-faq dd {
-    margin: 0 0 0.5rem 0;
-    color: rgb(var(--c-fg) / 0.92);
-  }
-  .install-toast {
-    position: fixed;
-    bottom: 1.5rem; left: 50%;
-    transform: translateX(-50%);
-    background: rgb(15 23 42 / 0.97);
-    border: 1px solid rgb(34 197 94 / 0.6);
-    border-radius: 9999px;
-    padding: 0.7rem 1.3rem;
-    color: rgb(74 222 128);
-    font-size: 0.95rem;
-    font-weight: 600;
-    box-shadow: 0 12px 30px -6px rgba(0,0,0,0.6);
-    z-index: 60;
+    line-height: 1.7;
+    color: rgb(var(--c-fg) / 0.94);
   }
 </style>
 {% endblock %}
 
 {% block content %}
-<article class="install-page" x-data="installPage()">
+<article class="install-page">
   <div class="text-xs text-muted tracking-widest mb-2">
     <a href="/" class="hover:text-accent">首頁</a>
     <span class="mx-1">/</span>
     <span>安裝教學</span>
   </div>
 
-  <h1>📱 把 ETF 觀察室裝到手機桌面</h1>
-  <p class="install-subtitle">把網站變成 app,點一下就開,不用每次打網址</p>
+  <h1>📱 把網頁變成 app</h1>
+  <p class="install-subtitle">點一下就開,不用每次打網址</p>
 
   {# ===== iPhone 區塊 ===== #}
   <section class="install-section is-ios">
-    <h2>🍎 iPhone 使用者</h2>
+    <h2>🍎 iPhone</h2>
 
-    <div class="install-step-block">
-      <div class="install-step-title">最快的方法:用相機掃 QR Code</div>
-      <div class="install-qr-wrap">
-        <img src="/static/img/install-qr.png" alt="ETF 觀察室 QR Code"
-             class="install-qr" width="200" height="200" loading="lazy">
-      </div>
-      <div class="install-step-row">
-        <span class="install-step-num">①</span>
-        <span>打開<strong>相機</strong> app(不是 Safari,就是平常拍照那個相機)</span>
-      </div>
-      <div class="install-step-row">
-        <span class="install-step-num">②</span>
-        <span>對準上面的 QR Code</span>
-      </div>
-      <div class="install-step-row">
-        <span class="install-step-num">③</span>
-        <span>點手機跳出來的網址</span>
-      </div>
-      <div class="install-step-row">
-        <span class="install-step-num">④</span>
-        <span>自動用 Safari 開,跟著教學卡做就好</span>
-      </div>
-      <p class="install-qr-tagline"><strong>不用切瀏覽器、不用複製貼上!</strong></p>
+    <div class="install-qr-caption">拿相機掃這個 QR Code,自動跳到 Safari</div>
+    <div class="install-qr-wrap">
+      <img src="/static/img/install-qr.png" alt="ETF 觀察室 QR Code"
+           class="install-qr" width="200" height="200" loading="lazy">
     </div>
 
-    <div class="install-step-block">
-      <div class="install-step-title">進去 Safari 之後怎麼裝?</div>
-      <div class="install-step-row">
-        <span class="install-step-num">①</span>
-        <span>點右下角「<strong>⋯</strong>」三個點</span>
-      </div>
-      <div class="install-step-row">
-        <span class="install-step-num">②</span>
-        <span>選「<strong>分享</strong>」→「<strong>更多</strong>」</span>
-      </div>
-      <div class="install-step-row">
-        <span class="install-step-num">③</span>
-        <span>找「<strong>加入主畫面</strong>」→「<strong>新增</strong>」</span>
-      </div>
-      <div class="install-success">完成!回到桌面就有 app icon 了</div>
+    <div class="install-step-row">
+      <span class="install-step-num">①</span>
+      <span>點右下角「<strong>⋯</strong>」三個點</span>
     </div>
+    <div class="install-step-row">
+      <span class="install-step-num">②</span>
+      <span>選「<strong>分享</strong>」→「<strong>更多</strong>」</span>
+    </div>
+    <div class="install-step-row">
+      <span class="install-step-num">③</span>
+      <span>找「<strong>加入主畫面</strong>」→「<strong>新增</strong>」</span>
+    </div>
+    <div class="install-success">完成!桌面就有 app icon 了</div>
   </section>
 
   {# ===== Android 區塊 ===== #}
   <section class="install-section is-android">
-    <h2>🤖 Android 使用者</h2>
-
-    <div class="install-step-block">
-      <div class="install-step-title">簡單版(推薦)</div>
-      <div class="install-step-row">
-        <span class="install-step-num">①</span>
-        <span>用 Chrome 打開 <span class="install-url">etf-watch.com</span></span>
-      </div>
-      <div class="install-step-row">
-        <span class="install-step-num">②</span>
-        <span>進來第二次後,下面會跳「<strong>📱 一鍵變 app</strong>」按鈕</span>
-      </div>
-      <div class="install-step-row">
-        <span class="install-step-num">③</span>
-        <span>點下去 → 系統跳安裝 → 確認</span>
-      </div>
-    </div>
-
-    <div class="install-step-block">
-      <div class="install-step-title">手動版(如果按鈕沒跳出來)</div>
-      <div class="install-step-row">
-        <span class="install-step-num">①</span>
-        <span>用 Chrome 打開網站</span>
-      </div>
-      <div class="install-step-row">
-        <span class="install-step-num">②</span>
-        <span>點右上角 ⋮(三個點)</span>
-      </div>
-      <div class="install-step-row">
-        <span class="install-step-num">③</span>
-        <span>找「<strong>加到主畫面</strong>」或「<strong>安裝應用程式</strong>」</span>
-      </div>
-      <div class="install-step-row">
-        <span class="install-step-num">④</span>
-        <span>點下去確認</span>
-      </div>
-    </div>
+    <h2>🤖 Android</h2>
+    <p class="install-android-line">進站第二次,底部會跳「<strong>📱 一鍵變 app</strong>」按鈕,點下去就裝好。</p>
   </section>
-
-  {# ===== FAQ 區塊 ===== #}
-  <section class="install-section">
-    <h2>常見問題</h2>
-    <dl class="install-faq">
-      <dt>Q:我從 LINE 點連結進來能裝嗎?</dt>
-      <dd>A:不行。LINE 自己的瀏覽器不能裝 app(蘋果限制)。請先把網址複製,自己打開 Safari 或 Chrome 貼上。</dd>
-
-      <dt>Q:裝完桌面找不到圖示?</dt>
-      <dd>A:滑到桌面最後一頁找找,或從手機桌面下拉搜尋「ETF 觀察室」。</dd>
-
-      <dt>Q:要錢嗎?</dt>
-      <dd>A:完全免費。</dd>
-    </dl>
-  </section>
-
-  {# ===== Toast(複製成功)===== #}
-  <div x-show="toast" x-cloak x-transition.opacity class="install-toast" x-text="toastMsg"></div>
 </article>
-
-<script>
-  function installPage() {
-    return {
-      toast: false,
-      toastMsg: '',
-      async copyUrl() {
-        const url = 'https://etf-watch.com';
-        try {
-          await navigator.clipboard.writeText(url);
-          this.showToast('✅ 網址已複製!打開 Safari 貼上即可');
-        } catch (e) {
-          // Fallback for older browsers
-          try {
-            const ta = document.createElement('textarea');
-            ta.value = url;
-            ta.style.position = 'fixed';
-            ta.style.opacity = '0';
-            document.body.appendChild(ta);
-            ta.select();
-            document.execCommand('copy');
-            document.body.removeChild(ta);
-            this.showToast('✅ 網址已複製!打開 Safari 貼上即可');
-          } catch (_) {
-            this.showToast('複製失敗,請手動輸入網址');
-          }
-        }
-      },
-      showToast(msg) {
-        this.toastMsg = msg;
-        this.toast = true;
-        setTimeout(() => { this.toast = false; }, 2000);
-      },
-    };
-  }
-</script>
 {% endblock %}
