@@ -35,21 +35,22 @@
 
     {# === PWA — manifest + theme-color + apple-touch + iOS / Android 主題設定 === #}
     <link rel="manifest" href="/static/manifest.json">
-    <meta name="theme-color" content="#EF9F27">
+    <meta name="theme-color" content="#0f172a">
 
     {# 多尺寸 favicon(覆蓋既有的 single icon)#}
     <link rel="icon" href="/static/icons/favicon.ico" sizes="any">
     <link rel="icon" href="/static/icons/icon-32x32.png" type="image/png" sizes="32x32">
     <link rel="icon" href="/static/icons/icon-16x16.png" type="image/png" sizes="16x16">
 
-    {# iOS 加桌面 #}
+    {# iOS 加桌面 — apple-touch-icon 用 180x180(iOS 標準)#}
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/icon-180x180.png">
     <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="ETF Watch">
+    <meta name="apple-mobile-web-app-title" content="ETF 觀察室">
 
     {# Android Tile color(舊版 IE/Edge,留著無害)#}
-    <meta name="msapplication-TileColor" content="#0a1628">
+    <meta name="msapplication-TileColor" content="#0f172a">
 
     {# Theme init — 在 Tailwind 載入之前先設好,避免 flash #}
     <script>
@@ -550,6 +551,141 @@
       .user-menu-logout { color: rgb(239 68 68); }
       .user-menu-logout svg { color: rgb(239 68 68); }
 
+      /* === PWA Install Prompt === */
+      .pwa-install-prompt {
+        position: fixed;
+        left: 0; right: 0;
+        bottom: 0;
+        z-index: 49;          /* 比 cookie banner z-50 低 */
+        padding: 0 1rem 1rem;
+        display: flex; justify-content: center;
+        pointer-events: none;
+      }
+      /* Android FAB(單顆按鈕 + × 關閉)*/
+      .pwa-fab-wrap {
+        position: relative;
+        display: inline-flex;
+        pointer-events: auto;
+      }
+      .pwa-install-fab {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-height: 48px;
+        padding: 0 1.5rem;
+        background: rgb(239 159 39);
+        color: white;
+        border: 0;
+        border-radius: 9999px;
+        font-size: 0.95rem;
+        font-weight: 700;
+        cursor: pointer;
+        box-shadow: 0 8px 24px -4px rgba(239, 159, 39, 0.5);
+        transition: background 0.15s, transform 0.15s;
+      }
+      .pwa-install-fab:hover { background: rgb(220 140 25); transform: translateY(-1px); }
+      .pwa-fab-close {
+        position: absolute;
+        top: -8px; right: -8px;
+        width: 22px; height: 22px;
+        display: flex; align-items: center; justify-content: center;
+        background: rgb(15 23 42);
+        color: white;
+        border: 1px solid rgb(var(--c-border));
+        border-radius: 9999px;
+        cursor: pointer;
+        padding: 0;
+      }
+      .pwa-fab-close:hover { background: rgb(30 41 59); }
+
+      /* iOS 教學卡 */
+      .pwa-install-card {
+        position: relative;
+        max-width: min(420px, calc(100vw - 2rem));
+        width: 100%;
+        background: rgb(15 23 42 / 0.97);
+        border: 1px solid rgb(239 159 39 / 0.5);
+        border-radius: 0.7rem;
+        box-shadow: 0 12px 40px -8px rgba(0,0,0,0.6);
+        backdrop-filter: blur(8px);
+        padding: 1.1rem 1.25rem;
+        color: rgb(var(--c-fg));
+        pointer-events: auto;
+      }
+      .pwa-install-close {
+        position: absolute;
+        top: 0.4rem; right: 0.4rem;
+        width: 1.75rem; height: 1.75rem;
+        display: flex; align-items: center; justify-content: center;
+        background: transparent;
+        border: 0;
+        color: rgb(var(--c-muted));
+        cursor: pointer;
+        border-radius: 9999px;
+      }
+      .pwa-install-close:hover { background: rgb(var(--c-bg-soft)); color: rgb(var(--c-fg)); }
+      .pwa-ios-title {
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: rgb(239 159 39);
+        margin-bottom: 0.2rem;
+        padding-right: 1.5rem;
+        line-height: 1.4;
+      }
+      .pwa-ios-subtitle {
+        font-size: 0.95rem;
+        color: rgb(var(--c-fg));
+        margin-bottom: 0.85rem;
+        font-weight: 600;
+      }
+      .pwa-ios-steps {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 0.85rem 0;
+        display: flex; flex-direction: column;
+        gap: 0.4rem;
+      }
+      .pwa-ios-step {
+        font-size: 0.92rem;
+        line-height: 1.55;
+        color: rgb(var(--c-fg) / 0.94);
+      }
+      .pwa-ios-final {
+        font-size: 0.92rem;
+        font-weight: 700;
+        color: rgb(34 197 94);
+        margin-bottom: 1rem;
+      }
+      .pwa-install-cta {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-height: 44px;
+        padding: 0 1.1rem;
+        background: rgb(239 159 39);
+        color: white;
+        border: 0;
+        border-radius: 0.45rem;
+        font-size: 0.95rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      .pwa-install-cta:hover { background: rgb(220 140 25); }
+      .pwa-install-secondary {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-height: 44px;
+        padding: 0 1rem;
+        background: transparent;
+        color: rgb(var(--c-muted));
+        border: 1px solid rgb(var(--c-border));
+        border-radius: 0.45rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: border-color 0.15s, color 0.15s;
+      }
+      .pwa-install-secondary:hover { border-color: rgb(var(--c-fg)); color: rgb(var(--c-fg)); }
+      .pwa-ios-actions { display: flex; gap: 0.55rem; }
+      .pwa-ios-actions .pwa-install-cta { flex: 1; }
+      .pwa-ios-actions .pwa-install-secondary { flex: 0 0 auto; min-width: 80px; }
+
       /* === Cookie banner === */
       /* 桌面預設 padding(原 px-4 sm:px-6 py-3 sm:py-4 移到 CSS,確保 mobile 有絕對控制權)*/
       .cookie-banner-inner {
@@ -1003,7 +1139,121 @@
       </div>
     </div>
 
+    {# === PWA Install Prompt — Android 一鍵 FAB / iOS 教學卡 === #}
+    <div x-data="pwaInstallPrompt()" x-init="init()" x-show="show" x-cloak x-transition.opacity
+         class="pwa-install-prompt">
+
+      {# Android Chrome:單顆橘色 FAB「📱 一鍵變 app」+ × 關閉 #}
+      <template x-if="!isIOS">
+        <div class="pwa-fab-wrap">
+          <button type="button" class="pwa-install-fab" @click="install()">📱 一鍵變 app</button>
+          <button type="button" @click="dismiss()" class="pwa-fab-close" aria-label="關閉">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </template>
+
+      {# iOS Safari 教學卡(沒 API,只能手動教學)#}
+      <template x-if="isIOS">
+        <div class="pwa-install-card pwa-ios-card">
+          <button type="button" @click="dismiss()" class="pwa-install-close" aria-label="關閉">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+          <div class="pwa-ios-title">📱 想要更方便?</div>
+          <div class="pwa-ios-subtitle">把 ETF 觀察室變成手機 app</div>
+          <ol class="pwa-ios-steps">
+            <li class="pwa-ios-step">① 點下面的 ⬆️(分享鈕)</li>
+            <li class="pwa-ios-step">② 滑一下找「加入主畫面」</li>
+            <li class="pwa-ios-step">③ 點「新增」</li>
+          </ol>
+          <div class="pwa-ios-final">搞定!桌面就有 app 了</div>
+          <div class="pwa-ios-actions">
+            <button type="button" class="pwa-install-cta" @click="dismiss()">好,我會弄</button>
+            <button type="button" class="pwa-install-secondary" @click="dismiss()">不要</button>
+          </div>
+        </div>
+      </template>
+    </div>
+
     <script>
+      function pwaInstallPrompt() {
+        return {
+          show: false,
+          isIOS: false,
+          deferredPrompt: null,
+          init() {
+            // 已安裝(standalone display mode 或 iOS standalone)→ 永久不顯示
+            const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+                                  || window.navigator.standalone === true;
+            if (isStandalone) {
+              try { localStorage.setItem('pwa_installed', '1'); } catch(e) {}
+              return;
+            }
+            try { if (localStorage.getItem('pwa_installed') === '1') return; } catch(e) {}
+
+            // 已 dismiss + 7 天內 → skip
+            try {
+              const ts = parseInt(localStorage.getItem('pwa_prompt_dismissed') || '0', 10);
+              if (ts && (Date.now() - ts < 7 * 24 * 60 * 60 * 1000)) return;
+            } catch(e) {}
+
+            // iOS 偵測(沒有 beforeinstallprompt API,只能教學)
+            const ua = navigator.userAgent;
+            this.isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+
+            const self = this;
+
+            // appinstalled 事件 — 安裝成功後永久標記
+            window.addEventListener('appinstalled', function () {
+              self.show = false;
+              try { localStorage.setItem('pwa_installed', '1'); } catch(e) {}
+            });
+
+            if (this.isIOS) {
+              // iOS 第二次訪問才顯示(避免第一次就煩)
+              try {
+                const visits = parseInt(localStorage.getItem('pwa_visits') || '0', 10) + 1;
+                localStorage.setItem('pwa_visits', String(visits));
+                if (visits >= 2) {
+                  // 等 cookie banner accept 後再顯示
+                  if (localStorage.getItem('cookie_consent_v1') === 'accepted') {
+                    setTimeout(function () { self.show = true; }, 1500);
+                  }
+                }
+              } catch(e) {}
+            } else {
+              // Android Chrome / Edge — beforeinstallprompt
+              window.addEventListener('beforeinstallprompt', function (e) {
+                e.preventDefault();
+                self.deferredPrompt = e;
+                try {
+                  if (localStorage.getItem('cookie_consent_v1') === 'accepted') {
+                    self.show = true;
+                  }
+                } catch(_) { self.show = true; }
+              });
+            }
+          },
+          async install() {
+            if (this.deferredPrompt) {
+              this.deferredPrompt.prompt();
+              try {
+                const choice = await this.deferredPrompt.userChoice;
+                if (choice && choice.outcome === 'accepted') {
+                  try { localStorage.setItem('pwa_installed', '1'); } catch(_) {}
+                }
+              } catch(_) {}
+              this.deferredPrompt = null;
+              this.show = false;
+            }
+          },
+          dismiss() {
+            this.show = false;
+            try { localStorage.setItem('pwa_prompt_dismissed', String(Date.now())); } catch(_) {}
+          },
+        };
+      }
+
       function cookieBanner() {
         return {
           show: false,

@@ -1,14 +1,14 @@
 {
   "name": "ETF 觀察室",
-  "short_name": "ETF Watch",
-  "description": "ETF 排行、配息、持股分析、定期定額試算工具",
+  "short_name": "ETF 觀察室",
+  "description": "台股 ETF 排行、配息、持股分析",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "theme_color": "#EF9F27",
-  "background_color": "#0a1628",
-  "lang": "zh-TW",
+  "theme_color": "#0f172a",
+  "background_color": "#0f172a",
+  "lang": "zh-Hant",
   "dir": "ltr",
   "categories": ["finance", "productivity", "utilities"],
   "icons": [
@@ -27,6 +27,12 @@
     {
       "src": "/static/icons/icon-128x128.png",
       "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/icons/icon-144x144.png",
+      "sizes": "144x144",
       "type": "image/png",
       "purpose": "any"
     },
