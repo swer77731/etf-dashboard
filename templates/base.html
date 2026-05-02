@@ -33,6 +33,24 @@
     <link rel="icon" type="image/svg+xml" href="{{ logo_url }}">
     {% endif %}
 
+    {# === PWA — manifest + theme-color + apple-touch + iOS / Android 主題設定 === #}
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#EF9F27">
+
+    {# 多尺寸 favicon(覆蓋既有的 single icon)#}
+    <link rel="icon" href="/static/icons/favicon.ico" sizes="any">
+    <link rel="icon" href="/static/icons/icon-32x32.png" type="image/png" sizes="32x32">
+    <link rel="icon" href="/static/icons/icon-16x16.png" type="image/png" sizes="16x16">
+
+    {# iOS 加桌面 #}
+    <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ETF Watch">
+
+    {# Android Tile color(舊版 IE/Edge,留著無害)#}
+    <meta name="msapplication-TileColor" content="#0a1628">
+
     {# Theme init — 在 Tailwind 載入之前先設好,避免 flash #}
     <script>
       (function () {
@@ -953,6 +971,16 @@
             this.show = false;
           },
         };
+      }
+    </script>
+
+    {# === Service Worker 註冊(只在 https 註冊;localhost 也算 secure context)=== #}
+    <script>
+      if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/service-worker.js')
+            .catch(function (err) { console.log('[SW] registration failed:', err); });
+        });
       }
     </script>
 </body>

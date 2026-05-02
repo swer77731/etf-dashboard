@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from datetime import date, datetime, timedelta
@@ -833,3 +833,32 @@ async def privacy(request: Request) -> HTMLResponse:
 async def account_delete(request: Request) -> HTMLResponse:
     """Google OAuth 上架要求:公開可訪問、無需登入的帳號刪除說明頁。"""
     return templates.TemplateResponse(request, "legal/account_delete.html", _common_ctx(request))
+
+
+# === PWA 路由(根路徑提供 sw + manifest)===
+# Service Worker 必須從根路徑提供才能控制整個 origin(Service-Worker-Allowed: /)
+# manifest.json 額外從根提供一份,讓 SW pre-cache 清單裡的 /manifest.json 命中
+_STATIC_DIR = PROJECT_ROOT / "static"
+
+
+@router.get("/service-worker.js", include_in_schema=False)
+async def service_worker():
+    """根路徑的 SW — 控制整個 origin scope。"""
+    return FileResponse(
+        str(_STATIC_DIR / "service-worker.js"),
+        media_type="application/javascript",
+        headers={
+            "Service-Worker-Allowed": "/",
+            "Cache-Control": "public, max-age=0, must-revalidate",  # SW 自身不快取,確保更新即時生效
+        },
+    )
+
+
+@router.get("/manifest.json", include_in_schema=False)
+async def manifest_root():
+    """根路徑同份 manifest — SW pre-cache 清單裡含 /manifest.json,提供 passthrough。
+    base.html 仍指向 /static/manifest.json(主路徑),這邊只是相容路徑。"""
+    return FileResponse(
+        str(_STATIC_DIR / "manifest.json"),
+        media_type="application/manifest+json",
+    )
