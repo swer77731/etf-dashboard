@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block title %}帳號刪除說明 — {{ brand_full }}{% endblock %}
+
+{% block head %}
+<style>
+  .legal-page { max-width: 48rem; margin: 0 auto; }
+  .legal-page h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: rgb(var(--c-fg));
+    margin-bottom: 0.5rem;
+  }
+  @media (min-width: 640px) { .legal-page h1 { font-size: 2rem; } }
+  .legal-page h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: rgb(var(--c-fg));
+    margin-top: 2rem;
+    margin-bottom: 0.85rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid rgb(var(--c-border));
+  }
+  .legal-page h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: rgb(var(--c-fg));
+    margin-top: 1.2rem;
+    margin-bottom: 0.5rem;
+  }
+  .legal-page p { margin: 0.7rem 0; line-height: 1.8; color: rgb(var(--c-fg) / 0.9); }
+  .legal-page ul, .legal-page ol {
+    margin: 0.6rem 0 0.8rem 1.4rem;
+    line-height: 1.8;
+    color: rgb(var(--c-fg) / 0.9);
+  }
+  .legal-page ul { list-style: disc; }
+  .legal-page ol { list-style: decimal; }
+  .legal-page li { margin: 0.25rem 0; }
+  .legal-page strong { color: rgb(var(--c-fg)); font-weight: 700; }
+  .legal-page a { color: rgb(var(--c-accent)); text-decoration: underline; }
+  .legal-page a:hover { opacity: 0.85; }
+  .legal-page table { width: 100%; border-collapse: collapse; margin: 0.6rem 0; }
+  .legal-page th, .legal-page td {
+    padding: 0.5rem 0.7rem;
+    border: 1px solid rgb(var(--c-border));
+    text-align: left;
+    font-size: 0.95rem;
+  }
+  .legal-page th { background: rgb(var(--c-bg-soft)); font-weight: 600; }
+  .legal-page .last-updated {
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgb(var(--c-border));
+    color: rgb(var(--c-muted));
+    font-size: 0.9rem;
+    text-align: right;
+  }
+  .legal-page .step-box {
+    background: rgb(var(--c-bg-soft));
+    border: 1px solid rgb(var(--c-border));
+    border-radius: 0.5rem;
+    padding: 1rem 1.2rem;
+    margin: 0.85rem 0;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<article class="legal-page">
+  <div class="text-xs text-muted tracking-widest mb-2">
+    <a href="/" class="hover:text-accent">首頁</a>
+    <span class="mx-1">/</span>
+    <span>帳號刪除說明</span>
+  </div>
+
+  <h1 class="hero-text">帳號刪除說明</h1>
+
+  <div class="bg-card border border-border rounded-xl p-6 sm:p-8 mt-5">
+
+    <p>本頁說明如何刪除你在 ETF 觀察室(以下簡稱「本網站」)使用 Google 帳號登入後留下的個人資料。本頁公開可訪問,無需登入即可閱讀。</p>
+
+    <h2>適用範圍</h2>
+    <p>本說明適用於以下情境:</p>
+    <ul>
+      <li>使用 <strong>Google 帳號登入</strong>(Google OAuth)註冊本網站會員後</li>
+      <li>本網站收到並儲存你的會員資料(Email、Google 帳號 ID、暱稱)後</li>
+      <li>你決定不再使用本網站,希望刪除所有相關個人資料</li>
+    </ul>
+
+    <p><strong>會員系統尚未上線時段</strong>:本網站尚未開放 Google 登入。除自動收集的瀏覽記錄外,沒有任何個人會員資料儲存於本站。</p>
+
+    <h2>刪除方式</h2>
+
+    <h3>方法 1:自助刪除(會員系統上線後)</h3>
+    <div class="step-box">
+      <ol>
+        <li>使用 Google 帳號登入本網站</li>
+        <li>點選右上角頭像 → <strong>「帳號設定」</strong></li>
+        <li>頁面底部點選 <strong>「刪除我的帳號」</strong></li>
+        <li>輸入確認字串完成驗證</li>
+        <li>系統將在 <strong>立即</strong> 刪除你的會員資料,並在 <strong>30 天內</strong> 從備份檔案中清除</li>
+      </ol>
+    </div>
+
+    <h3>方法 2:來信刪除(任何時候皆可使用)</h3>
+    <div class="step-box">
+      <ol>
+        <li>寄信至 <a href="mailto:swer77731@gmail.com?subject=刪除帳號">swer77731@gmail.com</a></li>
+        <li>主旨:<strong>「刪除帳號」</strong></li>
+        <li>內文需註明用於登入的 <strong>Google 帳號 Email</strong>(用以驗證身分)</li>
+        <li>站長將於 <strong>7 個工作天內</strong> 完成刪除並回信確認</li>
+      </ol>
+    </div>
+
+    <h3>方法 3:撤銷 Google 授權(立即停止本網站存取)</h3>
+    <div class="step-box">
+      <p>若僅希望停止本網站存取你的 Google 帳號資訊(但保留會員資料於本站):</p>
+      <ol>
+        <li>前往 <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">Google 帳號 → 第三方應用權限</a></li>
+        <li>找到「ETF 觀察室」</li>
+        <li>點選「移除存取權」</li>
+      </ol>
+      <p>此操作只解除 Google 端的授權,本站若仍保有資料,需另以方法 1 或 2 完成刪除。</p>
+    </div>
+
+    <h2>會被刪除的資料</h2>
+    <table>
+      <thead>
+        <tr><th>資料類型</th><th>處理方式</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Email 電子郵件信箱</td><td>立即刪除</td></tr>
+        <tr><td>Google 帳號 ID</td><td>立即刪除</td></tr>
+        <tr><td>暱稱(顯示名稱)</td><td>立即刪除</td></tr>
+        <tr><td>個人偏好設定(自選清單、推播設定)</td><td>立即刪除</td></tr>
+        <tr><td>瀏覽紀錄(已匿名化)</td><td>30 天後自動清除</td></tr>
+        <tr><td>留言、評論等公開內容</td><td>顯示名稱改為「已刪除使用者」,內容保留</td></tr>
+      </tbody>
+    </table>
+
+    <h2>不會被刪除的資料</h2>
+    <p>以下資料因法規或營運必要,將依下列原則處理:</p>
+    <ul>
+      <li><strong>系統 log(伺服器存取記錄)</strong>:保留 90 天,僅用於資安鑑識,IP 末段已遮罩</li>
+      <li><strong>金流交易紀錄</strong>(若曾有付費):依稅務法規保留 <strong>5 年</strong>,僅站長可查閱,絕不外流</li>
+      <li><strong>已匿名化的彙總統計</strong>(例如「累計訪客數」):無法還原為個人資料,將永久保留</li>
+    </ul>
+
+    <h2>處理時程</h2>
+    <table>
+      <thead>
+        <tr><th>項目</th><th>時程</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>主資料庫刪除</td><td>立即(自助)/ 7 個工作天內(來信)</td></tr>
+        <tr><td>備份檔案清除</td><td>30 天內</td></tr>
+        <tr><td>系統 log 自動清除</td><td>90 天</td></tr>
+        <tr><td>金流紀錄(若有)</td><td>5 年(稅務法規要求)</td></tr>
+      </tbody>
+    </table>
+
+    <h2>不可逆性</h2>
+    <p><strong>帳號刪除為不可逆操作。</strong>一旦執行,所有會員資料、自選清單、個人偏好將永久消失,無法復原。如需重新使用本網站,請以新帳號重新註冊。</p>
+
+    <h2>聯絡與問題回報</h2>
+    <p>如有以下情況,請來信聯繫:</p>
+    <ul>
+      <li>未在預期時間內收到刪除確認</li>
+      <li>對刪除流程有疑問</li>
+      <li>申請刪除遇到技術問題</li>
+    </ul>
+    <p>聯絡信箱:<a href="mailto:swer77731@gmail.com">swer77731@gmail.com</a></p>
+
+    <h2>相關文件</h2>
+    <ul>
+      <li><a href="/privacy">隱私權政策</a> — 完整資料收集與保護說明</li>
+      <li><a href="/terms">服務條款</a> — 使用條件、義務與權利</li>
+      <li><a href="/disclaimer">投資免責聲明</a> — 資訊性質與責任界線</li>
+    </ul>
+
+    <p class="last-updated">最後更新日期:2026-05-02</p>
+  </div>
+</article>
+{% endblock %}

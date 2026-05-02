@@ -817,3 +817,9 @@ async def terms(request: Request) -> HTMLResponse:
 @router.get("/privacy", response_class=HTMLResponse)
 async def privacy(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "legal/privacy.html", _common_ctx())
+
+
+@router.get("/account-delete", response_class=HTMLResponse)
+async def account_delete(request: Request) -> HTMLResponse:
+    """Google OAuth 上架要求:公開可訪問、無需登入的帳號刪除說明頁。"""
+    return templates.TemplateResponse(request, "legal/account_delete.html", _common_ctx())
