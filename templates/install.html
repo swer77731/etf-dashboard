@@ -103,6 +103,25 @@
     transition: background 0.15s;
   }
   .install-copy-btn:hover { background: rgb(220 140 25); }
+
+  /* QR Code 顯示區 */
+  .install-qr-wrap {
+    display: flex; justify-content: center;
+    margin: 0.85rem 0 1.1rem;
+  }
+  .install-qr {
+    width: 200px; height: 200px;
+    border-radius: 0.5rem;
+    background: #fff;
+    padding: 0.6rem;
+    box-shadow: 0 8px 24px -6px rgba(0,0,0,0.4);
+  }
+  .install-qr-tagline {
+    margin-top: 0.85rem !important;
+    text-align: center;
+    color: rgb(96 165 250);
+    font-size: 0.95rem;
+  }
   .install-url {
     display: inline-block;
     background: rgb(var(--c-bg-soft));
@@ -158,38 +177,43 @@
     <h2>🍎 iPhone 使用者</h2>
 
     <div class="install-step-block">
-      <div class="install-step-title">第一步:用 Safari 打開</div>
-      <div class="install-warn">
-        ⚠️ <strong>重點</strong>:必須用 Safari,不能用 LINE / FB 內建的瀏覽器
+      <div class="install-step-title">最快的方法:用相機掃 QR Code</div>
+      <div class="install-qr-wrap">
+        <img src="/static/img/install-qr.png" alt="ETF 觀察室 QR Code"
+             class="install-qr" width="200" height="200" loading="lazy">
       </div>
-      <p><strong>怎麼開 Safari?</strong></p>
-      <ul>
-        <li>回到手機桌面</li>
-        <li>找一個藍色指南針 icon 🧭(通常在底部那排)</li>
-        <li>點下去就是 Safari</li>
-      </ul>
-    </div>
-
-    <div class="install-step-block">
-      <div class="install-step-title">第二步:輸入網址</div>
-      <p>在 Safari 上方網址列打:<span class="install-url">swer-etf.zeabur.app</span></p>
-      <p>或點下面按鈕直接複製:</p>
-      <button type="button" class="install-copy-btn" @click="copyUrl()">📋 複製網址</button>
-    </div>
-
-    <div class="install-step-block">
-      <div class="install-step-title">第三步:加到主畫面</div>
       <div class="install-step-row">
         <span class="install-step-num">①</span>
-        <span>點手機最下面正中間的 ⬆️(分享鈕)</span>
+        <span>打開<strong>相機</strong> app(不是 Safari,就是平常拍照那個相機)</span>
       </div>
       <div class="install-step-row">
         <span class="install-step-num">②</span>
-        <span>跳出選單後往下滑,找「<strong>加入主畫面</strong>」</span>
+        <span>對準上面的 QR Code</span>
       </div>
       <div class="install-step-row">
         <span class="install-step-num">③</span>
-        <span>右上角點「<strong>新增</strong>」</span>
+        <span>點手機跳出來的網址</span>
+      </div>
+      <div class="install-step-row">
+        <span class="install-step-num">④</span>
+        <span>自動用 Safari 開,跟著教學卡做就好</span>
+      </div>
+      <p class="install-qr-tagline"><strong>不用切瀏覽器、不用複製貼上!</strong></p>
+    </div>
+
+    <div class="install-step-block">
+      <div class="install-step-title">進去 Safari 之後怎麼裝?</div>
+      <div class="install-step-row">
+        <span class="install-step-num">①</span>
+        <span>點右下角「<strong>⋯</strong>」三個點</span>
+      </div>
+      <div class="install-step-row">
+        <span class="install-step-num">②</span>
+        <span>選「<strong>分享</strong>」→「<strong>更多</strong>」</span>
+      </div>
+      <div class="install-step-row">
+        <span class="install-step-num">③</span>
+        <span>找「<strong>加入主畫面</strong>」→「<strong>新增</strong>」</span>
       </div>
       <div class="install-success">完成!回到桌面就有 app icon 了</div>
     </div>
@@ -203,7 +227,7 @@
       <div class="install-step-title">簡單版(推薦)</div>
       <div class="install-step-row">
         <span class="install-step-num">①</span>
-        <span>用 Chrome 打開 <span class="install-url">swer-etf.zeabur.app</span></span>
+        <span>用 Chrome 打開 <span class="install-url">etf-watch.com</span></span>
       </div>
       <div class="install-step-row">
         <span class="install-step-num">②</span>
@@ -261,7 +285,7 @@
       toast: false,
       toastMsg: '',
       async copyUrl() {
-        const url = 'https://swer-etf.zeabur.app';
+        const url = 'https://etf-watch.com';
         try {
           await navigator.clipboard.writeText(url);
           this.showToast('✅ 網址已複製!打開 Safari 貼上即可');
