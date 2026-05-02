@@ -171,26 +171,13 @@ def _member_stats() -> dict:
     }
 
 
-@router.get("", response_class=HTMLResponse)
+@router.get("")
 async def admin_root(request: Request):
-    """站長後台 — 只有 settings.admin_email 白名單的 Google 帳號能進。
+    """/admin 一律 redirect 到合併後的 /admin/analytics(避免兩個後台並存)。
 
-    流程:
-    - 未登入 → 跳 Google OAuth 登入
-    - 登入但 email 不在白名單 → 403
-    - 是站長 → 顯示 dashboard(會員數據,未來追加 DAU/PV/TG)
+    auth 在目的地頁做(/admin/analytics 接 Google admin / JWT 雙重驗證)。
     """
-    is_admin, user = _is_site_admin(request)
-    if user is None:
-        # 還沒登入 Google → 跳登入,登入後回 /admin
-        return RedirectResponse(url="/auth/google/login", status_code=302)
-    if not is_admin:
-        # 已登入但不是站長
-        raise HTTPException(403, "你不是站長,無權進入後台")
-
-    stats = _member_stats()
-    ctx = _admin_ctx(request, **stats, current_user=user)
-    return templates.TemplateResponse(request, "admin/dashboard.html", ctx)
+    return RedirectResponse(url="/admin/analytics", status_code=301)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -247,7 +234,20 @@ async def logout(request: Request):
 
 @router.get("/analytics", response_class=HTMLResponse)
 async def analytics_page(request: Request, range_days: int = 7):
-    if not _is_authed(request):
+    """流量後台 — 整合容量監控 / 會員註冊 / 訪客數據 / 熱門 ETF / 熱門搜尋 全套。
+
+    雙重 auth(2026-05-02):
+      1. Google admin email 白名單(首選,新機制)
+      2. JWT 密碼登入(後備,既有機制)
+    任一通過即放行。都沒過 → 跳 /admin/login(密碼登入頁,user 自己選 OAuth)
+    """
+    is_admin, user = _is_site_admin(request)
+    is_jwt = _is_authed(request)
+    # Google 登入但非站長 email → 403(不要跳密碼頁誤導)
+    if user is not None and not is_admin and not is_jwt:
+        raise HTTPException(403, "你不是站長,無權進入後台")
+    # 完全未登入 → 跳密碼頁(user 也可去首頁點 Google 登入再來)
+    if not is_admin and not is_jwt:
         return RedirectResponse(url="/admin/login", status_code=302)
 
     # range 限制
@@ -266,6 +266,7 @@ async def analytics_page(request: Request, range_days: int = 7):
     compares = admin_analytics.top_compares(days=range_days, limit=10)
     refs = admin_analytics.referer_breakdown(days=range_days)
     visits = admin_analytics.recent_visits(limit=100)
+    member_stats = _member_stats()   # 會員註冊統計(2026-05-02 併入)
 
     return templates.TemplateResponse(
         request, "admin/analytics.html",
@@ -282,6 +283,9 @@ async def analytics_page(request: Request, range_days: int = 7):
             compares=compares,
             refs=refs,
             visits=visits,
+            members=member_stats,
+            current_user=user,         # Google admin user dict | None
+            auth_via_google=is_admin,  # 顯示登出按鈕用哪種(Google form / 密碼 link)
         ),
     )
 

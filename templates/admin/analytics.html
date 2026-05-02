@@ -16,6 +16,16 @@
   <a href="/admin/send_daily_report" class="text-muted hover:text-fg transition" title="即時推一次今日 TG 日報">推送日報</a>
 {% endblock %}
 
+{# Google admin 登入 → 顯示 email + Google 登出 form;否則沿用密碼 JWT 登出 #}
+{% if auth_via_google and current_user %}
+{% block header_right %}
+  <span class="text-fg/85 hidden sm:inline text-xs">{{ current_user.email }}</span>
+  <form method="POST" action="/auth/logout" class="inline-block ml-1">
+    <button type="submit" class="text-muted hover:text-fg transition">登出</button>
+  </form>
+{% endblock %}
+{% endif %}
+
 {% block content %}
 
 {# === 📡 容量監控(同時在線)— 流量爆發時看天花板 === #}
@@ -71,6 +81,86 @@
     (依「近 30 天尖峰」決定)
   </div>
 </section>
+
+{# === 會員註冊(2026-05-02 從 /admin 併入)=== #}
+{% if members is defined and members %}
+<section class="mb-5">
+  <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
+    <span>👤 會員註冊</span>
+    <span class="text-xs text-muted font-normal">Google OAuth 註冊累計</span>
+  </h2>
+
+  {# Hero:總註冊會員 大卡 #}
+  <div class="card mb-3 px-5 py-6 sm:py-8 text-center"
+       style="border: 1px solid rgb(239 159 39 / 0.4); background: linear-gradient(180deg, rgb(239 159 39 / 0.06) 0%, rgb(19 24 41) 100%);">
+    <div class="text-xs uppercase tracking-[0.25em] text-muted mb-2">總註冊會員</div>
+    <div class="num font-bold leading-none admin-mem-hero-num">
+      {{ members.total }}<span class="text-xl text-muted ml-2 font-normal">人</span>
+    </div>
+  </div>
+
+  {# 三張小卡(mobile 1 欄 / desktop 3 欄)#}
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 mb-3">
+    <div class="card p-3 sm:p-4">
+      <div class="text-xs text-muted mb-1">今天新增</div>
+      <div class="num font-bold admin-mem-num" style="color: #10b981;">+{{ members.today }}</div>
+      <div class="text-xs text-muted mt-1">當日 0:00 起</div>
+    </div>
+    <div class="card p-3 sm:p-4">
+      <div class="text-xs text-muted mb-1">本週新增</div>
+      <div class="num font-bold admin-mem-num">+{{ members.this_week }}</div>
+      <div class="text-xs text-muted mt-1">週一 0:00 起</div>
+    </div>
+    <div class="card p-3 sm:p-4">
+      <div class="text-xs text-muted mb-1">本月新增</div>
+      <div class="num font-bold admin-mem-num">+{{ members.this_month }}</div>
+      <div class="text-xs text-muted mt-1">1 號 0:00 起</div>
+    </div>
+  </div>
+
+  {# 最近 10 註冊 #}
+  <div class="card p-3 sm:p-4">
+    <h3 class="text-sm font-semibold mb-2">最近註冊的 10 個會員</h3>
+    {% if members.recent and members.recent|length > 0 %}
+    <div class="overflow-x-auto -mx-3 sm:mx-0">
+      <table class="w-full text-sm min-w-[420px]">
+        <thead>
+          <tr class="text-xs text-muted uppercase tracking-wider border-b border-border">
+            <th class="text-left py-2 px-3 sm:px-2 admin-mem-cell">Email</th>
+            <th class="text-left py-2 px-3 sm:px-2 admin-mem-cell">暱稱</th>
+            <th class="text-left py-2 px-3 sm:px-2 admin-mem-cell whitespace-nowrap">註冊時間 (UTC)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in members.recent %}
+          <tr class="border-b border-border last:border-b-0">
+            <td class="py-2 px-3 sm:px-2 font-mono text-fg/90 admin-mem-cell admin-mem-cell-email whitespace-nowrap">{{ u.email_masked }}</td>
+            <td class="py-2 px-3 sm:px-2 text-fg/85 admin-mem-cell">{{ u.display_name }}</td>
+            <td class="py-2 px-3 sm:px-2 text-muted admin-mem-cell admin-mem-cell-time whitespace-nowrap">{{ u.created_at }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-muted text-sm py-4 text-center">尚無會員註冊</div>
+    {% endif %}
+  </div>
+</section>
+
+<style>
+  /* 會員區 mobile 字級控制 */
+  .admin-mem-hero-num { font-size: 3rem; color: #EF9F27; text-shadow: 0 0 24px rgb(239 159 39 / 0.3); }
+  @media (max-width: 640px) { .admin-mem-hero-num { font-size: 2.25rem; } }
+  .admin-mem-num { font-size: 1.5rem; line-height: 1.15; }
+  @media (max-width: 640px) {
+    .admin-mem-num { font-size: 1.3rem; }
+    .admin-mem-cell { padding: 0.45rem 0.55rem !important; font-size: 12px; }
+    .admin-mem-cell-email { font-size: 11.5px; }
+    .admin-mem-cell-time { font-size: 11px; }
+  }
+</style>
+{% endif %}
 
 {# === 大字數字卡 — 今日綜合 === #}
 <section class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
