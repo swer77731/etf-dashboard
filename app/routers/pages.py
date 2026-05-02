@@ -25,25 +25,41 @@ templates.env.filters["humanize_relative"] = humanize_relative
 templates.env.filters["is_fresh_news"] = is_fresh_news
 
 
-_LOGO_SVG = PROJECT_ROOT / "static" / "img" / "logo.svg"
+# 2026-05-02:logo 改用 static/icons/logo.svg(新路徑無 CDN cache 歷史)
+# 舊 static/img/logo.svg 在 Cloudflare HIT 1 年 immutable,改 bytes 也讀不到新版
+# 之後若要再換 logo,可用 query string `?v=N` 強制 reload,或再換新檔名
+_LOGO_SVG_NEW = PROJECT_ROOT / "static" / "icons" / "logo.svg"
+_LOGO_SVG_LEGACY = PROJECT_ROOT / "static" / "img" / "logo.svg"
 _LOGO_PNG = PROJECT_ROOT / "static" / "img" / "logo.png"
-_FAVICON  = PROJECT_ROOT / "static" / "img" / "favicon.ico"
+# favicon 同理:新路徑 static/icons/favicon.ico,舊 static/img/favicon.ico 仍 fallback
+_FAVICON_NEW = PROJECT_ROOT / "static" / "icons" / "favicon.ico"
+_FAVICON_LEGACY = PROJECT_ROOT / "static" / "img" / "favicon.ico"
 
 
 def _detect_brand_assets() -> dict:
     """偵測 LOGO / favicon 是否存在,讓 template 自動切換。
 
-    user 把檔案丟進 static/img/ 後,所有頁面自動使用 LOGO,不必改程式碼。
+    優先序:static/icons/(新,2026-05-02 PWA package) → static/img/(舊,fallback)
     """
-    if _LOGO_SVG.exists():
+    if _LOGO_SVG_NEW.exists():
+        logo_url = "/static/icons/logo.svg"
+    elif _LOGO_SVG_LEGACY.exists():
         logo_url = "/static/img/logo.svg"
     elif _LOGO_PNG.exists():
         logo_url = "/static/img/logo.png"
     else:
         logo_url = None
+
+    if _FAVICON_NEW.exists():
+        favicon_url = "/static/icons/favicon.ico"
+    elif _FAVICON_LEGACY.exists():
+        favicon_url = "/static/img/favicon.ico"
+    else:
+        favicon_url = None
+
     return {
         "logo_url": logo_url,
-        "favicon_url": "/static/img/favicon.ico" if _FAVICON.exists() else None,
+        "favicon_url": favicon_url,
         "has_logo": logo_url is not None,
     }
 
