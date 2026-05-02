@@ -1303,9 +1303,16 @@ etf_dashboard/
 ### Tooltip hover bug — 桌面 hover chart 沒觸發 formatter
 - 現象:`/dca` 桌面 hover chart 線條,tooltip DOM 有 render(`display:block`、空字串)但 formatter 沒被呼叫
 - playwright probe 確認:`dispatchAction({type:'showTip'})` 能成功 fire formatter,**只有 mouse hover 不 fire**
-- 候選 root cause:雲區兩個 `__cloud_*` series 加 `silent: true` + stack 機制干擾 zrender axisPointer
-- 已 attempt:Plan A(拿掉 silent)、Plan B(廢雲區改 areaStyle.origin:'start')— 都未解
-- 下次切點:檢查 `series` 順序與 `tooltip.show:false` per-series 是否仍干擾、或試完全不同的 chart 結構
+- ~~舊推測:雲區 silent series / stack 機制干擾 zrender axisPointer~~ — **作廢**
+- 2026-05-03 dig:當前 code(`templates/dca.html:1175-1195`)已經是 Plan A 收尾 — 純 4 條 line series,**沒任何 cloud / silent / stack / areaStyle / markArea**,bug 仍 reproduce → 不是 series 配置層問題
+- **新方向 = 事件層**。axisPointer 視覺有觸發(tooltip container 變 `display:block`)但 formatter callback 沒被呼叫,這個 pattern 通常是:
+  - canvas hover event 沒傳到 zrender(某個 wrapper / overlay 攔住 mouse event)
+  - 或 zr instance 綁的 canvas 跟實際接收 mouse event 的 canvas 不同
+  - 或 ECharts tooltip plugin 內部狀態跟 axisPointer 脫鉤
+- 下次切點:本機起 server + 登入(`/dca` 有 login wall,probe 不能跑)→ devtools 看 hover 時:
+  - `inst.getZr().handler._gestureMgr` 有沒有 mousemove listener?
+  - hover 當下 `inst.getZr().painter.getViewportRoot()` vs `el.querySelector('canvas')` 是同一顆 DOM 嗎?
+  - 隔離測試:把 `chart.clear()`(L1082)拿掉看會不會解(clear+setOption notMerge:true 可能讓 tooltip plugin 內部 state 失聯)
 
 ### 整站瘦身計畫 ⭐ 優先做(解 race condition 根源)
 - **Tailwind CDN 本地化**(改用 npm build 出 CSS,避免運行時 fetch + flash)

@@ -1120,12 +1120,13 @@ function dcaApp() {
         // legend 改用 HTML(.dca-chart-legend),這裡不留 legend 空間
         grid: { left: 56, right: 15, top: 12, bottom: 30, containLabel: false },
         tooltip: {
-          // TODO(2026-05-01):桌面 hover chart 沒觸發 formatter 被呼叫,probe 確認:
+          // TODO(2026-05-03):桌面 hover chart 沒觸發 formatter,probe 確認:
           //   - tooltip option 設定全對(show:true / trigger:axis / 5.5.1 支援)
           //   - tooltip DOM 容器有 render(display:block)但 innerText=''
-          //   - formatter calls=0 during mouse hover,但 dispatchAction({type:'showTip'}) 能 work
-          // 推測 silent: true on cloud series 或 series 順序讓 zrender axisPointer
-          // 不 fire on canvas hover。明天再 dig。
+          //   - formatter calls=0 during mouse hover,dispatchAction({type:'showTip'}) 能 work
+          // 已排除:cloud / silent series / stack / areaStyle / markArea(本檔已是 Plan A 收尾,
+          // 純 4 條 line series 仍 reproduce)→ 非 series 配置層問題。
+          // 新方向 = 事件層。下次切點見 CLAUDE.md「TODO」,先試把 chart.clear() 拿掉。
           show: true,
           trigger: 'axis',
           axisPointer: {
