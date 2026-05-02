@@ -1156,21 +1156,20 @@ function dcaApp() {
           },
         },
         series: [
-          // Plan B:廢掉雲區 stack 系列(stack 機制 + 透明線會擋 axisPointer 觸發),
-          // 只留 4 條線。3 條情境線就足以視覺區分,fan band 視覺由 P5/P95 圍出來
+          // Plan A 收尾:純 4 條 line series,不放任何 areaStyle / stack / silent / markArea
+          // 任何「填色 / 混合 series」都會干擾 zrender axisPointer,純線最乾淨
+          // 視覺 fan band 用 3 條線色階(綠虛 P95 / 藍實 P50 / 紅虛 P5)區分,不需填色
           { name: '較好', type: 'line', data: p95Series,
             symbol: 'none', smooth: true,
-            lineStyle: { color: '#10b981', width: 1.6, type: 'dashed' },
-            // areaStyle 連到 P5 形成 fan band 視覺替代
-            areaStyle: { color: 'rgba(148, 163, 184, 0.12)', origin: 'start' },
+            lineStyle: { color: '#10b981', width: 1.8, type: 'dashed' },
           },
           { name: '中位', type: 'line', data: p50Series,
             symbol: 'none', smooth: true,
-            lineStyle: { color: '#3b82f6', width: 2.4 },
+            lineStyle: { color: '#3b82f6', width: 2.6 },
           },
           { name: '較差', type: 'line', data: p5Series,
             symbol: 'none', smooth: true,
-            lineStyle: { color: '#ef4444', width: 1.6, type: 'dashed' },
+            lineStyle: { color: '#ef4444', width: 1.8, type: 'dashed' },
           },
           { name: '投入', type: 'line', data: investedSeries,
             symbol: 'none', smooth: false,

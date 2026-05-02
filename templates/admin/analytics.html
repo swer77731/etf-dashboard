@@ -97,8 +97,8 @@
     </div>
   {% endmacro %}
 
-  {{ stat_card('今日訪客 (DAU)', ov.dau, ov.dau_change_pct) }}
-  {{ stat_card('今日瀏覽 (PV)', ov.pv, ov.pv_change_pct) }}
+  {{ stat_card('今日訪客數', ov.dau, ov.dau_change_pct) }}
+  {{ stat_card('今日瀏覽次數', ov.pv, ov.pv_change_pct) }}
   {% set dur = ov.avg_duration_sec %}
   {% if dur >= 60 %}
     {% set dur_disp = (dur // 60)|int ~ ' 分 ' ~ (dur % 60)|int ~ ' 秒' %}
@@ -117,9 +117,9 @@
   </div>
 </section>
 
-{# === DAU 30 天折線圖 === #}
+{# === 訪客數 / 瀏覽次數 30 天折線圖 === #}
 <section class="card p-4 mb-6">
-  <h3 class="text-base font-semibold mb-3">DAU / PV 近 30 天</h3>
+  <h3 class="text-base font-semibold mb-3">訪客數 / 瀏覽次數 近 30 天</h3>
   <div id="trend-chart" style="height: 240px;"></div>
 </section>
 
@@ -243,7 +243,7 @@
         <thead>
           <tr>
             <th>時間 (UTC)</th>
-            <th>Session</th>
+            <th>訪問階段</th>
             <th>IP</th>
             <th>頁面</th>
             <th>路徑</th>
@@ -272,7 +272,7 @@
 </section>
 
 <script>
-  // === DAU 折線 ===
+  // === 訪客數 / 瀏覽次數 折線 ===
   document.addEventListener('DOMContentLoaded', function () {
     if (typeof echarts === 'undefined') return;
 
@@ -286,7 +286,7 @@
         backgroundColor: 'transparent',
         grid: { left: 40, right: 16, top: 24, bottom: 30 },
         tooltip: { trigger: 'axis', confine: true, backgroundColor: '#0a0e1a', borderColor: '#1f2937', textStyle: { color: '#e5e7eb', fontSize: 12 } },
-        legend: { data: ['DAU', 'PV'], textStyle: { color: '#9ca3af', fontSize: 11 }, top: 0, right: 0 },
+        legend: { data: ['訪客數', '瀏覽次數'], textStyle: { color: '#9ca3af', fontSize: 11 }, top: 0, right: 0 },
         xAxis: {
           type: 'category',
           data: trendData.map(d => d.date.slice(5)),
@@ -297,8 +297,8 @@
           { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: '#1f2937' } }, axisLabel: { color: '#9ca3af', fontSize: 10 } },
         ],
         series: [
-          { name: 'DAU', type: 'line', smooth: true, data: trendData.map(d => d.dau), itemStyle: { color: '#3b82f6' }, lineStyle: { width: 2 } },
-          { name: 'PV',  type: 'line', smooth: true, data: trendData.map(d => d.pv),  itemStyle: { color: '#f59e0b' }, lineStyle: { width: 2 } },
+          { name: '訪客數', type: 'line', smooth: true, data: trendData.map(d => d.dau), itemStyle: { color: '#3b82f6' }, lineStyle: { width: 2 } },
+          { name: '瀏覽次數',  type: 'line', smooth: true, data: trendData.map(d => d.pv),  itemStyle: { color: '#f59e0b' }, lineStyle: { width: 2 } },
         ],
       });
       window.addEventListener('resize', () => chart.resize());

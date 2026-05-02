@@ -282,8 +282,8 @@ async def bot_cleanup(request: Request):
     <div class="flex justify-between"><span class="text-gray-400">命中 bot UA 條件筆數(預覽)</span><span class="num font-mono text-amber-400">{pre_bot}</span></div>
     <div class="flex justify-between border-t border-[#1f2937] pt-3"><span class="text-gray-400">實際 DELETE rows</span><span class="num font-mono text-red-400">−{deleted_analytics}</span></div>
     <div class="flex justify-between"><span class="text-gray-400">清理後 analytics_log 總筆數</span><span class="num font-mono text-green-400">{post_total}</span></div>
-    <div class="flex justify-between border-t border-[#1f2937] pt-3"><span class="text-gray-400">今日 DAU(清理後)</span><span class="num font-mono text-green-400 text-xl">{post_dau_today}</span></div>
-    <div class="flex justify-between"><span class="text-gray-400">今日 PV(清理後)</span><span class="num font-mono text-green-400">{post_pv_today}</span></div>
+    <div class="flex justify-between border-t border-[#1f2937] pt-3"><span class="text-gray-400">今日訪客數(清理後)</span><span class="num font-mono text-green-400 text-xl">{post_dau_today}</span></div>
+    <div class="flex justify-between"><span class="text-gray-400">今日瀏覽次數(清理後)</span><span class="num font-mono text-green-400">{post_pv_today}</span></div>
   </div>
   <div class="mt-6 text-xs text-gray-500 leading-relaxed">
     <p>* 已套 {len(_BOT_UA_PATTERNS)} 個 UA 子字串黑名單 + 空 UA。</p>
@@ -421,23 +421,23 @@ async def bot_diagnosis(request: Request):
     <div>
       <h1 class="text-xl font-semibold">Bot 診斷 · 今日(原始數字,未排除)</h1>
       <div class="text-sm text-gray-400 mt-1">
-        總 session = <span class="num">{totals.total_sessions}</span> ·
-        總 PV = <span class="num">{totals.total_pv}</span>
+        總訪問階段 = <span class="num">{totals.total_sessions}</span> ·
+        總瀏覽次數 = <span class="num">{totals.total_pv}</span>
       </div>
     </div>
     <a href="/admin/analytics" class="text-sm text-gray-400 hover:text-white">← 回 Analytics</a>
   </header>
 
   <div class="banner">
-    <b>已排除 {len(bot_ips)} 個高 session IP</b>(24h 內 sessions ≥ {threshold},自動視為 bot)<br>
-    <span class="text-xs">/admin/analytics 與 TG 日報的 DAU / PV / 排行皆已排除這些 IP。本頁仍顯示原始數字。</span><br>
+    <b>已排除 {len(bot_ips)} 個高訪問階段 IP</b>(24h 內訪問階段 ≥ {threshold},自動視為 bot)<br>
+    <span class="text-xs">/admin/analytics 與 TG 日報的 訪客數 / 瀏覽次數 / 排行皆已排除這些 IP。本頁仍顯示原始數字。</span><br>
     <span class="text-xs num font-mono text-gray-300">{bot_ips_preview}</span>
   </div>
 
   <div class="card">
-    <h2>1. 同 session 訪問次數分布(快看)</h2>
+    <h2>1. 同訪問階段瀏覽次數分布(快看)</h2>
     <table>
-      <thead><tr><th>區間</th><th class="text-right">session 數</th></tr></thead>
+      <thead><tr><th>區間</th><th class="text-right">訪問階段數</th></tr></thead>
       <tbody>{bucket_html}</tbody>
     </table>
     <p class="text-xs text-gray-500 mt-3">
@@ -446,9 +446,9 @@ async def bot_diagnosis(request: Request):
   </div>
 
   <div class="card">
-    <h2>2. UA 分布(Top 30,按 session 數排)</h2>
+    <h2>2. UA 分布(Top 30,按訪問階段數排)</h2>
     <table>
-      <thead><tr><th>User-Agent</th><th class="text-right">sessions</th><th class="text-right">PV</th></tr></thead>
+      <thead><tr><th>User-Agent</th><th class="text-right">訪問階段</th><th class="text-right">瀏覽次數</th></tr></thead>
       <tbody>{ua_html}</tbody>
     </table>
     <p class="text-xs text-gray-500 mt-3">
@@ -457,9 +457,9 @@ async def bot_diagnosis(request: Request):
   </div>
 
   <div class="card">
-    <h2>3. 同 IP 開超多 session(bot 特徵 — 真人 1-3 個就頂)</h2>
+    <h2>3. 同 IP 開超多訪問階段(bot 特徵 — 真人 1-3 個就頂)</h2>
     <table>
-      <thead><tr><th>IP(末段已遮)</th><th class="text-right">sessions</th><th class="text-right">PV</th></tr></thead>
+      <thead><tr><th>IP(末段已遮)</th><th class="text-right">訪問階段</th><th class="text-right">瀏覽次數</th></tr></thead>
       <tbody>{ip_html}</tbody>
     </table>
   </div>
