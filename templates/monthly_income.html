@@ -75,6 +75,64 @@
   }
   .mi-warning-banner strong { color: rgb(252 165 165); font-weight: 700; }
 
+  /* === 摺疊警示橫條(取代原 modal,/dca 同款橘色)=== */
+  .mi-warn-bar {
+    background: rgb(245 158 11 / 0.12);
+    border: 1px solid rgb(245 158 11 / 0.45);
+    border-radius: 0.55rem;
+    overflow: hidden;
+  }
+  .mi-warn-summary {
+    width: 100%;
+    display: flex; align-items: flex-start; gap: 0.55rem;
+    padding: 0.7rem 0.95rem;
+    background: transparent;
+    border: 0;
+    color: rgb(252 211 77);
+    font-size: 13px;
+    line-height: 1.55;
+    text-align: left;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  @media (min-width: 768px) { .mi-warn-summary { font-size: 14px; padding: 0.75rem 1rem; } }
+  .mi-warn-icon {
+    width: 1.05rem; height: 1.05rem;
+    color: rgb(245 158 11);
+    flex-shrink: 0; margin-top: 2px;
+  }
+  .mi-warn-text { flex: 1; min-width: 0; }
+  .mi-warn-cta {
+    display: inline-block;
+    margin-left: 0.3rem;
+    color: rgb(var(--c-accent));
+    font-weight: 600;
+  }
+  .mi-warn-chevron {
+    width: 1.1rem; height: 1.1rem;
+    color: rgb(252 211 77);
+    flex-shrink: 0; margin-top: 2px;
+    transition: transform 0.18s;
+  }
+  .mi-warn-chevron.is-open { transform: rotate(180deg); }
+  .mi-warn-detail {
+    padding: 0.2rem 0.95rem 0.85rem 0.95rem;
+    border-top: 1px solid rgb(245 158 11 / 0.25);
+    color: rgb(var(--c-fg) / 0.92);
+    font-size: 0.92rem;
+    line-height: 1.7;
+  }
+  @media (min-width: 768px) { .mi-warn-detail { padding: 0.25rem 1rem 1rem 1rem; } }
+  .mi-warn-detail p { margin: 0.55rem 0; }
+  .mi-warn-detail strong { color: rgb(252 165 165); font-weight: 700; }
+  .mi-warn-detail ul { list-style: disc; padding-left: 1.3rem; margin: 0.4rem 0; }
+  .mi-warn-detail li { margin: 0.3rem 0; }
+  .mi-warn-final {
+    color: rgb(252 165 165);
+    font-weight: 600;
+    margin-top: 0.85rem !important;
+  }
+
   /* === Modal === */
   .mi-modal-backdrop {
     position: fixed; inset: 0; z-index: 50;
@@ -722,31 +780,26 @@
          x-data="monthlyIncomePicker()" x-init="init()">
 
 
-  {# === 首次進入 Disclaimer Modal(localStorage 30 日記憶) === #}
-  <div x-show="showDisclaimer" x-cloak x-transition.opacity.duration.150ms
-       class="mi-modal-backdrop" @click.self="ackDisclaimer()" role="dialog" aria-modal="true">
-    <div class="mi-modal">
-      <div class="flex items-start gap-3 mb-4">
-        <svg class="mi-modal-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
-        </svg>
-        <h3 class="mi-modal-title">使用前請務必閱讀</h3>
-      </div>
-
-      <div class="mi-modal-body space-y-3">
-        <p>本工具以「<strong>{{ last_full_year }} 年實際配息資料</strong>」做歷史試算,<strong>並非投資建議</strong>。</p>
-        <p>你看到的所有數字都是<strong>預估值</strong>:</p>
-        <ul>
-          <li>殖利率是 {{ last_full_year }} 年實際數字推算,不保證 {{ next_year }} 年配同樣的錢</li>
-          <li>月份覆蓋是 {{ past_3y_start }}-{{ past_3y_end }} 年配息習慣,不保證未來不變</li>
-          <li>平均殖利率假設等權重投入,實際因買進時點而不同</li>
-        </ul>
-        <p class="mi-modal-final">投資有風險,請自行判斷,虧損自負。</p>
-      </div>
-
-      <button type="button" @click="ackDisclaimer()" class="mi-modal-btn mt-6">
-        我了解,進入試算
-      </button>
+  {# === 頂端摺疊警示橫條(取代原 modal 全螢幕擋頁)=== #}
+  <div x-data="{ warnOpen: false }" class="mi-warn-bar mb-5">
+    <button type="button" @click="warnOpen = !warnOpen"
+            class="mi-warn-summary"
+            :aria-expanded="warnOpen">
+      <svg class="mi-warn-icon" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
+      </svg>
+      <span class="mi-warn-text">本工具以 {{ last_full_year }} 年實際配息資料做歷史試算,非投資建議。<span class="mi-warn-cta">點此展開完整說明</span></span>
+      <svg class="mi-warn-chevron" :class="warnOpen ? 'is-open' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div x-show="warnOpen" x-cloak x-transition.opacity.duration.150ms class="mi-warn-detail">
+      <p>本工具以「<strong>{{ last_full_year }} 年實際配息資料</strong>」做歷史試算,<strong>並非投資建議</strong>。</p>
+      <p>你看到的所有數字都是<strong>預估值</strong>:</p>
+      <ul>
+        <li>殖利率是 {{ last_full_year }} 年實際數字推算,不保證 {{ next_year }} 年配同樣的錢</li>
+        <li>月份覆蓋是 {{ past_3y_start }}-{{ past_3y_end }} 年配息習慣,不保證未來不變</li>
+        <li>平均殖利率假設等權重投入,實際因買進時點而不同</li>
+      </ul>
+      <p class="mi-warn-final">投資有風險,請自行判斷,虧損自負。</p>
     </div>
   </div>
 

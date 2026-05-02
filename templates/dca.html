@@ -13,20 +13,20 @@
     --c-danger: 239 68 68;
   }
 
-  /* === 頂部警示 === */
+  /* === 頂部警示(2026-05-02 字級放寬,行距 1.6)=== */
   .dca-top-warn {
     background: rgb(var(--c-warn-bg) / 0.12);
     border: 1px solid rgb(var(--c-warn-bg) / 0.45);
     border-radius: 0.55rem;
-    padding: 0.7rem 0.95rem;
+    padding: 0.85rem 1.05rem;
     color: rgb(252 211 77);
     font-size: 13px;
-    line-height: 1.55;
-    display: flex; align-items: flex-start; gap: 0.5rem;
+    line-height: 1.6;
+    display: flex; align-items: flex-start; gap: 0.55rem;
     margin-bottom: 1rem;
   }
-  @media (min-width: 768px) { .dca-top-warn { font-size: 14px; padding: 0.75rem 1rem; } }
-  .dca-top-warn svg { width: 1.05rem; height: 1.05rem; flex-shrink: 0; margin-top: 2px; color: rgb(245 158 11); }
+  @media (min-width: 768px) { .dca-top-warn { font-size: 14px; padding: 0.95rem 1.15rem; } }
+  .dca-top-warn svg { width: 1.1rem; height: 1.1rem; flex-shrink: 0; margin-top: 3px; color: rgb(245 158 11); }
 
   /* === 卡片 === */
   .dca-card {
@@ -230,6 +230,8 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.4rem;
   }
+  /* mobile cols-6 強制 3+3 兩行 — 1 / 3 / 5 / 10 / 20 / 30 全部排得下;桌面恢復一行 */
+  .dca-chip-row.cols-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   @media (min-width: 768px) { .dca-chip-row.cols-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
   .dca-chip-row.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dca-chip-btn {
