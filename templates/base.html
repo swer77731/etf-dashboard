@@ -550,20 +550,44 @@
       .user-menu-logout { color: rgb(239 68 68); }
       .user-menu-logout svg { color: rgb(239 68 68); }
 
-      /* === Cookie banner(mobile 瘦身)=== */
+      /* === Cookie banner === */
+      /* 桌面預設 padding(原 px-4 sm:px-6 py-3 sm:py-4 移到 CSS,確保 mobile 有絕對控制權)*/
+      .cookie-banner-inner {
+        padding: 0.85rem 1rem;
+        box-sizing: border-box;
+      }
+      .cookie-banner-btn {
+        padding: 0.4rem 1rem;
+        font-size: 14px;
+      }
+      @media (min-width: 640px) {
+        .cookie-banner-inner { padding: 0.95rem 1.5rem; }
+      }
+      /* mobile 瘦身 — 高度約桌面 1/3 + 強制 single-line text + ellipsis */
       @media (max-width: 767px) {
         .cookie-banner-inner {
-          padding-top: 0.4rem !important;
-          padding-bottom: 0.4rem !important;
-          gap: 0.5rem !important;
+          padding: 0.4rem 0.7rem;
+          gap: 0.5rem;
         }
         .cookie-banner-text {
           font-size: 12px;
           line-height: 1.35;
+          /* 關鍵:flex:1 配合 min-width:0 才能正確收縮 */
+          min-width: 0;
+        }
+        /* truncate 必須在 block 元素上才生效 */
+        .cookie-banner-text-mobile {
+          display: block;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
         .cookie-banner-btn {
-          padding: 0.3rem 0.85rem !important;
-          font-size: 12px !important;
+          padding: 0.3rem 0.7rem;
+          font-size: 12px;
+          /* 防按鈕被擠壓 */
+          flex-shrink: 0;
+          white-space: nowrap;
         }
       }
 
@@ -950,20 +974,21 @@
     </script>
 
     {# === Cookie Banner(只在第一次訪問顯示;localStorage 'cookie_consent_v1')
-       Mobile < 768px:單行 + 文字截斷縮短 + 高度約桌面 1/3
-       Desktop ≥ 768px:維持 wrap 寬鬆排版 #}
+       Mobile < 768px:極短文案單行 truncate
+       Desktop ≥ 768px:完整文案 + 額外「隱私政策」按鈕 #}
     <div x-data="cookieBanner()" x-init="init()" x-show="show" x-cloak x-transition.opacity
          class="cookie-banner fixed bottom-0 left-0 right-0 z-50 lg:left-64"
-         style="background: rgb(15 20 36 / 0.97); border-top: 1px solid rgb(31 41 55); backdrop-filter: blur(8px);">
-      <div class="cookie-banner-inner max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center gap-3 text-sm">
+         style="background: rgb(15 20 36 / 0.97); border-top: 1px solid rgb(31 41 55); backdrop-filter: blur(8px); box-sizing: border-box;">
+      <div class="cookie-banner-inner max-w-6xl mx-auto flex items-center gap-3 text-sm">
+        {# 文字區:mobile 顯示短文,desktop 顯示完整文案 — 不同 element 切換,避免 ellipsis 不準 #}
         <div class="cookie-banner-text flex-1 min-w-0 text-fg/90">
-          {# Mobile 單行縮短版 #}
-          <span class="md:hidden truncate">🍪 本站使用 Cookie 與 GA 流量分析,繼續瀏覽即同意 <a href="/privacy" class="text-accent">隱私政策</a></span>
-          {# Desktop 完整版 #}
-          <span class="hidden md:inline leading-relaxed">
+          <div class="cookie-banner-text-mobile md:hidden">
+            🍪 使用 Cookie 與 GA,繼續即同意 <a href="/privacy" class="text-accent">隱私政策</a>
+          </div>
+          <div class="cookie-banner-text-desktop hidden md:block leading-relaxed">
             🍪 本網站使用 Cookie 提升使用體驗,包含 Google Analytics 流量分析。繼續瀏覽即代表你同意
             <a href="/privacy" class="text-accent hover:underline">隱私權政策</a>。
-          </span>
+          </div>
         </div>
         <div class="flex items-center gap-2 shrink-0">
           <a href="/privacy"
@@ -971,7 +996,7 @@
             隱私政策
           </a>
           <button type="button" @click="accept()"
-                  class="cookie-banner-btn px-4 py-1.5 text-sm rounded-md bg-accent text-white font-semibold hover:opacity-90 transition shadow-[0_0_12px_var(--c-accent-glow)]">
+                  class="cookie-banner-btn rounded-md bg-accent text-white font-semibold hover:opacity-90 transition shadow-[0_0_12px_var(--c-accent-glow)]">
             了解
           </button>
         </div>
