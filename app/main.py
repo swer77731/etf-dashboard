@@ -8,13 +8,16 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.analytics_middleware import AnalyticsMiddleware
+from app.auth.middleware import CurrentUserMiddleware
 from app.config import PROJECT_ROOT, settings
 from app.database import init_db
 from app.routers import admin as admin_router
 from app.routers import api as api_router
+from app.routers import auth as auth_router
 from app.routers import monthly_income as monthly_income_router
 from app.routers import pages as pages_router
 from app.scheduler import shutdown_scheduler, start_scheduler, startup_sync_if_needed
@@ -186,6 +189,23 @@ app.add_middleware(ServerTimingMiddleware)
 # Session cookie 7 天、IP 末段遮、5 秒去重。
 app.add_middleware(AnalyticsMiddleware)
 
+# Auth — 從 session cookie 撈 user → 掛 request.state.user
+# 必須在 SessionMiddleware 之後執行(LIFO 註冊 = 在 SessionMiddleware 之前 add)
+app.add_middleware(CurrentUserMiddleware)
+
+# Session cookie(SessionMiddleware 內建用 itsdangerous 簽章)
+# - secure=True 在 production(HTTPS only)
+# - same_site=lax 配合 OAuth redirect 流程
+# - max_age=30 天
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.session_secret_key,
+    session_cookie="session",
+    max_age=60 * 60 * 24 * 30,   # 30 天
+    same_site="lax",
+    https_only=(settings.app_env == "production"),
+)
+
 # 紀律 #16 — swer-etf.zeabur.app → etf-watch.com 301 全站重導(SEO 權重轉移)。
 # 註冊順序最後 = request 進來第一站,redirect 不浪費下游 middleware 計算。
 app.add_middleware(HostRedirectMiddleware)
@@ -198,5 +218,6 @@ app.mount(
 
 app.include_router(pages_router.router)
 app.include_router(api_router.router)
+app.include_router(auth_router.router)
 app.include_router(monthly_income_router.router)
 app.include_router(admin_router.router)

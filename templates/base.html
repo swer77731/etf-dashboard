@@ -435,11 +435,135 @@
         html { font-size: 15.5px; }
         .section-card { padding: 1rem !important; }
       }
+
+      /* === user_menu(登入按鈕 / 已登入頭像 dropdown)=== */
+      .user-login-btn-sidebar {
+        display: flex; align-items: center; justify-content: center; gap: 0.55rem;
+        width: 100%;
+        padding: 0.6rem 0.85rem;
+        background: rgb(var(--c-bg-soft));
+        border: 1px solid rgb(var(--c-border));
+        border-radius: 0.5rem;
+        color: rgb(var(--c-fg));
+        font-size: 0.92rem;
+        font-weight: 600;
+        transition: border-color 0.12s, background 0.12s;
+      }
+      .user-login-btn-sidebar:hover {
+        border-color: rgb(var(--c-accent));
+        background: rgb(var(--c-card));
+      }
+      .user-login-btn-mobile {
+        display: inline-flex; align-items: center;
+        padding: 0.4rem 0.75rem;
+        background: rgb(239 159 39);
+        color: white;
+        border-radius: 0.4rem;
+        font-size: 0.85rem;
+        font-weight: 700;
+        text-decoration: none;
+      }
+      .user-login-btn-mobile:hover { background: rgb(220 140 25); }
+
+      .user-menu-wrap { position: relative; }
+      .user-menu-trigger {
+        display: flex; align-items: center; gap: 0.55rem;
+        width: 100%;
+        padding: 0.45rem 0.6rem;
+        background: rgb(var(--c-bg-soft));
+        border: 1px solid rgb(var(--c-border));
+        border-radius: 0.5rem;
+        color: rgb(var(--c-fg));
+        cursor: pointer;
+        transition: border-color 0.12s;
+      }
+      .user-menu-trigger:hover { border-color: rgb(var(--c-accent) / 0.5); }
+      .user-menu-mobile .user-menu-trigger {
+        width: auto; padding: 0.25rem; background: transparent; border: 0;
+      }
+      .user-menu-avatar {
+        width: 1.75rem; height: 1.75rem;
+        border-radius: 9999px;
+        object-fit: cover;
+        flex-shrink: 0;
+        background: rgb(var(--c-card));
+      }
+      .user-menu-avatar-fallback {
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 0.85rem; font-weight: 700;
+        color: rgb(var(--c-fg));
+        background: rgb(var(--c-accent) / 0.15);
+      }
+      .user-menu-name {
+        font-size: 0.88rem; font-weight: 600;
+        color: rgb(var(--c-fg));
+        flex: 1; min-width: 0;
+        text-align: left;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .user-menu-chevron {
+        width: 0.95rem; height: 0.95rem;
+        color: rgb(var(--c-muted));
+        transition: transform 0.15s;
+        flex-shrink: 0;
+      }
+      .user-menu-chevron.is-open { transform: rotate(180deg); }
+      .user-menu-dropdown {
+        position: absolute;
+        z-index: 50;
+        background: rgb(var(--c-card));
+        border: 1px solid rgb(var(--c-border));
+        border-radius: 0.55rem;
+        box-shadow: 0 10px 30px -8px rgba(0,0,0,0.45);
+        overflow: hidden;
+        min-width: 14rem;
+      }
+      .user-menu-sidebar .user-menu-dropdown {
+        top: calc(100% + 0.4rem);
+        left: 0; right: 0;
+      }
+      .user-menu-mobile .user-menu-dropdown {
+        top: calc(100% + 0.4rem);
+        right: 0;
+      }
+      .user-menu-info {
+        padding: 0.7rem 0.9rem;
+        border-bottom: 1px solid rgb(var(--c-border));
+      }
+      .user-menu-info-name {
+        font-size: 0.92rem; font-weight: 700;
+        color: rgb(var(--c-fg));
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .user-menu-info-email {
+        font-size: 0.78rem;
+        color: rgb(var(--c-muted));
+        margin-top: 0.15rem;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .user-menu-form { margin: 0; }
+      .user-menu-item {
+        display: flex; align-items: center; gap: 0.55rem;
+        width: 100%;
+        padding: 0.6rem 0.9rem;
+        background: transparent;
+        border: 0;
+        color: rgb(var(--c-fg));
+        font-size: 0.9rem;
+        text-align: left;
+        cursor: pointer;
+        transition: background 0.1s;
+      }
+      .user-menu-item:hover { background: rgb(var(--c-accent) / 0.08); }
+      .user-menu-item svg { flex-shrink: 0; color: rgb(var(--c-muted)); }
+      .user-menu-logout { color: rgb(239 68 68); }
+      .user-menu-logout svg { color: rgb(239 68 68); }
     </style>
     {% block head %}{% endblock %}
 </head>
 {% from "_partials/brand_mark.html" import brand_mark %}
 {% from "_partials/etf_search.html" import etf_search %}
+{% from "_partials/user_menu.html" import login_button, user_dropdown %}
 <body x-data="appShell()" x-init="init()">
 
     <div class="grid-bg"></div>
@@ -477,6 +601,17 @@
       <div class="mb-5">
         {{ etf_search(placeholder='搜尋 ETF...', size='sm') }}
       </div>
+
+      {# 登入按鈕 / 已登入頭像 dropdown(sidebar 主導航上方,顯眼)#}
+      {% if google_oauth_enabled %}
+        <div class="mb-5">
+          {% if current_user %}
+            {{ user_dropdown(current_user, variant='sidebar') }}
+          {% else %}
+            {{ login_button(variant='sidebar') }}
+          {% endif %}
+        </div>
+      {% endif %}
 
       <nav class="flex-1 overflow-y-auto">
         <div class="text-xs uppercase tracking-[0.2em] text-muted/80 font-semibold mb-3 px-3">主導航</div>
@@ -554,18 +689,29 @@
     <div class="lg:pl-64 min-h-screen flex flex-col relative">
 
       {# Mobile top bar — only visible < lg #}
-      <header class="lg:hidden sticky top-0 z-20 backdrop-blur bg-card/85 border-b border-border px-4 py-3 flex items-center justify-between">
-        <button @click="sidebarOpen=true" class="p-2 -ml-2 text-fg" aria-label="open menu">
+      <header class="lg:hidden sticky top-0 z-20 backdrop-blur bg-card/85 border-b border-border px-4 py-3 flex items-center justify-between gap-2">
+        <button @click="sidebarOpen=true" class="p-2 -ml-2 text-fg flex-shrink-0" aria-label="open menu">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
         <a href="/" class="flex items-center gap-2 group min-w-0 flex-1 justify-center">
           {{ brand_mark(size="md", logo_url=logo_url, has_logo=has_logo, brand_zh=brand_zh, with_glow=False) }}
           <span class="font-semibold text-fg truncate">{{ brand_zh }}</span>
         </a>
-        <button @click="setTheme(theme==='dark' ? 'light' : 'dark')" class="p-3 -mr-2 -my-1 text-muted hover:text-fg rounded-lg hover:bg-card-hover/50 transition" aria-label="toggle theme">
-          <svg x-show="theme==='dark'" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-          <svg x-show="theme==='light'" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
-        </button>
+        <div class="flex items-center gap-1 flex-shrink-0">
+          {% if google_oauth_enabled and current_user %}
+            {# 已登入:頭像 dropdown(主題切換移進 dropdown 裡)#}
+            {{ user_dropdown(current_user, variant='mobile') }}
+          {% else %}
+            {# 未登入:主題切換 + 橘色「登入」按鈕 #}
+            <button @click="setTheme(theme==='dark' ? 'light' : 'dark')" class="p-2 text-muted hover:text-fg rounded-lg hover:bg-card-hover/50 transition" aria-label="toggle theme">
+              <svg x-show="theme==='dark'" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+              <svg x-show="theme==='light'" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+            </button>
+            {% if google_oauth_enabled %}
+              {{ login_button(variant='mobile') }}
+            {% endif %}
+          {% endif %}
+        </div>
       </header>
 
       <main class="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-10 py-6 sm:py-10 relative">

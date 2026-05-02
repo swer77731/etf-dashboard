@@ -8,3 +8,4 @@ from app.models.holdings import Holding  # noqa: F401
 from app.models.holdings_change import HoldingsChange  # noqa: F401
 from app.models.analytics import AnalyticsLog, SearchLog, CompareLog, OnlineSnapshot  # noqa: F401
 from app.models.etf_yearly_return import EtfYearlyReturn  # noqa: F401
+from app.models.user import User  # noqa: F401

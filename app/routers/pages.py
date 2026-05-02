@@ -48,14 +48,24 @@ def _detect_brand_assets() -> dict:
     }
 
 
-def _common_ctx() -> dict:
-    """共用品牌 context — 所有頁面都會用到。"""
+def _common_ctx(request: Request | None = None) -> dict:
+    """共用品牌 context — 所有頁面都會用到。
+
+    若傳入 request,會從 request.state.user(由 CurrentUserMiddleware 注入)
+    補 current_user dict 進 ctx。沒有 request 或未登入 → current_user=None。
+    """
+    from app.auth.oauth import is_google_oauth_enabled
+    current_user = None
+    if request is not None:
+        current_user = getattr(request.state, "user", None)
     return {
         "app_name": settings.app_name,
         "app_env": settings.app_env,
         "brand_zh": settings.app_name,
         "brand_en": settings.app_brand_en,
         "brand_full": settings.app_brand_full,
+        "current_user": current_user,
+        "google_oauth_enabled": is_google_oauth_enabled(),
         **_detect_brand_assets(),
     }
 
@@ -239,7 +249,7 @@ async def index(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request, "index.html",
         {
-            **_common_ctx(),
+            **_common_ctx(request),
             **payload,
             "today_iso": date.today().isoformat(),
         },
@@ -311,7 +321,7 @@ async def compare(
     return templates.TemplateResponse(
         request, "compare.html",
         {
-            **_common_ctx(),
+            **_common_ctx(request),
             **payload,
         },
     )
@@ -372,7 +382,7 @@ async def news(
 
     def _build():
         return {
-            **_common_ctx(),
+            **_common_ctx(request),
             **_build_news_payload(etf, days, page),
             "today_iso": today_iso,
             "request": request,
@@ -501,7 +511,7 @@ async def dividend_calendar(
 
     def _build():
         return {
-            **_common_ctx(),
+            **_common_ctx(request),
             "year": year,
             "month": month,
             "mode": mode_norm,
@@ -571,7 +581,7 @@ async def ranking_detail(request: Request, kind: str, p: str = "3m") -> HTMLResp
     return templates.TemplateResponse(
         request, "ranking_detail.html",
         {
-            **_common_ctx(),
+            **_common_ctx(request),
             "kind": kind,
             "kind_label": meta["label"],
             "kind_subtitle": meta["subtitle"],
@@ -588,7 +598,7 @@ async def ranking_detail(request: Request, kind: str, p: str = "3m") -> HTMLResp
 async def visual_preview_page(request: Request) -> HTMLResponse:
     """臨時視覺風格預覽頁(A/B/C 三選一,選完即廢)。"""
     return templates.TemplateResponse(
-        request, "visual_preview.html", _common_ctx(),
+        request, "visual_preview.html", _common_ctx(request),
     )
 
 
@@ -603,7 +613,7 @@ async def monthly_income_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request, "monthly_income.html",
         {
-            **_common_ctx(),
+            **_common_ctx(request),
             "last_full_year": last_full_year,
             "past_3y_start": last_full_year - 2,
             "past_3y_end": last_full_year,
@@ -619,7 +629,7 @@ async def dca_page(request: Request) -> HTMLResponse:
     ETF 清單 / 元資訊由 /api/dca/etf_list + /api/dca/etf_meta 動態提供
     (避免 80 支 inline 在 HTML 拖慢首屏)。
     """
-    return templates.TemplateResponse(request, "dca.html", _common_ctx())
+    return templates.TemplateResponse(request, "dca.html", _common_ctx(request))
 
 
 @router.get("/monthly-income-preview")
@@ -678,7 +688,7 @@ async def holdings_page(
     return templates.TemplateResponse(
         request, "holdings.html",
         {
-            **_common_ctx(),
+            **_common_ctx(request),
             "initial_codes": initial_codes,
             "days": days,
             "days_options": _HOLDINGS_ALLOWED_DAYS,
@@ -708,7 +718,7 @@ async def etf_detail(request: Request, code: str) -> HTMLResponse:
         payload = _build_etf_detail_payload(code_norm)
         if payload is None:
             return None
-        return {**_common_ctx(), **payload, "request": request}
+        return {**_common_ctx(request), **payload, "request": request}
 
     response = _render_cached(("etf_detail_html", code_norm), "etf_detail.html", _build)
     if response is None:
@@ -783,7 +793,7 @@ async def test_holdings(request: Request, code: str = "0050") -> HTMLResponse:
     return templates.TemplateResponse(
         request, "test_holdings.html",
         {
-            **_common_ctx(),
+            **_common_ctx(request),
             "code": code,
             "etf_found": etf is not None,
             "etf_name": etf.name if etf else None,
@@ -796,30 +806,30 @@ async def test_holdings(request: Request, code: str = "0050") -> HTMLResponse:
 
 @router.get("/contact", response_class=HTMLResponse)
 async def contact(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(request, "contact.html", _common_ctx())
+    return templates.TemplateResponse(request, "contact.html", _common_ctx(request))
 
 
 @router.get("/changelog", response_class=HTMLResponse)
 async def changelog(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(request, "changelog.html", _common_ctx())
+    return templates.TemplateResponse(request, "changelog.html", _common_ctx(request))
 
 
 @router.get("/disclaimer", response_class=HTMLResponse)
 async def disclaimer(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(request, "legal/disclaimer.html", _common_ctx())
+    return templates.TemplateResponse(request, "legal/disclaimer.html", _common_ctx(request))
 
 
 @router.get("/terms", response_class=HTMLResponse)
 async def terms(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(request, "legal/terms.html", _common_ctx())
+    return templates.TemplateResponse(request, "legal/terms.html", _common_ctx(request))
 
 
 @router.get("/privacy", response_class=HTMLResponse)
 async def privacy(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(request, "legal/privacy.html", _common_ctx())
+    return templates.TemplateResponse(request, "legal/privacy.html", _common_ctx(request))
 
 
 @router.get("/account-delete", response_class=HTMLResponse)
 async def account_delete(request: Request) -> HTMLResponse:
     """Google OAuth 上架要求:公開可訪問、無需登入的帳號刪除說明頁。"""
-    return templates.TemplateResponse(request, "legal/account_delete.html", _common_ctx())
+    return templates.TemplateResponse(request, "legal/account_delete.html", _common_ctx(request))
