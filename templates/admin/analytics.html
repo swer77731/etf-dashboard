@@ -22,16 +22,6 @@
   <a href="/admin/send_daily_report" class="text-muted hover:text-fg transition" title="即時推一次今日 TG 日報">推送日報</a>
 {% endblock %}
 
-{# Google admin 登入 → 顯示 email + Google 登出 form;否則沿用密碼 JWT 登出 #}
-{% if auth_via_google and current_user %}
-{% block header_right %}
-  <span class="text-fg/85 hidden sm:inline text-xs">{{ current_user.email }}</span>
-  <form method="POST" action="/auth/logout" class="inline-block ml-1">
-    <button type="submit" class="text-muted hover:text-fg transition">登出</button>
-  </form>
-{% endblock %}
-{% endif %}
-
 {% block content %}
 
 {# === 📡 容量監控(同時在線)— 流量爆發時看天花板 === #}

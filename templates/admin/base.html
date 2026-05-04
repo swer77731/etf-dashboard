@@ -71,7 +71,12 @@
       <div class="flex items-center gap-3 text-sm">
         {% block nav %}{% endblock %}
         {% block header_right %}
-          <a href="/admin/logout" class="text-muted hover:text-fg transition">登出</a>
+          {% if current_user %}
+            <span class="text-fg/85 hidden sm:inline text-xs">{{ current_user.email }}</span>
+          {% endif %}
+          <form method="POST" action="/auth/logout" class="inline-block ml-1">
+            <button type="submit" class="text-muted hover:text-fg transition">登出</button>
+          </form>
         {% endblock %}
       </div>
     </div>

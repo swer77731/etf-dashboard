@@ -7,15 +7,6 @@
   <a href="/admin/analytics" class="text-muted hover:text-fg transition">流量分析</a>
 {% endblock %}
 
-{% if auth_via_google and current_user %}
-{% block header_right %}
-  <span class="text-fg/85 hidden sm:inline text-xs">{{ current_user.email }}</span>
-  <form method="POST" action="/auth/logout" class="inline-block ml-1">
-    <button type="submit" class="text-muted hover:text-fg transition">登出</button>
-  </form>
-{% endblock %}
-{% endif %}
-
 {% block content %}
 <section class="mb-5">
   <h2 class="text-xl font-semibold mb-1">錯誤回報收件匣</h2>

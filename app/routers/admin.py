@@ -1,23 +1,24 @@
-"""後台 — /admin/login + /admin/analytics(JWT cookie 驗證)。
+"""後台 — Google OAuth 站長身份驗證(2026-05-04 大掃除版)。
 
-紀律 #16:
-- ADMIN_PASSWORD 是占位值 CHANGE_ME 時直接拒登(避免被人猜)
-- JWT 用 settings.secret_key 簽,7 天有效,HttpOnly cookie
-- secret_key 還是預設 change-me-in-production 時也擋(production 一定要設)
-- 失敗 sleep 0.5s 防 timing attack
-- 全中文 UI,跟 dashboard 暗色一致
+設計:
+- 唯一身份來源 = Google 登入 + ADMIN_EMAIL 白名單比對
+- 沒有密碼登入,沒有 JWT cookie。憑 SessionMiddleware 注入的 user dict 判斷
+- 未登入 → /admin/login 顯示「請用 Google 登入」引導頁
+- 已登入但非 admin → 403
+- 已登入且是 admin → 放行
+
+歷史:之前有密碼 + JWT cookie 雙路徑(2026-05-02 加 Google admin 後並存),
+本次砍掉密碼路徑,統一在 Google admin。.env 留 ADMIN_PASSWORD 設定值無妨,
+會被忽略。
 """
 from __future__ import annotations
 
 import logging
-import secrets
-import time
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from jose import JWTError, jwt
 from sqlalchemy import desc, func, select
 
 from app.config import PROJECT_ROOT, settings
@@ -28,9 +29,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin", tags=["admin"])
 templates = Jinja2Templates(directory=str(PROJECT_ROOT / "templates"))
 
-ADMIN_COOKIE = "etfw_admin"
-JWT_ALG = "HS256"
-JWT_TTL_DAYS = 7
 
 # 沒有 settings.app_brand_full 等於 user 沒設定 → fallback;但 _common_ctx 在 pages.py
 # 不想 import 拉出來只給 admin 用,直接走最小 ctx
@@ -43,41 +41,8 @@ def _admin_ctx(request: Request, **extra) -> dict:
     }
 
 
-def _admin_disabled_reason() -> str | None:
-    """admin 功能能不能用?回原因字串(disabled)or None(OK)。"""
-    if not settings.admin_password or settings.admin_password == "CHANGE_ME":
-        return "ADMIN_PASSWORD 未設定(或仍是占位值 CHANGE_ME)"
-    if not settings.secret_key or settings.secret_key == "change-me-in-production":
-        return "SECRET_KEY 未設定"
-    return None
-
-
-def _make_token() -> str:
-    payload = {
-        "iat": datetime.now(tz=timezone.utc),
-        "exp": datetime.now(tz=timezone.utc) + timedelta(days=JWT_TTL_DAYS),
-        "scope": "admin",
-    }
-    return jwt.encode(payload, settings.secret_key, algorithm=JWT_ALG)
-
-
-def _verify_token(token: str) -> bool:
-    try:
-        payload = jwt.decode(token, settings.secret_key, algorithms=[JWT_ALG])
-        return payload.get("scope") == "admin"
-    except JWTError:
-        return False
-
-
-def _is_authed(request: Request) -> bool:
-    token = request.cookies.get(ADMIN_COOKIE)
-    if not token:
-        return False
-    return _verify_token(token)
-
-
 # ─────────────────────────────────────────────────────────────
-# /admin → redirect 看狀態
+# 站長身份判斷 — Google OAuth + ADMIN_EMAIL 白名單
 # ─────────────────────────────────────────────────────────────
 
 def _admin_emails() -> set[str]:
@@ -89,15 +54,17 @@ def _admin_emails() -> set[str]:
 
 
 def _require_admin(request: Request):
-    """雙 auth check — Google admin email 白名單 OR JWT 密碼登入,任一通過即放行。
+    """Google admin 身份檢查。
 
-    回傳 None 代表通過;否則回 RedirectResponse / HTTPException 給呼叫方 raise / return。
+    回傳:
+    - None → 通過(是站長)
+    - RedirectResponse → 未登入,呼叫方 return 之
+    - 直接 raise HTTPException(403) → 已登入但非站長,呼叫方不必處理
     """
     is_admin, user = _is_site_admin(request)
-    is_jwt = _is_authed(request)
-    if user is not None and not is_admin and not is_jwt:
+    if user is not None and not is_admin:
         raise HTTPException(403, "你不是站長,無權進入後台")
-    if not is_admin and not is_jwt:
+    if not is_admin:
         return RedirectResponse(url="/admin/login", status_code=302)
     return None
 
@@ -199,59 +166,37 @@ def _member_stats() -> dict:
 
 @router.get("")
 async def admin_root(request: Request):
-    """/admin 一律 redirect 到合併後的 /admin/analytics(避免兩個後台並存)。
-
-    auth 在目的地頁做(/admin/analytics 接 Google admin / JWT 雙重驗證)。
-    """
+    """/admin 一律 redirect 到 /admin/analytics(auth 在目的地頁做)。"""
     return RedirectResponse(url="/admin/analytics", status_code=301)
 
 
 # ─────────────────────────────────────────────────────────────
-# /admin/login
+# /admin/login — Google 登入引導頁
 # ─────────────────────────────────────────────────────────────
 
 @router.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request, error: str | None = None):
+async def login_page(request: Request):
+    """已登入 admin → 直接 redirect /admin/analytics。
+    已登入但非 admin → 403。
+    未登入 → 顯示「請用 Google 登入」引導頁。
+    """
+    is_admin, user = _is_site_admin(request)
+    if is_admin:
+        return RedirectResponse(url="/admin/analytics", status_code=302)
+    if user is not None and not is_admin:
+        # 已登入但非站長 → 直接 403,不要顯示登入頁(會繞回來)
+        raise HTTPException(403, "你不是站長,無權進入後台")
+
+    # 未登入 → render 引導頁
+    from app.auth.oauth import is_google_oauth_enabled
     return templates.TemplateResponse(
         request, "admin/login.html",
-        _admin_ctx(request, error=error, disabled_reason=_admin_disabled_reason()),
+        _admin_ctx(
+            request,
+            google_enabled=is_google_oauth_enabled(),
+            admin_emails_set=bool(_admin_emails()),
+        ),
     )
-
-
-@router.post("/login", response_class=HTMLResponse)
-async def login_submit(request: Request, password: str = Form(...)):
-    reason = _admin_disabled_reason()
-    if reason:
-        # 配置不全 → 不准登
-        return templates.TemplateResponse(
-            request, "admin/login.html",
-            _admin_ctx(request, error=f"後台目前停用:{reason}", disabled_reason=reason),
-        )
-    # constant-time compare 防 timing attack
-    ok = secrets.compare_digest(password.encode(), settings.admin_password.encode())
-    if not ok:
-        time.sleep(0.5)
-        return templates.TemplateResponse(
-            request, "admin/login.html",
-            _admin_ctx(request, error="密碼錯誤", disabled_reason=None),
-        )
-
-    resp = RedirectResponse(url="/admin/analytics", status_code=302)
-    resp.set_cookie(
-        ADMIN_COOKIE, _make_token(),
-        max_age=JWT_TTL_DAYS * 24 * 3600,
-        httponly=True,
-        samesite="lax",
-        secure=False,
-    )
-    return resp
-
-
-@router.get("/logout")
-async def logout(request: Request):
-    resp = RedirectResponse(url="/admin/login", status_code=302)
-    resp.delete_cookie(ADMIN_COOKIE)
-    return resp
 
 
 # ─────────────────────────────────────────────────────────────
@@ -260,21 +205,11 @@ async def logout(request: Request):
 
 @router.get("/analytics", response_class=HTMLResponse)
 async def analytics_page(request: Request, range_days: int = 7):
-    """流量後台 — 整合容量監控 / 會員註冊 / 訪客數據 / 熱門 ETF / 熱門搜尋 全套。
-
-    雙重 auth(2026-05-02):
-      1. Google admin email 白名單(首選,新機制)
-      2. JWT 密碼登入(後備,既有機制)
-    任一通過即放行。都沒過 → 跳 /admin/login(密碼登入頁,user 自己選 OAuth)
-    """
-    is_admin, user = _is_site_admin(request)
-    is_jwt = _is_authed(request)
-    # Google 登入但非站長 email → 403(不要跳密碼頁誤導)
-    if user is not None and not is_admin and not is_jwt:
-        raise HTTPException(403, "你不是站長,無權進入後台")
-    # 完全未登入 → 跳密碼頁(user 也可去首頁點 Google 登入再來)
-    if not is_admin and not is_jwt:
-        return RedirectResponse(url="/admin/login", status_code=302)
+    """流量後台 — 整合容量監控 / 會員註冊 / 訪客數據 / 熱門 ETF / 熱門搜尋 全套。"""
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
+    is_admin, user = _is_site_admin(request)  # 通過上面後 user / is_admin 一定可用
 
     # range 限制
     if range_days not in (7, 30):
@@ -312,8 +247,7 @@ async def analytics_page(request: Request, range_days: int = 7):
             visits=visits,
             members=member_stats,
             pending_reports_count=pending_reports,
-            current_user=user,         # Google admin user dict | None
-            auth_via_google=is_admin,  # 顯示登出按鈕用哪種(Google form / 密碼 link)
+            current_user=user,
         ),
     )
 
@@ -367,7 +301,7 @@ async def error_reports_page(request: Request, tab: str = "pending"):
             for r in rows
         ]
 
-    is_admin, user = _is_site_admin(request)
+    is_admin, user = _is_site_admin(request)  # ctx 用,通過 _require_admin 後一定 True
     return templates.TemplateResponse(
         request, "admin/error_reports.html",
         _admin_ctx(
@@ -377,7 +311,6 @@ async def error_reports_page(request: Request, tab: str = "pending"):
             pending_count=pending_count,
             handled_count=handled_count,
             current_user=user,
-            auth_via_google=is_admin,
         ),
     )
 
@@ -412,8 +345,9 @@ async def handle_error_report(
 # Debug endpoint — 即時觸發日報(只給已登入 admin 用)
 @router.get("/send_daily_report")
 async def trigger_daily_report(request: Request):
-    if not _is_authed(request):
-        raise HTTPException(403, "not admin")
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
     from app.services import tg_notify
     text = admin_analytics.build_daily_report()
     ok = tg_notify.send_message(text)
@@ -431,8 +365,9 @@ def trigger_yearly_returns_backfill(request: Request):
     丟 threadpool 跑,避免吃掉 asyncio event loop 害整站 stalled。
     呼叫端瀏覽器可能 504 timeout,但 server 端會繼續跑完。
     """
-    if not _is_authed(request):
-        raise HTTPException(403, "not admin")
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
     from app.database import init_db
     from app.services import yearly_returns_sync
     init_db()
@@ -453,8 +388,9 @@ def trigger_yearly_returns_backfill(request: Request):
 # Bot 歷史紀錄清理 — 刪 analytics_log 中 UA 命中黑名單的 row
 @router.get("/bot-cleanup", response_class=HTMLResponse)
 async def bot_cleanup(request: Request):
-    if not _is_authed(request):
-        return RedirectResponse(url="/admin/login", status_code=302)
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
 
     from sqlalchemy import text as sql_text
     from app.analytics_middleware import BOT_UA_LIKE_PATTERNS, _BOT_UA_PATTERNS
@@ -530,8 +466,9 @@ async def bot_cleanup(request: Request):
 # Bot 診斷 — 看 DAU 是否被 bot / scraper 灌水
 @router.get("/bot-diagnosis", response_class=HTMLResponse)
 async def bot_diagnosis(request: Request):
-    if not _is_authed(request):
-        return RedirectResponse(url="/admin/login", status_code=302)
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
 
     from sqlalchemy import text as sql_text
     from app.database import session_scope
