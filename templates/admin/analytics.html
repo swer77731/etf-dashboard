@@ -13,6 +13,12 @@
     近 30 天
   </a>
   <span class="text-muted">|</span>
+  <a href="/admin/error-reports" class="text-muted hover:text-fg transition">
+    錯誤回報{% if pending_reports_count and pending_reports_count > 0 %}
+      <span class="ml-1 num text-warning">({{ pending_reports_count }} 待處理)</span>
+    {% endif %}
+  </a>
+  <span class="text-muted">|</span>
   <a href="/admin/send_daily_report" class="text-muted hover:text-fg transition" title="即時推一次今日 TG 日報">推送日報</a>
 {% endblock %}
 

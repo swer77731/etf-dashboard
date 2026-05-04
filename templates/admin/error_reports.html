@@ -1,0 +1,156 @@
+{% extends "admin/base.html" %}
+
+{% block title %}錯誤回報 — {{ brand_full }}{% endblock %}
+
+{% block nav %}
+  <span class="text-muted">|</span>
+  <a href="/admin/analytics" class="text-muted hover:text-fg transition">流量分析</a>
+{% endblock %}
+
+{% if auth_via_google and current_user %}
+{% block header_right %}
+  <span class="text-fg/85 hidden sm:inline text-xs">{{ current_user.email }}</span>
+  <form method="POST" action="/auth/logout" class="inline-block ml-1">
+    <button type="submit" class="text-muted hover:text-fg transition">登出</button>
+  </form>
+{% endblock %}
+{% endif %}
+
+{% block content %}
+<section class="mb-5">
+  <h2 class="text-xl font-semibold mb-1">錯誤回報收件匣</h2>
+  <p class="text-sm text-muted">使用者透過頁面右下角浮動按鈕送出的錯誤回報。</p>
+</section>
+
+{# === Tab 切換 === #}
+<div class="flex gap-2 mb-5 border-b border-border">
+  <a href="/admin/error-reports?tab=pending"
+     class="px-4 py-2 text-sm font-medium transition
+            {% if tab == 'pending' %}
+              text-fg border-b-2 border-warning
+            {% else %}
+              text-muted hover:text-fg
+            {% endif %}">
+    待處理
+    <span class="ml-1 num {% if tab == 'pending' %}text-warning{% else %}text-muted{% endif %}">
+      ({{ pending_count }})
+    </span>
+  </a>
+  <a href="/admin/error-reports?tab=handled"
+     class="px-4 py-2 text-sm font-medium transition
+            {% if tab == 'handled' %}
+              text-fg border-b-2 border-down
+            {% else %}
+              text-muted hover:text-fg
+            {% endif %}">
+    已處理
+    <span class="ml-1 num {% if tab == 'handled' %}text-down{% else %}text-muted{% endif %}">
+      ({{ handled_count }})
+    </span>
+  </a>
+</div>
+
+{# === 列表 === #}
+{% if items|length == 0 %}
+  <div class="card p-8 text-center text-muted">
+    {% if tab == 'pending' %}目前沒有待處理的回報{% else %}尚無已處理的回報{% endif %}
+  </div>
+{% else %}
+  <div class="space-y-3">
+    {% for item in items %}
+    <details class="card p-0 group">
+      <summary class="px-4 py-3 cursor-pointer flex items-start gap-3 list-none
+                      hover:bg-card-hi transition" style="user-select: none;">
+        <span class="text-muted text-xs num flex-shrink-0 mt-0.5">
+          {{ item.created_at|replace('T', ' ') }}
+        </span>
+        <span class="text-accent text-xs num flex-shrink-0 mt-0.5 truncate max-w-[180px] sm:max-w-[260px]">
+          {{ item.page_url }}
+        </span>
+        <span class="text-sm text-fg/90 flex-1 truncate">
+          {{ item.description_short }}{% if item.description|length > 80 %}…{% endif %}
+        </span>
+        <span class="text-muted text-xs flex-shrink-0 group-open:rotate-180 transition-transform"
+              style="transition-duration: 150ms;">⌄</span>
+      </summary>
+
+      <div class="px-4 pb-4 pt-1 border-t border-border space-y-3">
+        {# 完整描述 #}
+        <div>
+          <div class="text-xs text-muted mb-1">完整描述</div>
+          <div class="text-sm text-fg whitespace-pre-wrap break-words bg-bg/50 rounded p-3 border border-border">{{ item.description }}</div>
+        </div>
+
+        {# Meta info #}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+          <div>
+            <span class="text-muted">回報時間:</span>
+            <span class="num text-fg/80">{{ item.created_at|replace('T', ' ') }} (UTC)</span>
+          </div>
+          <div>
+            <span class="text-muted">頁面網址:</span>
+            <a href="{{ item.page_url }}" target="_blank" rel="noopener"
+               class="text-accent hover:underline num break-all">{{ item.page_url }}</a>
+          </div>
+          <div>
+            <span class="text-muted">IP:</span>
+            <span class="num text-fg/70">{{ item.ip_masked }}</span>
+          </div>
+          <div>
+            <span class="text-muted">User Agent:</span>
+            <span class="num text-fg/70 break-all">{{ item.user_agent }}</span>
+          </div>
+        </div>
+
+        {% if item.status == 'pending' %}
+          {# 待處理 — 顯示處理 form #}
+          <form method="POST" action="/admin/error-reports/{{ item.id }}/handle"
+                class="space-y-2 pt-2 border-t border-border">
+            <label class="block">
+              <span class="text-xs text-muted">處理備註(選填)</span>
+              <textarea name="note" rows="2" maxlength="1000"
+                        placeholder="例:已修復、無法重現、誤報、ETF 改名等"
+                        class="mt-1 w-full bg-bg border border-border rounded-md px-3 py-2 text-sm text-fg
+                               focus:outline-none focus:border-accent"></textarea>
+            </label>
+            <button type="submit"
+                    class="bg-down hover:opacity-90 text-white text-sm font-medium px-4 py-2 rounded-md transition">
+              標記已處理
+            </button>
+          </form>
+        {% else %}
+          {# 已處理 — 顯示處理時間 + 備註 #}
+          <div class="pt-2 border-t border-border space-y-2">
+            <div class="text-xs">
+              <span class="text-muted">處理時間:</span>
+              <span class="num text-down">{{ item.handled_at|replace('T', ' ') if item.handled_at else '—' }} (UTC)</span>
+            </div>
+            {% if item.handled_note %}
+            <div>
+              <div class="text-xs text-muted mb-1">處理備註</div>
+              <div class="text-sm text-fg/85 whitespace-pre-wrap break-words bg-bg/50 rounded p-3 border border-border">{{ item.handled_note }}</div>
+            </div>
+            {% else %}
+            <div class="text-xs text-muted">(無處理備註)</div>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+    </details>
+    {% endfor %}
+  </div>
+
+  {% if items|length >= 200 %}
+  <div class="text-xs text-muted text-center mt-4">
+    最多顯示 200 筆。早期紀錄請查 DB。
+  </div>
+  {% endif %}
+{% endif %}
+
+<style>
+  /* details summary 預設 marker 移除(各瀏覽器) */
+  details > summary { list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+  details > summary::marker { display: none; }
+</style>
+{% endblock %}

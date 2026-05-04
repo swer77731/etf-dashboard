@@ -1,0 +1,301 @@
+{# === 錯誤回報浮動按鈕 + modal + toast ===
+
+    使用情境:base.html 在 </body> 前 include,並用 {% if show_error_report %}
+    控制是否載入。show_error_report 由 pages._common_ctx 依路徑白名單決定。
+
+    紀律 #18(手機速度優先):
+      - 純 CSS + Alpine.js(站內已用),不引第三方
+      - 按鈕 transform: translateZ(0) GPU 提升
+      - modal 用 x-show(display 切換)非 x-transition,無動畫
+      - 任何 transition <= 150ms,不超過 200ms 紅線
+#}
+<div x-data="errorReportWidget()" x-cloak class="error-report-root">
+  {# === 浮動按鈕 === #}
+  <button type="button" @click="open()"
+          class="error-report-btn"
+          aria-label="回報此頁錯誤">
+    <span aria-hidden="true">❗</span> 回報錯誤
+  </button>
+
+  {# === Modal === #}
+  <div x-show="modalOpen" x-cloak
+       class="error-report-backdrop"
+       @click.self="close()"
+       @keydown.escape.window="close()"
+       role="dialog" aria-modal="true" aria-labelledby="error-report-title">
+    <div class="error-report-modal" @click.stop>
+      <h3 id="error-report-title" class="error-report-title">回報此頁錯誤</h3>
+
+      <div class="error-report-page">
+        <span class="error-report-page-label">頁面:</span>
+        <span class="error-report-page-url" x-text="pageUrl"></span>
+      </div>
+
+      <label class="error-report-label" for="error-report-textarea">
+        請描述錯誤狀況:
+      </label>
+      <textarea id="error-report-textarea"
+                x-model="description"
+                @input="error = ''"
+                placeholder="請至少 10 字"
+                maxlength="1000"
+                rows="5"
+                class="error-report-textarea"></textarea>
+
+      <div class="error-report-error" x-show="error" x-text="error"></div>
+
+      <div class="error-report-actions">
+        <button type="button" @click="close()"
+                class="error-report-btn-cancel">取消</button>
+        <button type="button" @click="submit()"
+                :disabled="submitting"
+                class="error-report-btn-submit"
+                x-text="submitting ? '送出中...' : '送出'"></button>
+      </div>
+    </div>
+  </div>
+
+  {# === Toast === #}
+  <div x-show="toast.show" x-cloak
+       class="error-report-toast"
+       :class="toast.type === 'success' ? 'is-success' : 'is-error'"
+       x-text="toast.msg"
+       role="status" aria-live="polite"></div>
+</div>
+
+<style>
+  /* === 浮動按鈕 === */
+  .error-report-btn {
+    position: fixed;
+    bottom: 80px;
+    right: 16px;
+    z-index: 9000;
+    background: #f59e0b;
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    transform: translateZ(0);            /* GPU 加速,紀律 #18 */
+    transition: background-color 120ms;  /* < 200ms */
+    -webkit-tap-highlight-color: transparent;
+  }
+  .error-report-btn:hover { background: #d97706; }
+  .error-report-btn:active { background: #b45309; }
+  @media (max-width: 480px) {
+    .error-report-btn {
+      bottom: 76px;
+      right: 12px;
+      font-size: 13px;
+      padding: 7px 12px;
+    }
+  }
+
+  /* === Modal backdrop === */
+  .error-report-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 9100;
+    background: rgba(0, 0, 0, 0.65);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  /* === Modal box === */
+  .error-report-modal {
+    width: 100%;
+    max-width: 480px;
+    background: #131829;
+    color: #e5e7eb;
+    border: 1px solid #1f2937;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+  }
+  .error-report-title {
+    font-size: 17px;
+    font-weight: 600;
+    margin: 0 0 14px 0;
+  }
+  .error-report-page {
+    font-size: 13px;
+    color: #9ca3af;
+    margin-bottom: 14px;
+    word-break: break-all;
+  }
+  .error-report-page-label { color: #9ca3af; }
+  .error-report-page-url {
+    color: #e5e7eb;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .error-report-label {
+    display: block;
+    font-size: 14px;
+    color: #e5e7eb;
+    margin-bottom: 8px;
+  }
+  .error-report-textarea {
+    width: 100%;
+    background: #0a0e1a;
+    color: #e5e7eb;
+    border: 1px solid #1f2937;
+    border-radius: 6px;
+    padding: 10px;
+    font-size: 14px;
+    font-family: inherit;
+    line-height: 1.5;
+    resize: vertical;
+    min-height: 110px;
+    box-sizing: border-box;
+  }
+  .error-report-textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+  }
+  .error-report-error {
+    color: #ef4444;
+    font-size: 13px;
+    margin-top: 8px;
+  }
+  .error-report-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 16px;
+  }
+  .error-report-btn-cancel,
+  .error-report-btn-submit {
+    padding: 8px 18px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background-color 120ms;
+  }
+  .error-report-btn-cancel {
+    background: transparent;
+    color: #9ca3af;
+    border-color: #1f2937;
+  }
+  .error-report-btn-cancel:hover {
+    color: #e5e7eb;
+    background: #1a2138;
+  }
+  .error-report-btn-submit {
+    background: #f59e0b;
+    color: #ffffff;
+  }
+  .error-report-btn-submit:hover { background: #d97706; }
+  .error-report-btn-submit:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  /* === Toast === */
+  .error-report-toast {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%) translateZ(0);
+    z-index: 9200;
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #ffffff;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+    max-width: calc(100vw - 32px);
+    text-align: center;
+  }
+  .error-report-toast.is-success { background: #10b981; }
+  .error-report-toast.is-error { background: #ef4444; }
+</style>
+
+<script>
+  function errorReportWidget() {
+    return {
+      modalOpen: false,
+      pageUrl: '',
+      description: '',
+      error: '',
+      submitting: false,
+      toast: { show: false, msg: '', type: 'success' },
+      _toastTimer: null,
+
+      open() {
+        this.pageUrl = window.location.pathname + window.location.search;
+        this.description = '';
+        this.error = '';
+        this.modalOpen = true;
+        // 等 x-show 渲染後 focus
+        this.$nextTick(() => {
+          const ta = document.getElementById('error-report-textarea');
+          if (ta) ta.focus();
+        });
+      },
+
+      close() {
+        this.modalOpen = false;
+        this.error = '';
+      },
+
+      _isJunk(s) {
+        // 全空白 / 全標點 / 全符號 → 視為無效描述
+        // \p{P} 標點、\p{S} 符號(emoji 等);搭 \s 空白
+        return /^[\s\p{P}\p{S}]+$/u.test(s);
+      },
+
+      async submit() {
+        const desc = (this.description || '').trim();
+        if (desc.length < 10) {
+          this.error = '請至少 10 字';
+          return;
+        }
+        if (this._isJunk(desc)) {
+          this.error = '請描述具體狀況';
+          return;
+        }
+        this.error = '';
+        this.submitting = true;
+        try {
+          const resp = await fetch('/api/error-report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              page_url: this.pageUrl,
+              description: desc,
+            }),
+          });
+          if (resp.ok) {
+            this.modalOpen = false;
+            this._showToast('✅ 已收到,謝謝!', 'success');
+          } else if (resp.status === 429) {
+            this.modalOpen = false;
+            this._showToast('太頻繁,請稍後再試', 'error');
+          } else {
+            const data = await resp.json().catch(() => ({}));
+            this.error = data.detail || '送出失敗,請稍後再試';
+          }
+        } catch (e) {
+          this.error = '網路錯誤,請稍後再試';
+        } finally {
+          this.submitting = false;
+        }
+      },
+
+      _showToast(msg, type) {
+        if (this._toastTimer) clearTimeout(this._toastTimer);
+        this.toast = { show: true, msg: msg, type: type };
+        this._toastTimer = setTimeout(() => {
+          this.toast.show = false;
+        }, 2000);
+      },
+    };
+  }
+</script>

@@ -64,16 +64,34 @@ def _detect_brand_assets() -> dict:
     }
 
 
+def _show_error_report_for(path: str) -> bool:
+    """8 個「有資料頁面」白名單 — 浮動回報按鈕只在這些路徑顯示。
+
+    法律 / 教學 / 後台 / 註冊登入 / 雜訊頁(/news 等)預設 False。
+    """
+    if path in (
+        "/", "/holdings", "/compare", "/dca",
+        "/monthly-income", "/dividend-calendar",
+    ):
+        return True
+    if path.startswith("/etf/") or path.startswith("/ranking/"):
+        return True
+    return False
+
+
 def _common_ctx(request: Request | None = None) -> dict:
     """共用品牌 context — 所有頁面都會用到。
 
     若傳入 request,會從 request.state.user(由 CurrentUserMiddleware 注入)
     補 current_user dict 進 ctx。沒有 request 或未登入 → current_user=None。
+    show_error_report:依 request.url.path 判斷,白名單 8 頁顯示浮動回報按鈕。
     """
     from app.auth.oauth import is_google_oauth_enabled
     current_user = None
+    show_error_report = False
     if request is not None:
         current_user = getattr(request.state, "user", None)
+        show_error_report = _show_error_report_for(request.url.path)
     return {
         "app_name": settings.app_name,
         "app_env": settings.app_env,
@@ -82,6 +100,7 @@ def _common_ctx(request: Request | None = None) -> dict:
         "brand_full": settings.app_brand_full,
         "current_user": current_user,
         "google_oauth_enabled": is_google_oauth_enabled(),
+        "show_error_report": show_error_report,
         **_detect_brand_assets(),
     }
 

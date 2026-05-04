@@ -1,15 +1,17 @@
 """JSON API routes."""
 from __future__ import annotations
 
+import re
 import time as _time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_session, session_scope
+from app.models.error_report import ErrorReport
 from app.models.etf import ETF
 from app.models.holdings import Holding
 from app.models.holdings_change import HoldingsChange
@@ -634,3 +636,69 @@ async def dca_etf_meta(code: str = Query(..., min_length=1)) -> dict:
     }
     _DCA_META_CACHE[code] = (now + _DCA_META_TTL, payload)
     return payload
+
+
+# ─────────────────────────────────────────────────────────────
+# 錯誤回報 — 8 個有資料頁面右下角浮動按鈕呼叫此 endpoint
+# ─────────────────────────────────────────────────────────────
+
+# 只有空白 / 標點 / 符號 / 底線 → 視為空描述
+_PUNCT_ONLY_RE = re.compile(r"^[\s\W_]+$", re.UNICODE)
+
+
+@router.post("/error-report")
+async def submit_error_report(
+    request: Request,
+    payload: dict = Body(...),
+    session: Session = Depends(get_session),
+) -> dict:
+    """收使用者錯誤回報。
+
+    驗證:description >= 10 / 不全空白標點 / page_url 非空。
+    防灌水:同 IP 5 分鐘 1 次 / 24h 10 次 → 否則 429。
+    寫入:ip_masked(末段已遮)/ user_agent / status='pending'。
+    """
+    page_url = (payload.get("page_url") or "").strip()
+    description = (payload.get("description") or "").strip()
+
+    if not page_url:
+        raise HTTPException(400, "page_url 不能空")
+    if len(description) < 10:
+        raise HTTPException(400, "請至少 10 字")
+    if _PUNCT_ONLY_RE.match(description):
+        raise HTTPException(400, "請描述具體狀況")
+
+    # IP 取 + 末段遮罩(沿用 analytics_middleware 既有 helper)
+    from app.analytics_middleware import _client_ip, _ip_mask
+    raw_ip = _client_ip(request)
+    ip_m = _ip_mask(raw_ip) if raw_ip else None
+
+    # 防灌水(僅在拿得到 IP 時生效;沒 IP 直接放過)
+    if ip_m:
+        now_dt = datetime.utcnow()
+        recent_5min = session.scalar(
+            select(func.count()).select_from(ErrorReport)
+            .where(ErrorReport.ip_masked == ip_m)
+            .where(ErrorReport.created_at >= now_dt - timedelta(minutes=5))
+        ) or 0
+        if recent_5min >= 1:
+            raise HTTPException(429, "太頻繁,請稍後再試")
+        recent_24h = session.scalar(
+            select(func.count()).select_from(ErrorReport)
+            .where(ErrorReport.ip_masked == ip_m)
+            .where(ErrorReport.created_at >= now_dt - timedelta(days=1))
+        ) or 0
+        if recent_24h >= 10:
+            raise HTTPException(429, "今日回報已達上限")
+
+    ua = (request.headers.get("user-agent") or "")[:512]
+    rec = ErrorReport(
+        page_url=page_url[:512],
+        description=description[:1000],
+        ip_masked=ip_m,
+        user_agent=ua,
+        status="pending",
+    )
+    session.add(rec)
+    session.commit()
+    return {"ok": True, "id": rec.id}

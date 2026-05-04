@@ -1158,5 +1158,10 @@
         });
       }
     </script>
+
+    {# === 錯誤回報浮動按鈕(只在 8 個有資料頁面顯示)=== #}
+    {% if show_error_report %}
+      {% include "_partials/error_report.html" %}
+    {% endif %}
 </body>
 </html>

@@ -18,6 +18,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from jose import JWTError, jwt
+from sqlalchemy import desc, func, select
 
 from app.config import PROJECT_ROOT, settings
 from app.services import admin_analytics
@@ -85,6 +86,31 @@ def _admin_emails() -> set[str]:
     if not raw:
         return set()
     return {e.strip().lower() for e in raw.split(",") if e.strip()}
+
+
+def _require_admin(request: Request):
+    """雙 auth check — Google admin email 白名單 OR JWT 密碼登入,任一通過即放行。
+
+    回傳 None 代表通過;否則回 RedirectResponse / HTTPException 給呼叫方 raise / return。
+    """
+    is_admin, user = _is_site_admin(request)
+    is_jwt = _is_authed(request)
+    if user is not None and not is_admin and not is_jwt:
+        raise HTTPException(403, "你不是站長,無權進入後台")
+    if not is_admin and not is_jwt:
+        return RedirectResponse(url="/admin/login", status_code=302)
+    return None
+
+
+def _pending_error_reports_count() -> int:
+    """錯誤回報待處理筆數 — analytics 頁 nav 用。"""
+    from app.database import session_scope
+    from app.models.error_report import ErrorReport
+    with session_scope() as s:
+        return s.scalar(
+            select(func.count()).select_from(ErrorReport)
+            .where(ErrorReport.status == "pending")
+        ) or 0
 
 
 def _is_site_admin(request: Request) -> tuple[bool, dict | None]:
@@ -267,6 +293,7 @@ async def analytics_page(request: Request, range_days: int = 7):
     refs = admin_analytics.referer_breakdown(days=range_days)
     visits = admin_analytics.recent_visits(limit=100)
     member_stats = _member_stats()   # 會員註冊統計(2026-05-02 併入)
+    pending_reports = _pending_error_reports_count()  # nav 入口顯示待處理筆數
 
     return templates.TemplateResponse(
         request, "admin/analytics.html",
@@ -284,10 +311,102 @@ async def analytics_page(request: Request, range_days: int = 7):
             refs=refs,
             visits=visits,
             members=member_stats,
+            pending_reports_count=pending_reports,
             current_user=user,         # Google admin user dict | None
             auth_via_google=is_admin,  # 顯示登出按鈕用哪種(Google form / 密碼 link)
         ),
     )
+
+
+# ─────────────────────────────────────────────────────────────
+# /admin/error-reports — 錯誤回報收件匣
+# ─────────────────────────────────────────────────────────────
+
+@router.get("/error-reports", response_class=HTMLResponse)
+async def error_reports_page(request: Request, tab: str = "pending"):
+    """錯誤回報收件匣 — 待處理 / 已處理 雙 tab。"""
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
+
+    if tab not in ("pending", "handled"):
+        tab = "pending"
+
+    from app.database import session_scope
+    from app.models.error_report import ErrorReport
+
+    with session_scope() as s:
+        pending_count = s.scalar(
+            select(func.count()).select_from(ErrorReport)
+            .where(ErrorReport.status == "pending")
+        ) or 0
+        handled_count = s.scalar(
+            select(func.count()).select_from(ErrorReport)
+            .where(ErrorReport.status == "handled")
+        ) or 0
+        rows = s.scalars(
+            select(ErrorReport)
+            .where(ErrorReport.status == tab)
+            .order_by(desc(ErrorReport.created_at))
+            .limit(200)
+        ).all()
+        # 在 session 內 materialize,避免 detached
+        items = [
+            {
+                "id": r.id,
+                "created_at": r.created_at.isoformat(timespec="seconds") if r.created_at else "",
+                "page_url": r.page_url,
+                "description": r.description,
+                "description_short": (r.description or "")[:80],
+                "ip_masked": r.ip_masked or "—",
+                "user_agent": r.user_agent or "—",
+                "status": r.status,
+                "handled_at": r.handled_at.isoformat(timespec="seconds") if r.handled_at else None,
+                "handled_note": r.handled_note,
+            }
+            for r in rows
+        ]
+
+    is_admin, user = _is_site_admin(request)
+    return templates.TemplateResponse(
+        request, "admin/error_reports.html",
+        _admin_ctx(
+            request,
+            tab=tab,
+            items=items,
+            pending_count=pending_count,
+            handled_count=handled_count,
+            current_user=user,
+            auth_via_google=is_admin,
+        ),
+    )
+
+
+@router.post("/error-reports/{report_id}/handle")
+async def handle_error_report(
+    request: Request,
+    report_id: int,
+    note: str = Form(""),
+):
+    """標記為已處理 — 寫 handled_at + handled_note + status='handled'。"""
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
+
+    from app.database import session_scope
+    from app.models.error_report import ErrorReport
+
+    with session_scope() as s:
+        rec = s.get(ErrorReport, report_id)
+        if not rec:
+            raise HTTPException(404, "找不到此筆回報")
+        if rec.status == "handled":
+            raise HTTPException(400, "此筆已處理過")
+        rec.status = "handled"
+        rec.handled_at = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+        rec.handled_note = (note or "").strip()[:1000] or None
+
+    return RedirectResponse(url="/admin/error-reports?tab=pending", status_code=303)
 
 
 # Debug endpoint — 即時觸發日報(只給已登入 admin 用)
