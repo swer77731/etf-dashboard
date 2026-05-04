@@ -504,6 +504,20 @@
     var etfNorm = normalize(etfData);
     var taiexNorm = normalize(taiexData);
 
+    // 數字格式:期初=100 → 顯示「+45.2% / -19.5% / 0.0%」(user spec 2026-05-04)
+    //   - 正:加 + 號,1 位小數
+    //   - 負:負號自動帶,1 位小數
+    //   - 零(round 後):「0.0%」,不加 + / -
+    // abs+sign 確保正負四捨五入對稱(JS Math.round(-0.5)=0 不對稱)
+    function fmtReturnPct(v) {
+      var pct = v - 100;
+      var sign = pct < 0 ? -1 : 1;
+      var rounded = Math.round(Math.abs(pct) * 10) / 10 * sign;
+      if (rounded > 0) return '+' + rounded.toFixed(1) + '%';
+      if (rounded < 0) return rounded.toFixed(1) + '%';
+      return '0.0%';
+    }
+
     // 顏色由 CSS variable 取(--c-accent 等是 "59 130 246" 三段 triplet)
     function cssVar(name) {
       var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -577,6 +591,15 @@
           borderColor: border,
           textStyle: { color: fg, fontSize: 13 },
           axisPointer: { lineStyle: { color: muted } },
+          formatter: function (params) {
+            if (!params || !params.length) return '';
+            var lines = ['<b>' + params[0].axisValueLabel + '</b>'];
+            params.forEach(function (p) {
+              var n = Array.isArray(p.value) ? p.value[1] : p.value;
+              lines.push(p.marker + ' ' + p.seriesName + ': ' + fmtReturnPct(n));
+            });
+            return lines.join('<br/>');
+          },
         },
         legend: {
           data: showTaiex ? [etfName, '大盤(TAIEX)'] : [etfName],
@@ -595,7 +618,7 @@
           axisLine: { show: false },
           axisLabel: {
             color: muted, fontSize: 11,
-            formatter: function (v) { return v.toFixed(0); },
+            formatter: fmtReturnPct,
           },
           splitLine: { lineStyle: { color: border, type: 'dashed', opacity: 0.5 } },
         },
