@@ -124,6 +124,11 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
 )
+# 紀律 #18 — httpx INFO 級別會把完整 URL 印進 log,FinMind URL 含 ?token=...&...
+# 等敏感 query string,直接讓整段 token + 帳號 email 露出。降到 WARNING 後
+# httpx 自身只在 4xx/5xx 才出聲,正常 sync 對我們也夠 — 自家 service 層
+# 已 log 必要資訊。自家 raise / log 路徑另外走 finmind._redact()(紀律 #18)。
+logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
