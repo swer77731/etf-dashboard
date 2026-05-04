@@ -49,6 +49,9 @@ scripts/out/
 # One-off probe / scratch scripts(命名慣例:scripts/_*.py 不進 git)
 scripts/_*.py
 
+# Mobile / verification screenshots(每次驗收會重產生,不進 repo)
+screenshots/
+
 # Design references / mockups (本地參考用,不進 repo)
 design/
 

@@ -1587,8 +1587,25 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
   - 月份左右切換 + 模式 toggle + 紅色週日 + 今天紅框
   - NULL cash_dividend → 顯示「金額未公告」
 - [x] Phase 4: `/contact` 聯絡頁 + `/changelog` 更新日誌 ✅ 2026-04-27
+- [x] 錯誤回報系統 ✅ 2026-05-04(commit 93b981c)
+  - migration 006 + `error_reports` table + `(ip_masked, created_at)` 複合 index
+  - `app/models/error_report.py` ORM
+  - `POST /api/error-report` — 描述 ≥10 字 / 非全空白標點 / page_url 非空 / 同 IP 5min 1 次 + 24h 10 次 rate-limit(直接查 table 自身,無另外 cache)
+  - `templates/_partials/error_report.html`(浮動按鈕 + Modal + Toast,Alpine.js + 純 CSS,紀律 #18 GPU 加速 / 無動畫)
+  - `_common_ctx` 路徑白名單集中判斷 `show_error_report`,8 頁顯示(/、/etf/*、/holdings、/compare、/dca、/monthly-income、/dividend-calendar、/ranking/*),其他預設 False
+  - 後台 `/admin/error-reports` 待處理 / 已處理雙 tab + 標記已處理 form
+  - analytics nav 加「錯誤回報 (N 待處理)」入口
+- [x] 後台 OAuth 統一(2026-05-04 commit b90a217)
+  - 砍密碼 / JWT cookie 路徑(`_admin_disabled_reason` / `_make_token` / `_verify_token` / `_is_authed` / `ADMIN_COOKIE`)
+  - `/admin/login` 改 Google 登入引導頁(3 case:google_enabled+admin_emails、google disabled、admin_emails 空)
+  - 4 個漏網 endpoint(`send_daily_report` / `yearly_returns/backfill` / `bot-cleanup` / `bot-diagnosis`)補 `_require_admin`
+  - `admin/base.html` 預設 header_right 改用 `/auth/logout` form
+- [x] FinMind token / email log leak 修復(2026-05-04 commit 8738f15)
+  - `logging.getLogger("httpx").setLevel(logging.WARNING)` 一行修法
+  - 不再印 `?token=eyJ... &user_id=... email=...@gmail.com` 到 log / stdout / Zeabur stream
 - [ ] Step 2.5 Phase 3 (etf 詳情頁):十大持股 + 產業分布(需爬蟲,獨立工程)
 - [ ] Step 6:會員系統(Step 5 TG 推播延後 / 訂閱金流 user 思考中)
+- [ ] 後台中文化(任務 B,排程中)
 
 ---
 
@@ -1733,6 +1750,38 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
 - 解法:powershell port-based kill 加上 fallback `Stop-Process` 多個 PID,接著 `python run.py` 重啟
 - 教訓:**Windows uvicorn `--reload` 偶爾不會清舊 worker**,改完不認 → port-based kill 全部相關 python.exe 後再起
 
+### 2026-05-04 / 錯誤回報 / 浮動按鈕在手機某些頁面擋到內容
+- Playwright iPhone SE 375x667 拍 16 張看完,默認狀態 button `bottom: 80px right: 16px` 在 8 頁中 4 頁擋到關鍵內容:
+  - `/dividend-calendar`:擋到 ETF 列每筆殖利率 % 的右半
+  - `/dca`:擋到「每月 N 號」下拉選單 caret(form 互動元件)
+  - `/monthly-income`:擋到「選 ETF 開始試算 →」CTA 箭頭
+  - `/ranking/top`:擋到第一名 ETF 的報酬率 % 數字(排行的核心)
+- user 實機操作後判定可接受,**維持現狀不修**;若收到 user 回報再修
+- 教訓:任何「fixed bottom-right」浮動元件在規劃時就要列出每頁底部關鍵內容是否會被遮蔽,當下用 Playwright iPhone SE 截圖驗一輪再 commit。**不要等使用者實機後才補驗**(這次因為 user 提醒才補,違反紀律 #18 "規劃時就要納入手機影響")
+- 候選修法存進 CLAUDE.md(若未來要修):
+  - A. backdrop opacity 0.65 → 0.85(只解 modal 開啟時 button 殘影)
+  - B. modal 開時 `x-show` 同步隱藏 button(乾淨)
+  - C. button 縮成 36px 圓形 ❗ icon-only(idle 狀態最小佔位)
+  - D. body 全頁 `padding-bottom: 80px`(代價是底部多空白)
+  - 當前選 F:維持現狀
+
+### 2026-05-04 / 後台 password / JWT 路徑與 Google OAuth 並存造成 /admin/login 誤導
+- 本機 dev 沒設 `ADMIN_PASSWORD` 時,`/admin/login` 顯示「⚠ 後台目前停用 — ADMIN_PASSWORD 未設定」誤導訊息,但實際 Google OAuth 路徑可登入
+- 4 個 admin endpoint(`send_daily_report` / `yearly_returns/backfill` / `bot-cleanup` / `bot-diagnosis`)只走 JWT 密碼路徑,Google admin **進不去**,半套 bug 藏著
+- 教訓:**任何雙路徑 auth(備用機制)用 OR 邏輯時,UI 訊息必須反映「至少一條通了」狀態,而非單條訊息死鎖**;且新加身份檢查時要 grep 所有受保護 endpoint 確認都套了新邏輯,不能只改首要 endpoint
+
+### 2026-05-04 / FinMind token / email leak 進 log
+- 紀律 #18 已鎖「不准把 token 漏進 log」(2026-04-27),但今天 debug 時看 server stdout 才發現 **httpx 預設 INFO log 印完整 URL** = FinMind 每筆 API call 整段 token + 帳號 email 進 log / Zeabur log stream / docker 日誌
+- 這條 leak 從專案開始就存在,直到偶然看 server log 才發現
+- 修法:`logging.getLogger("httpx").setLevel(logging.WARNING)` 一行
+- 教訓:**紀律 #18 落地不能只看自家 raise / log 路徑,也要審所有第三方 lib 的預設 logger level**;新加任何外部 HTTP wrapper 時順手做這個審查
+
+### 2026-05-04 / Windows uvicorn 多 process kill 不掉 / pyc cache 卡舊 code
+- 重啟 server 想驗 admin refactor,但發現 endpoint 還回舊「not admin」訊息 → 以為 code 沒寫對 → 5 分鐘鬼打牆
+- 真正原因:port 8000 被多個 uvicorn worker 持有,`Stop-Process -Id <reloader>` 只殺 parent,child worker respawn 仍持 port + 持舊 code(因為 pyc cache)
+- 解法:三步 — `Stop-Process -Id <每個 OwningProcess>`(逐個殺)→ `find app -name __pycache__ -exec rm -rf` → 重啟
+- 教訓:**Windows + uvicorn `--reload` debug 卡關第一招**:port 上看 `OwningProcess` 一一 kill + 清 pycache。寫進紀律 #11 後續落地
+
 ---
 
 # 🎯 重要決策歷程
@@ -1773,6 +1822,40 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
 - 痛點:80% 散戶只想看「我這支 ETF 漲多少」,大盤對比是進階需求
 - 決定:預設只一條 ETF 線,右上角 toggle switch「疊加大盤對比」用戶主動開
 - 紀律 #1「白癡都看得懂」:預設介面只給核心資訊,進階需求收進開關
+
+### 2026-05-04 / 錯誤回報 rate-limit 用 SQL 查 table 自身,不另外架 Redis / cache
+- 考量:
+  - Redis:多一個 service / docker 進程 / 設定 / 連線管理,本專案還沒上 Redis
+  - in-memory dict:多 worker 不共享(雖然目前 single-process)
+  - 自家寫 SQLite cache table:與 error_reports 重複造輪子
+  - **SQL 查 error_reports 自身**:單一資料源、無同步問題、新建 `(ip_masked, created_at)` 複合 index 後 query 是 index seek
+- 決定:`SELECT COUNT(*) FROM error_reports WHERE ip_masked=? AND created_at >= ?` 兩條 query
+- Trade-off:每次提交多 2 次 read + 1 次 insert = 3 次 SQLite 操作。SQLite 每秒上千 op,使用者每 5 分鐘最多 1 次提交,負擔可忽略
+
+### 2026-05-04 / `show_error_report` 由 `_common_ctx` 路徑白名單集中判斷,不要求每個 view 加旗標
+- user spec 寫「view 函數傳 show_error_report=True」,但 8 個 view 一一改 = 8 處可能漏改
+- 改成 `_common_ctx(request)` 內 `_show_error_report_for(path)` 對白名單比對,所有 view 自動獲得正確旗標
+- 新加頁面預設 False(安全側),要顯示按鈕只需更新白名單一處
+- 違反 user 字面 spec 但符合精神(8 頁顯示按鈕),且更不易漏掉
+
+### 2026-05-04 / 後台 admin auth 大掃除 — 走 Plan A(全砍密碼層)而非 Plan B(只改訊息)
+- Plan A:砍 `_admin_disabled_reason` / JWT cookie / 密碼 form / `/admin/logout`,統一在 Google OAuth + ADMIN_EMAIL
+- Plan B:保留密碼路徑當備用,只修「Google OK 時不顯示密碼停用警示」
+- user 拍板 A,理由:「不該再檢查 ADMIN_PASSWORD,那是舊版的事」
+- 收益:
+  - 砍掉 4 個漏網 endpoint 的雙重檢查 bug(原只走 JWT,Google admin 進不去)
+  - code 量 −69 行(183 → 100 行 admin.py)
+  - login UI 邏輯一致(只有 Google,不會誤導)
+- 風險:既有 JWT cookie 失效,user 自己重 Google 登入即可
+
+### 2026-05-04 / FinMind token leak 修法走方案 A(httpx logger → WARNING)而非方案 B(transport / logging filter redact)
+- 方案 A:`logging.getLogger("httpx").setLevel(logging.WARNING)` 一行
+- 方案 B:寫 logging.Filter 攔截 httpx logger record 並 redact URL token
+- 走 A 因為:
+  1. httpx INFO log 對我們沒實質 debug 價值(自家 service 層已 log 必要)
+  2. 4xx/5xx 還在 WARNING 出聲,故障時仍可診斷
+  3. 自家 raise / log 路徑早有 `_redact()`(紀律 #18 既有落地)
+  4. 紀律 #14 不過度設計,簡單 1 行勝過 logging filter 基礎建設
 
 ### 為什麼選這個技術棧
 - **FastAPI**:async 友善、自動產 OpenAPI doc、Pydantic 整合好
@@ -2039,3 +2122,5 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
 2026-04-27 16:00 | Phase 2A / 2B / 3 / 4 一輪做完 | ✅ | 首頁 6 類別卡 2x3 + Top 5 + 新聞 5 則;`/ranking/{kind}` 各類別 Top 30 + 5 期間 tab;`/dividend-calendar` 月曆 + 列表雙模式 + 紅色週日;`/contact` + `/changelog` 上線 + sidebar 底部小字導覽。所有頁面採紀律 #19 字級基準,新增 helper `dividend_metrics.get_dividends_in_range` + partial `ranking_card.html` / `news_preview.html`
 2026-04-27 18:00 | Holdings chart 重做 + 多 bug 連環修 | ✅ | 廢 ECharts 並排 N bar(canvas 初始化寬度 / 中文 fallback / axisLabel 截字 / hideOverlap 排序錯亂等踩不完)→ 改純 div + CSS `@keyframes bar-enter` + 等權平均合併;ECharts gradient `'rgb(R G B)' + '33'` canvas 不認 → 加 `cssVarRgba(name, alpha)` helper;detail chart hover 視覺消失 → `emphasis: { disabled: true }`;sidebar autocomplete `@click.outside` 從 dropdown 移到 x-data root(同 click 同時 open=true 又 outside=close);dividend calendar 加殖利率欄;0050 holdings 顯示 5 筆 → API 過濾退化 batch + sync 紀律 #20 per-ETF 寬容門檻
 2026-04-28 早上 | TAIEX toggle 對比大盤(預設關)| ✅ | detail chart header 右上加 CSS toggle switch + buildOption(showTaiex) + replaceMerge 'series' 動態切換;紀律 #1「白癡都看得懂」— 預設只一條線最直觀
+2026-05-03 上午 | Netmarble Launcher 殺乾淨(off-topic 系統管理)+ 3 個 housekeeping commit | ✅ | 順手 commit + push:D 槽鐵律入 CLAUDE.md / `scripts/_*.py` 慣例 gitignore + `build_etf_universe.py` 進 git / DCA tooltip TODO 改寫成事件層方向(舊「series 順序」推測作廢);保留 server 給後續 task
+2026-05-04 上午 | 錯誤回報系統 + 後台 OAuth 統一 + token leak 修復 | ✅ | 一日 3 commit push 上線。錯誤回報:migration 006 / `error_reports` table / `POST /api/error-report` rate-limit 直查 table 自身 / 8 頁浮動按鈕 + Modal(Alpine + 純 CSS,紀律 #18) / 後台收件匣雙 tab。後台 OAuth:砍密碼 / JWT 路徑(−69 行)/ 統一 Google OAuth / 修復 4 漏網 endpoint。token leak:httpx logger → WARNING 一行,堵住自開站以來 FinMind URL 進 log 的洩漏。紀律 #18 補驗收:Playwright 16 張手機截圖,4 頁浮動按鈕擋到核心數字 → user 實機可接受、維持現狀。教訓:任何 fixed bottom-right 浮動元件規劃時就要 Playwright 驗一輪,不是上線後補。
