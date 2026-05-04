@@ -442,6 +442,9 @@ async def bot_cleanup(request: Request):
 <style>body {{ background:#0a0e1a; color:#e5e7eb; font-family:'Noto Sans TC',ui-sans-serif,system-ui,sans-serif; }}</style>
 </head>
 <body class="px-4 py-8 max-w-2xl mx-auto">
+  <div class="mb-3">
+    <a href="/admin/analytics" class="text-sm text-gray-400 hover:text-white">← 回後台首頁</a>
+  </div>
   <h1 class="text-xl font-semibold mb-4">機器人清理 完成</h1>
   <div class="bg-[#131829] border border-[#1f2937] rounded-xl p-5 space-y-3 text-base">
     <div class="flex justify-between"><span class="text-gray-400">清理前訪問日誌總筆數</span><span class="num font-mono">{pre_total}</span></div>
@@ -584,15 +587,15 @@ async def bot_diagnosis(request: Request):
 </style>
 </head>
 <body class="px-4 sm:px-6 py-6 max-w-6xl mx-auto">
-  <header class="mb-6 flex items-center justify-between">
-    <div>
-      <h1 class="text-xl font-semibold">機器人診斷 · 今日(原始數字,未排除)</h1>
-      <div class="text-sm text-gray-400 mt-1">
-        總訪問階段 = <span class="num">{totals.total_sessions}</span> ·
-        總瀏覽次數 = <span class="num">{totals.total_pv}</span>
-      </div>
+  <div class="mb-3">
+    <a href="/admin/analytics" class="text-sm text-gray-400 hover:text-white">← 回後台首頁</a>
+  </div>
+  <header class="mb-6">
+    <h1 class="text-xl font-semibold">機器人診斷 · 今日(原始數字,未排除)</h1>
+    <div class="text-sm text-gray-400 mt-1">
+      總訪問階段 = <span class="num">{totals.total_sessions}</span> ·
+      總瀏覽次數 = <span class="num">{totals.total_pv}</span>
     </div>
-    <a href="/admin/analytics" class="text-sm text-gray-400 hover:text-white">← 回流量分析</a>
   </header>
 
   <div class="banner">

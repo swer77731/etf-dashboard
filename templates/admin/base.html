@@ -63,8 +63,10 @@
 <body>
   <header class="border-b border-border">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-3 flex-wrap">
         <a href="/" class="text-sm text-muted hover:text-fg transition">← 回前台</a>
+        {# 子頁面 override 此 block 顯示「← 回後台首頁」連到 /admin/analytics #}
+        {% block back_to_dashboard %}{% endblock %}
         <span class="text-muted">|</span>
         <h1 class="text-base sm:text-lg font-semibold">{{ brand_zh }} · 後台</h1>
       </div>
