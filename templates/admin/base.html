@@ -56,6 +56,22 @@
     .admin-table td { padding: 0.6rem 0.75rem; border-bottom: 1px solid #1f2937; font-size: 0.92rem; }
     .admin-table tr:hover td { background: #1a2138; }
     .admin-table .num-col { font-family: ui-monospace, monospace; }
+
+    /* Bug 2 修法 A — table-scroll-shadow:CSS 純 trick(R. Komarov)
+       橫向滾邊出現/消失:左/右滾到底時對應邊 shadow 自動隱藏。
+       原理:4 層 background,2 層固定卡片色 + 2 層漸層 fade,
+       attachment local/scroll 配合使 fade 隨 content 移動。 */
+    .table-scroll-shadow {
+      background:
+        linear-gradient(to right, #131829 30%, rgba(19, 24, 41, 0)),
+        linear-gradient(to right, rgba(19, 24, 41, 0), #131829 70%) right,
+        radial-gradient(farthest-side at 0 50%, rgba(0,0,0,0.4), rgba(0,0,0,0)),
+        radial-gradient(farthest-side at 100% 50%, rgba(0,0,0,0.4), rgba(0,0,0,0)) right;
+      background-color: #131829;
+      background-repeat: no-repeat;
+      background-size: 40px 100%, 40px 100%, 14px 100%, 14px 100%;
+      background-attachment: local, local, scroll, scroll;
+    }
   </style>
 
   {% block head %}{% endblock %}

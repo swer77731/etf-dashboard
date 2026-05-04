@@ -324,7 +324,14 @@
 <section class="card p-4 mb-6">
   <h3 class="text-base font-semibold mb-3">最近訪問 <span class="text-xs text-muted ml-2">最新 {{ visits|length }} 筆 · IP 已遮罩</span></h3>
   {% if visits %}
-    <div class="overflow-x-auto">
+    {# Bug 2 修法 A — 手機顯示「左右滑動」提示(桌機 sm:hidden) #}
+    <div class="flex items-center justify-center gap-1.5 text-xs text-muted mb-2 sm:hidden">
+      <span aria-hidden="true">←</span>
+      <span>左右滑動查看完整欄位</span>
+      <span aria-hidden="true">→</span>
+    </div>
+    {# table-scroll-shadow — 純 CSS scroll edge fade(右邊 fade 提示「還有內容」)#}
+    <div class="overflow-x-auto table-scroll-shadow">
       <table class="admin-table min-w-[720px]">
         <thead>
           <tr>
