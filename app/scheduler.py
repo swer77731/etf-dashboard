@@ -8,6 +8,8 @@
 - 每天 23:00 : 健康度總檢查(health_check.daily_health_check)
 - 每週日 02:00: dividend 全量 sync(dividend_sync.sync_all)
 - 每週一 03:00: etf_universe 同步(etf_universe.sync_universe)
+- 每週一 03:00: 受益人數週更(beneficial_count_sync.sync_all_latest)
+                  抓最近 2 週覆寫,FinMind 該 dataset 約週末釋出該週交易日資料
 
 每個 sync 內已落實紀律 #20(record_sync_attempt + missing 清單)。
 若 sync 跑完 missing 不為空,scheduler 會 5 分鐘後 one-shot retry 一次,
@@ -28,6 +30,7 @@ from apscheduler.triggers.date import DateTrigger
 from app.config import settings
 from app.services import (
     admin_analytics,
+    beneficial_count_sync,
     dividend_announce_sync,
     dividend_sync,
     etf_universe,
@@ -54,6 +57,7 @@ _locks: dict[str, threading.Lock] = {
     "analytics_cleanup": threading.Lock(),
     "capacity_snapshot": threading.Lock(),
     "yearly_returns": threading.Lock(),
+    "beneficial": threading.Lock(),
 }
 
 # 5 分鐘後 retry 用 — APScheduler 有 max_instances=1 + coalesce 防併發
@@ -245,6 +249,31 @@ def capacity_snapshot_job() -> None:
         _release("capacity_snapshot")
 
 
+def beneficial_job(_retry: bool = False) -> None:
+    """每週一 03:00 (Taipei) — 受益人數週更(全 active ETF 抓最近 2 週)。
+
+    weeks=2 是 Phase 2 約定:覆蓋上週 + 抓本週,UPSERT idempotent。
+    紀律 #20:missing 不空 → 5 分鐘後 retry 一次。
+    """
+    if not _try_lock("beneficial"):
+        return
+    try:
+        logger.info("[beneficial_job] start (retry=%s)", _retry)
+        stats = beneficial_count_sync.sync_all_latest()
+        logger.info(
+            "[beneficial_job] ok=%d / no_data=%d / err=%d / rows=%d",
+            stats["ok"], stats.get("no_data", 0),
+            stats.get("fetch_error", 0), stats["total_rows_written"],
+        )
+        # 有 fetch_error 才 retry(no_data 是業務層,不重試)
+        if not _retry and stats.get("fetch_error", 0) > 0:
+            _schedule_retry("beneficial", lambda: beneficial_job(_retry=True))
+    except Exception:
+        logger.exception("[beneficial_job] failed")
+    finally:
+        _release("beneficial")
+
+
 def yearly_returns_job() -> None:
     """每天 04:00 (Taipei) 更新 etf_yearly_returns。
 
@@ -359,6 +388,10 @@ def start_scheduler() -> AsyncIOScheduler:
          CronTrigger(day_of_week="sun", hour=2, minute=0, timezone=tz)),
         # 每週一 03:00 — etf_universe 同步
         ("universe_weekly", universe_job,
+         CronTrigger(day_of_week="mon", hour=3, minute=0, timezone=tz)),
+        # 每週一 03:00 — 受益人數週更(FinMind throttle 1s/call,跟 universe 共
+        # 用 throttle 自然序列化,先後不影響)
+        ("beneficial_weekly", beneficial_job,
          CronTrigger(day_of_week="mon", hour=3, minute=0, timezone=tz)),
         # 每天 03:00 — analytics 90 天清理(避開 02/03 的 weekly 工作衝突,
         # APScheduler max_instances=1 會排隊,週日週一也會跑)
