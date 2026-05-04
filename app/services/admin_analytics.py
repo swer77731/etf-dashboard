@@ -83,6 +83,11 @@ PATH_LABELS: list[tuple[str, str]] = [
     ("/disclaimer", "免責聲明"),
     ("/terms", "使用條款"),
     ("/privacy", "隱私權"),
+    ("/dca", "定期定額試算"),
+    ("/install", "安裝教學"),
+    ("/account-delete", "帳號刪除"),
+    ("/auth/google/callback", "Google 登入完成"),
+    ("/auth/google/login", "Google 登入"),
     ("/admin/login", "後台登入"),
     ("/", "首頁"),    # 必須最後 — 空 prefix 全匹配
 ]
@@ -236,7 +241,13 @@ def top_etfs(days: int = 7, limit: int = 10) -> list[dict]:
 
 
 def top_features(days: int = 7, limit: int = 10) -> list[dict]:
-    """熱門功能 — path 用 label_for_path 對應後再聚合。已排除 24h 高 session IP。"""
+    """熱門功能 — path 用 label_for_path 對應後再聚合。已排除 24h 高 session IP。
+
+    過濾技術路徑(不算「使用者操作的功能」):
+    - /api/*(JSON / autocomplete / 內部 endpoint)
+    - /static/*(資產;analytics_middleware 已預過濾,雙保險)
+    - /service-worker.js / /manifest.json / /favicon.ico(瀏覽器自動請求)
+    """
     today = today_taipei_date()
     start, _ = day_range_utc(today - timedelta(days=days - 1))
     end, _ = day_range_utc(today + timedelta(days=1))
@@ -246,6 +257,11 @@ def top_features(days: int = 7, limit: int = 10) -> list[dict]:
         q = (select(AnalyticsLog.path, func.count(AnalyticsLog.id).label("cnt"))
             .where(AnalyticsLog.ts >= start)
             .where(AnalyticsLog.ts < end)
+            .where(~AnalyticsLog.path.like("/api/%"))
+            .where(~AnalyticsLog.path.like("/static/%"))
+            .where(AnalyticsLog.path.notin_(
+                ("/service-worker.js", "/manifest.json", "/favicon.ico")
+            ))
             .group_by(AnalyticsLog.path))
         if excl is not None:
             q = q.where(excl)

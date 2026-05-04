@@ -437,28 +437,28 @@ async def bot_cleanup(request: Request):
     return HTMLResponse(content=f"""<!doctype html>
 <html lang="zh-Hant" data-theme="dark">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bot 清理結果</title>
+<title>機器人清理結果</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>body {{ background:#0a0e1a; color:#e5e7eb; font-family:'Noto Sans TC',ui-sans-serif,system-ui,sans-serif; }}</style>
 </head>
 <body class="px-4 py-8 max-w-2xl mx-auto">
-  <h1 class="text-xl font-semibold mb-4">Bot 清理 完成 ✓</h1>
+  <h1 class="text-xl font-semibold mb-4">機器人清理 完成</h1>
   <div class="bg-[#131829] border border-[#1f2937] rounded-xl p-5 space-y-3 text-base">
-    <div class="flex justify-between"><span class="text-gray-400">清理前 analytics_log 總筆數</span><span class="num font-mono">{pre_total}</span></div>
-    <div class="flex justify-between"><span class="text-gray-400">命中 bot UA 條件筆數(預覽)</span><span class="num font-mono text-amber-400">{pre_bot}</span></div>
-    <div class="flex justify-between border-t border-[#1f2937] pt-3"><span class="text-gray-400">實際 DELETE rows</span><span class="num font-mono text-red-400">−{deleted_analytics}</span></div>
-    <div class="flex justify-between"><span class="text-gray-400">清理後 analytics_log 總筆數</span><span class="num font-mono text-green-400">{post_total}</span></div>
+    <div class="flex justify-between"><span class="text-gray-400">清理前訪問日誌總筆數</span><span class="num font-mono">{pre_total}</span></div>
+    <div class="flex justify-between"><span class="text-gray-400">命中機器人識別條件筆數(預覽)</span><span class="num font-mono text-amber-400">{pre_bot}</span></div>
+    <div class="flex justify-between border-t border-[#1f2937] pt-3"><span class="text-gray-400">實際刪除筆數</span><span class="num font-mono text-red-400">−{deleted_analytics}</span></div>
+    <div class="flex justify-between"><span class="text-gray-400">清理後訪問日誌總筆數</span><span class="num font-mono text-green-400">{post_total}</span></div>
     <div class="flex justify-between border-t border-[#1f2937] pt-3"><span class="text-gray-400">今日訪客數(清理後)</span><span class="num font-mono text-green-400 text-xl">{post_dau_today}</span></div>
     <div class="flex justify-between"><span class="text-gray-400">今日瀏覽次數(清理後)</span><span class="num font-mono text-green-400">{post_pv_today}</span></div>
   </div>
   <div class="mt-6 text-xs text-gray-500 leading-relaxed">
-    <p>* 已套 {len(_BOT_UA_PATTERNS)} 個 UA 子字串黑名單 + 空 UA。</p>
-    <p>* search_log / compare_log 沒 ua 欄位無法歷史過濾,新資料會被 middleware 擋。</p>
-    <p>* 此 endpoint 重複跑安全(已刪過的不會再算)。</p>
+    <p>* 已套 {len(_BOT_UA_PATTERNS)} 個瀏覽器識別黑名單 + 空識別。</p>
+    <p>* 搜尋日誌 / 比較日誌 沒識別欄位無法歷史過濾,新資料會被中介層擋。</p>
+    <p>* 此頁重複跑安全(已刪過的不會再算)。</p>
   </div>
   <div class="mt-6 flex gap-3 text-sm">
-    <a href="/admin/bot-diagnosis" class="text-blue-400 hover:text-blue-300">→ 重看 Bot 診斷</a>
-    <a href="/admin/analytics" class="text-blue-400 hover:text-blue-300">→ Analytics</a>
+    <a href="/admin/bot-diagnosis" class="text-blue-400 hover:text-blue-300">→ 重看機器人診斷</a>
+    <a href="/admin/analytics" class="text-blue-400 hover:text-blue-300">→ 流量分析</a>
   </div>
 </body></html>""")
 
@@ -504,11 +504,11 @@ async def bot_diagnosis(request: Request):
         bucket_rows = s.execute(sql_text("""
             SELECT
                 CASE
-                    WHEN cnt = 1 THEN '1 page'
-                    WHEN cnt <= 5 THEN '2-5 pages'
-                    WHEN cnt <= 20 THEN '6-20 pages'
-                    WHEN cnt <= 100 THEN '21-100 pages'
-                    ELSE '100+ pages (very suspicious)'
+                    WHEN cnt = 1 THEN '1 頁'
+                    WHEN cnt <= 5 THEN '2-5 頁'
+                    WHEN cnt <= 20 THEN '6-20 頁'
+                    WHEN cnt <= 100 THEN '21-100 頁'
+                    ELSE '100 頁以上(高度可疑)'
                 END AS bucket,
                 COUNT(*) AS session_count
             FROM (
@@ -566,7 +566,7 @@ async def bot_diagnosis(request: Request):
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex,nofollow">
-<title>Bot 診斷 — 後台</title>
+<title>機器人診斷 — 後台</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   body {{ background:#0a0e1a; color:#e5e7eb; font-family:'Noto Sans TC',ui-sans-serif,system-ui,sans-serif; }}
@@ -586,18 +586,18 @@ async def bot_diagnosis(request: Request):
 <body class="px-4 sm:px-6 py-6 max-w-6xl mx-auto">
   <header class="mb-6 flex items-center justify-between">
     <div>
-      <h1 class="text-xl font-semibold">Bot 診斷 · 今日(原始數字,未排除)</h1>
+      <h1 class="text-xl font-semibold">機器人診斷 · 今日(原始數字,未排除)</h1>
       <div class="text-sm text-gray-400 mt-1">
         總訪問階段 = <span class="num">{totals.total_sessions}</span> ·
         總瀏覽次數 = <span class="num">{totals.total_pv}</span>
       </div>
     </div>
-    <a href="/admin/analytics" class="text-sm text-gray-400 hover:text-white">← 回 Analytics</a>
+    <a href="/admin/analytics" class="text-sm text-gray-400 hover:text-white">← 回流量分析</a>
   </header>
 
   <div class="banner">
-    <b>已排除 {len(bot_ips)} 個高訪問階段 IP</b>(24h 內訪問階段 ≥ {threshold},自動視為 bot)<br>
-    <span class="text-xs">/admin/analytics 與 TG 日報的 訪客數 / 瀏覽次數 / 排行皆已排除這些 IP。本頁仍顯示原始數字。</span><br>
+    <b>已排除 {len(bot_ips)} 個高訪問階段位址</b>(24 小時內訪問階段 ≥ {threshold},自動視為機器人)<br>
+    <span class="text-xs">/admin/analytics 與 TG 日報的 訪客數 / 瀏覽次數 / 排行皆已排除這些位址。本頁仍顯示原始數字。</span><br>
     <span class="text-xs num font-mono text-gray-300">{bot_ips_preview}</span>
   </div>
 
@@ -608,31 +608,31 @@ async def bot_diagnosis(request: Request):
       <tbody>{bucket_html}</tbody>
     </table>
     <p class="text-xs text-gray-500 mt-3">
-      正常人類 1-20 頁;100+ 是 bot / 爬蟲特徵。
+      正常人類 1-20 頁;100+ 是機器人 / 爬蟲特徵。
     </p>
   </div>
 
   <div class="card">
-    <h2>2. UA 分布(Top 30,按訪問階段數排)</h2>
+    <h2>2. 瀏覽器識別分布(前 30 名,按訪問階段數排)</h2>
     <table>
-      <thead><tr><th>User-Agent</th><th class="text-right">訪問階段</th><th class="text-right">瀏覽次數</th></tr></thead>
+      <thead><tr><th>瀏覽器識別</th><th class="text-right">訪問階段</th><th class="text-right">瀏覽次數</th></tr></thead>
       <tbody>{ua_html}</tbody>
     </table>
     <p class="text-xs text-gray-500 mt-3">
-      看到 bot/crawler/spider/Googlebot/UptimeRobot/python-requests/curl 等就是 bot。
+      看到 bot/crawler/spider/Googlebot/UptimeRobot/python-requests/curl 等就是機器人。
     </p>
   </div>
 
   <div class="card">
-    <h2>3. 同 IP 開超多訪問階段(bot 特徵 — 真人 1-3 個就頂)</h2>
+    <h2>3. 同位址開超多訪問階段(機器人特徵 — 真人 1-3 個就頂)</h2>
     <table>
-      <thead><tr><th>IP(末段已遮)</th><th class="text-right">訪問階段</th><th class="text-right">瀏覽次數</th></tr></thead>
+      <thead><tr><th>位址(末段已遮)</th><th class="text-right">訪問階段</th><th class="text-right">瀏覽次數</th></tr></thead>
       <tbody>{ip_html}</tbody>
     </table>
   </div>
 
   <p class="text-xs text-gray-500 mt-6">
-    截圖回給 Claude(或回報前 5 列 UA + Top 5 IP),決定要不要加 bot filter middleware。
+    截圖回給 Claude(或回報前 5 列識別 + 前 5 個位址),決定要不要加機器人過濾。
   </p>
 </body>
 </html>"""

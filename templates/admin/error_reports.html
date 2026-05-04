@@ -76,7 +76,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
           <div>
             <span class="text-muted">回報時間:</span>
-            <span class="num text-fg/80">{{ item.created_at|replace('T', ' ') }} (UTC)</span>
+            <span class="num text-fg/80">{{ item.created_at|replace('T', ' ') }}(世界時)</span>
           </div>
           <div>
             <span class="text-muted">頁面網址:</span>
@@ -114,7 +114,7 @@
           <div class="pt-2 border-t border-border space-y-2">
             <div class="text-xs">
               <span class="text-muted">處理時間:</span>
-              <span class="num text-down">{{ item.handled_at|replace('T', ' ') if item.handled_at else '—' }} (UTC)</span>
+              <span class="num text-down">{{ item.handled_at|replace('T', ' ') if item.handled_at else '—' }}(世界時)</span>
             </div>
             {% if item.handled_note %}
             <div>
