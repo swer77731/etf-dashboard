@@ -10,3 +10,5 @@ from app.models.analytics import AnalyticsLog, SearchLog, CompareLog, OnlineSnap
 from app.models.etf_yearly_return import EtfYearlyReturn  # noqa: F401
 from app.models.user import User  # noqa: F401
 from app.models.error_report import ErrorReport  # noqa: F401
+from app.models.etf_beneficial_count import EtfBeneficialCount  # noqa: F401
+from app.models.etf_aum import EtfAum  # noqa: F401
