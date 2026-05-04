@@ -301,7 +301,7 @@
   <h3 class="text-base font-semibold mb-3">流量來源 <span class="text-xs text-muted ml-2">近 {{ range_days }} 天</span></h3>
   {% if refs %}
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-      <div id="ref-chart" style="height: 260px;"></div>
+      <div id="ref-chart" style="height: 320px;"></div>
       <table class="admin-table">
         <thead><tr><th>來源</th><th class="text-right">次數</th><th class="text-right">占比</th></tr></thead>
         <tbody>
@@ -401,33 +401,39 @@
       const el2 = document.getElementById('ref-chart');
       if (el2) {
         const chart2 = echarts.init(el2, null, { renderer: 'canvas' });
-        // Bug 1 修法 A — 關 pie outside label,改靠 bottom legend + 在 legend 加百分比
-        // 之前 outside label 在手機 375px 撞圖外、引線交叉、文字截斷
+        // Bug 1 修法 A v2 — 關 pie outside label,改靠 bottom legend 多行顯示
         const refsByLabel = {};
         refsData.forEach(r => { refsByLabel[r.label] = r; });
         chart2.setOption({
           backgroundColor: 'transparent',
           tooltip: { trigger: 'item', confine: true, backgroundColor: '#0a0e1a', borderColor: '#1f2937', textStyle: { color: '#e5e7eb' }, formatter: '{b}: {c} ({d}%)' },
           legend: {
-            type: 'scroll',
+            // type='plain' 自動換行(預設),手機可看 4-6 個 / 行不必分頁
+            // 之前 type='scroll' 手機只看到 2 個,8 個來源要翻 1/4 頁太煩
             textStyle: { color: '#9ca3af', fontSize: 11 },
             bottom: 0,
-            // 太多 referer 時自動橫向滾,不換行炸版
-            pageIconColor: '#9ca3af',
-            pageTextStyle: { color: '#9ca3af' },
+            left: 8,
+            right: 8,
+            itemGap: 10,
+            itemWidth: 12,
+            itemHeight: 10,
             formatter: function (name) {
+              // 長 URL(>14 字)截斷加 …,避免單筆吃掉整行
               const r = refsByLabel[name];
-              return r ? (name + '  ' + r.pct + '%') : name;
+              const short = name.length > 14 ? name.slice(0, 13) + '…' : name;
+              return r ? (short + ' ' + r.pct + '%') : short;
             },
           },
           color: ['#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#9ca3af'],
           series: [{
             type: 'pie',
-            radius: ['40%', '65%'],
-            center: ['50%', '42%'],
+            // 上一版 ['40%', '65%'] 在手機右側被切;縮成 55% 留邊
+            radius: ['38%', '55%'],
+            // 上一版 ['50%','42%'] legend 多行後重疊;往上調到 35% 給 legend 3 行空間
+            center: ['50%', '35%'],
             data: refsData.map(r => ({ name: r.label, value: r.count })),
-            label: { show: false },              // 關外圍 label
-            labelLine: { show: false },          // 順手關引線
+            label: { show: false },
+            labelLine: { show: false },
             emphasis: {
               label: { show: true, fontSize: 13, fontWeight: 600, color: '#e5e7eb', formatter: '{b}\n{d}%' },
             },
