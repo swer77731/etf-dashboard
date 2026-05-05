@@ -11,7 +11,7 @@ from typing import Sequence
 def render(
     values: Sequence[float],
     width: int = 120,
-    height: int = 40,
+    height: int = 70,
     stroke: str = "#3b82f6",
     stroke_width: float = 1.5,
 ) -> str:
