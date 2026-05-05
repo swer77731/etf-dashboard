@@ -10,6 +10,8 @@
 - 每週一 03:00: etf_universe 同步(etf_universe.sync_universe)
 - 每週一 03:00: 受益人數週更(beneficial_count_sync.sync_all_latest)
                   抓最近 2 週覆寫,FinMind 該 dataset 約週末釋出該週交易日資料
+- 每月 5 號 03:00: ETF 規模月更(aum_sync.sync_latest_month)
+                  SITCA 月報 1-5 號公告上月,5 號抓最穩
 
 每個 sync 內已落實紀律 #20(record_sync_attempt + missing 清單)。
 若 sync 跑完 missing 不為空,scheduler 會 5 分鐘後 one-shot retry 一次,
@@ -30,6 +32,7 @@ from apscheduler.triggers.date import DateTrigger
 from app.config import settings
 from app.services import (
     admin_analytics,
+    aum_sync,
     beneficial_count_sync,
     dividend_announce_sync,
     dividend_sync,
@@ -58,6 +61,7 @@ _locks: dict[str, threading.Lock] = {
     "capacity_snapshot": threading.Lock(),
     "yearly_returns": threading.Lock(),
     "beneficial": threading.Lock(),
+    "aum": threading.Lock(),
 }
 
 # 5 分鐘後 retry 用 — APScheduler 有 max_instances=1 + coalesce 防併發
@@ -274,6 +278,31 @@ def beneficial_job(_retry: bool = False) -> None:
         _release("beneficial")
 
 
+def aum_job(_retry: bool = False) -> None:
+    """每月 5 號 03:00 (Taipei) — SITCA AUM 月更(抓最新可拿月)。
+
+    SITCA 月報延遲 1-2 月,5 號抓最穩(SITCA 月初 1-5 號公告上月)。
+    紀律 #20:fetch_error / no_data → 5 分鐘後 retry 一次。
+    """
+    if not _try_lock("aum"):
+        return
+    try:
+        logger.info("[aum_job] start (retry=%s)", _retry)
+        stats = aum_sync.sync_latest_month()
+        logger.info(
+            "[aum_job] ok=%d / no_data=%d / degraded=%d / err=%d / rows=%d",
+            stats["ok"], stats["no_data"], stats.get("degraded", 0),
+            stats.get("fetch_error", 0), stats["total_rows_written"],
+        )
+        # 沒抓到任何月(可能 SITCA 月報還沒釋出 / 網路問題)→ retry 一次
+        if not _retry and stats["ok"] == 0:
+            _schedule_retry("aum", lambda: aum_job(_retry=True))
+    except Exception:
+        logger.exception("[aum_job] failed")
+    finally:
+        _release("aum")
+
+
 def yearly_returns_job() -> None:
     """每天 04:00 (Taipei) 更新 etf_yearly_returns。
 
@@ -393,6 +422,9 @@ def start_scheduler() -> AsyncIOScheduler:
         # 用 throttle 自然序列化,先後不影響)
         ("beneficial_weekly", beneficial_job,
          CronTrigger(day_of_week="mon", hour=3, minute=0, timezone=tz)),
+        # 每月 5 號 03:00 — SITCA AUM 月更(SITCA 月報 1-5 號公告上月,5 號最穩)
+        ("aum_monthly", aum_job,
+         CronTrigger(day=5, hour=3, minute=0, timezone=tz)),
         # 每天 03:00 — analytics 90 天清理(避開 02/03 的 weekly 工作衝突,
         # APScheduler max_instances=1 會排隊,週日週一也會跑)
         ("analytics_cleanup_daily", analytics_cleanup_job,

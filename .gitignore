@@ -52,6 +52,9 @@ scripts/_*.py
 # Mobile / verification screenshots(每次驗收會重產生,不進 repo)
 screenshots/
 
+# Session 工作日誌(自動模式內部紀錄,不進 repo)
+docs/SESSION_LOG.md
+
 # Design references / mockups (本地參考用,不進 repo)
 design/
 
