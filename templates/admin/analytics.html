@@ -20,9 +20,45 @@
   </a>
   <span class="text-muted">|</span>
   <a href="/admin/send_daily_report" class="text-muted hover:text-fg transition" title="即時推一次今日 TG 日報">推送日報</a>
+  {# 臨時 backfill 觸發 — prod 健康度資料初始化用,驗收完整段拿掉 #}
+  <span class="text-muted">|</span>
+  <form method="POST" action="/admin/_backfill_holders" class="inline-block"
+        onsubmit="return confirm('確定要 backfill 受益人數?\n跑 ~14 分鐘,會打 ~1075 次 FinMind API。\n建議避開深夜 03:00 cron 時段(universe/news/dividend 同時跑可能撞 quota)。')">
+    <button type="submit" class="text-muted hover:text-fg transition">Backfill 受益人數</button>
+  </form>
+  <form method="POST" action="/admin/_backfill_aum" class="inline-block"
+        onsubmit="return confirm('確定要 backfill 規模?跑 ~30 秒。')">
+    <button type="submit" class="text-muted hover:text-fg transition">Backfill 規模</button>
+  </form>
 {% endblock %}
 
 {% block content %}
+
+{# 臨時 backfill 觸發後 banner(?triggered=holders / aum / *_busy)#}
+{% set triggered = request.query_params.get('triggered') %}
+{% if triggered == 'holders' %}
+  <div class="card p-3 mb-4" style="border-left: 4px solid #3b82f6;">
+    <div>✅ 已觸發受益人數 backfill,~14 分鐘跑完。</div>
+    {% if last_holders_relative %}
+      <div class="text-xs text-muted mt-1">上次成功:{{ last_holders_relative }}</div>
+    {% endif %}
+  </div>
+{% elif triggered == 'holders_busy' %}
+  <div class="card p-3 mb-4" style="border-left: 4px solid #f59e0b;">
+    <div>⚠ 受益人數 backfill 已在跑,等上一輪結束再觸發(~14 分鐘)。</div>
+  </div>
+{% elif triggered == 'aum' %}
+  <div class="card p-3 mb-4" style="border-left: 4px solid #10b981;">
+    <div>✅ 已觸發規模 backfill,~30 秒跑完。</div>
+    {% if last_aum_relative %}
+      <div class="text-xs text-muted mt-1">上次成功:{{ last_aum_relative }}</div>
+    {% endif %}
+  </div>
+{% elif triggered == 'aum_busy' %}
+  <div class="card p-3 mb-4" style="border-left: 4px solid #f59e0b;">
+    <div>⚠ 規模 backfill 已在跑,等上一輪結束再觸發。</div>
+  </div>
+{% endif %}
 
 {# === 📡 容量監控(同時在線)— 流量爆發時看天花板 === #}
 {% set cap_color_map = {'green': '#10b981', 'yellow': '#eab308', 'orange': '#f97316', 'red': '#ef4444'} %}

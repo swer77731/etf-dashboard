@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Form, HTTPException, Request
@@ -23,6 +24,12 @@ from sqlalchemy import desc, func, select
 
 from app.config import PROJECT_ROOT, settings
 from app.services import admin_analytics
+
+# 臨時 backfill endpoint 用 — 防同時段雙觸發。驗收後跟 endpoint 一起拿掉。
+_BACKFILL_LOCKS: dict[str, threading.Lock] = {
+    "holders": threading.Lock(),
+    "aum": threading.Lock(),
+}
 
 logger = logging.getLogger(__name__)
 
@@ -218,6 +225,20 @@ async def analytics_page(request: Request, range_days: int = 7):
     today = admin_analytics.today_taipei_date()
     yesterday = today - timedelta(days=1)
 
+    # 健康度 backfill 狀態 — 給臨時 backfill 按鈕的 banner 顯示「上次成功」
+    from app.services.sync_status import get_sync_status
+    from app.services.time_utils import humanize_relative
+    holders_ss = get_sync_status("finmind_beneficial")
+    aum_ss = get_sync_status("sitca_aum_monthly")
+    last_holders_relative = (
+        humanize_relative(holders_ss.last_success_at)
+        if holders_ss and holders_ss.last_success_at else None
+    )
+    last_aum_relative = (
+        humanize_relative(aum_ss.last_success_at)
+        if aum_ss and aum_ss.last_success_at else None
+    )
+
     overview = admin_analytics.overview_with_diff(today, yesterday)
     trend = admin_analytics.dau_trend(days=30)
     capacity = admin_analytics.capacity_overview()
@@ -248,6 +269,8 @@ async def analytics_page(request: Request, range_days: int = 7):
             members=member_stats,
             pending_reports_count=pending_reports,
             current_user=user,
+            last_holders_relative=last_holders_relative,
+            last_aum_relative=last_aum_relative,
         ),
     )
 
@@ -312,6 +335,78 @@ async def error_reports_page(request: Request, tab: str = "pending"):
             handled_count=handled_count,
             current_user=user,
         ),
+    )
+
+
+# ─────────────────────────────────────────────────────────────
+# 臨時 backfill endpoint(prod 健康度資料初始化用,驗收完拿掉)
+# ─────────────────────────────────────────────────────────────
+
+def _run_holders_backfill():
+    """背景跑全 active ETF 受益人數 1 年 backfill。Lock 防雙觸發。"""
+    if not _BACKFILL_LOCKS["holders"].acquire(blocking=False):
+        logger.warning("[manual_backfill][holders] 已在跑,skip")
+        return
+    try:
+        from app.services import beneficial_count_sync
+        logger.info("[manual_backfill][holders] start")
+        stats = beneficial_count_sync.backfill_all(weeks=52)
+        # 不 log per_code(太冗),只 log 摘要
+        summary = {k: v for k, v in stats.items() if k != "per_code"}
+        logger.info("[manual_backfill][holders] done: %s", summary)
+    except Exception:
+        logger.exception("[manual_backfill][holders] failed")
+    finally:
+        _BACKFILL_LOCKS["holders"].release()
+
+
+def _run_aum_backfill():
+    """背景跑 SITCA 規模 12 月 backfill。Lock 防雙觸發。"""
+    if not _BACKFILL_LOCKS["aum"].acquire(blocking=False):
+        logger.warning("[manual_backfill][aum] 已在跑,skip")
+        return
+    try:
+        from app.services import aum_sync
+        logger.info("[manual_backfill][aum] start")
+        stats = aum_sync.backfill_all_months(months=12)
+        logger.info("[manual_backfill][aum] done: %s", stats)
+    except Exception:
+        logger.exception("[manual_backfill][aum] failed")
+    finally:
+        _BACKFILL_LOCKS["aum"].release()
+
+
+@router.post("/_backfill_holders")
+async def trigger_backfill_holders(request: Request):
+    """[臨時] 觸發受益人數 1 年 backfill。POST + admin only。"""
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
+    if _BACKFILL_LOCKS["holders"].locked():
+        return RedirectResponse(
+            url="/admin/analytics?triggered=holders_busy", status_code=303
+        )
+    threading.Thread(target=_run_holders_backfill,
+                     name="manual-backfill-holders", daemon=True).start()
+    return RedirectResponse(
+        url="/admin/analytics?triggered=holders", status_code=303
+    )
+
+
+@router.post("/_backfill_aum")
+async def trigger_backfill_aum(request: Request):
+    """[臨時] 觸發規模 12 月 backfill。POST + admin only。"""
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
+    if _BACKFILL_LOCKS["aum"].locked():
+        return RedirectResponse(
+            url="/admin/analytics?triggered=aum_busy", status_code=303
+        )
+    threading.Thread(target=_run_aum_backfill,
+                     name="manual-backfill-aum", daemon=True).start()
+    return RedirectResponse(
+        url="/admin/analytics?triggered=aum", status_code=303
     )
 
 
