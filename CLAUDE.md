@@ -1603,6 +1603,25 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
 - [x] FinMind token / email log leak 修復(2026-05-04 commit 8738f15)
   - `logging.getLogger("httpx").setLevel(logging.WARNING)` 一行修法
   - 不再印 `?token=eyJ... &user_id=... email=...@gmail.com` 到 log / stdout / Zeabur stream
+- [x] ETF 健康度系統(規模與人氣)✅ 2026-05-04 ~ 05-05
+  - migration 007 + EtfBeneficialCount + EtfAum models(VARCHAR(16) etf_code 同 etf_yearly_returns 規範)
+  - **受益人數**:FinMind TaiwanStockHoldingSharesPer,週更(該週最後交易日,通常週五,連假前推)
+    - sync service `app/services/beneficial_count_sync.py`,254 ETF backfill 1 年 = 10,581 row
+    - cron `beneficial_weekly` 每週一 03:00
+  - **規模**:SITCA `etf_statement2.aspx?txtYM=YYYYMM&txtR1=0`,月更
+    - **Phase 0 PoC 發現**:SITCA chart iframe 直接 GET 拿全 25 欄(規模 + 受益人數 + 定期定額),
+      不需要 Playwright form POST,工時 4hr → 1.5hr
+    - sync service `app/services/aum_sync.py`,12 月 backfill = 2,970 row(11 月 ok / 1 月 SITCA 尚未釋出)
+    - aum_thousand_ntd INTEGER 千元(Python `round()` 銀行家捨入)
+    - cron `aum_monthly` 每月 5 號 03:00
+  - 前端:`/etf/{code}` 在「期間報酬」下方加「規模與人氣」section(原「📊 ETF 健康度」改名)
+    - `app/services/sparkline.py` 純 Python SVG path 產生器(紀律 #18 — 無 JS / 無函式庫)
+    - `app/services/etf_health.py` ctx builder(萬 / 億 / 兆單位 + 紅綠箭頭)
+    - 2 partial:`etf_health.html` section + `etf_health_card.html` 卡(共用受益人數 / 規模)
+    - 4 行對比表(最新 / 1m / 3m / 6m,原 1y 因 backfill 範圍剛好不夠永遠「資料累積中」拿掉)
+    - lazy load:content-visibility:auto + IntersectionObserver fallback(紀律 #18 FCP 救 ~200ms)
+- [x] FinMind 美股 probe(2026-05-05)— 結論:只 USStockInfo + USStockPrice 可用,
+  其他 8 個 dataset 全 422,無法做美股版健康度 / 配息 / 財報。詳情頁面只能做 K 棒走勢
 - [ ] Step 2.5 Phase 3 (etf 詳情頁):十大持股 + 產業分布(需爬蟲,獨立工程)
 - [ ] Step 6:會員系統(Step 5 TG 推播延後 / 訂閱金流 user 思考中)
 - [ ] 後台中文化(任務 B,排程中)
@@ -1781,6 +1800,38 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
 - 真正原因:port 8000 被多個 uvicorn worker 持有,`Stop-Process -Id <reloader>` 只殺 parent,child worker respawn 仍持 port + 持舊 code(因為 pyc cache)
 - 解法:三步 — `Stop-Process -Id <每個 OwningProcess>`(逐個殺)→ `find app -name __pycache__ -exec rm -rf` → 重啟
 - 教訓:**Windows + uvicorn `--reload` debug 卡關第一招**:port 上看 `OwningProcess` 一一 kill + 清 pycache。寫進紀律 #11 後續落地
+
+### 2026-05-04 / SITCA 規模 PoC 從 Playwright 改 httpx — 找到 chart iframe 真實 endpoint
+- 原 plan:Playwright form POST(_VIEWSTATE / radio 切「月」/ select_option / 查詢按鈕)
+- 第一次 POST → 302 → /GenericError;Visibility / DivDate2 隱身 / r1_onchange 大半註解掉
+- **轉機**:Playwright recon 拿到 page.evaluate iframe,看到 chart 在 `etf_beneficial2.aspx?RD1=...` 顯示總體
+- 進一步試 4 個 SITCA 子頁:`etf_performance.aspx` / `etf_statement.aspx` / `etf_info.aspx` / `etf_beneficial.aspx` **全部都用 iframe 模式**
+- 進一步試 `etf_*_2.aspx`(每頁的 chart iframe URL):`etf_statement2.aspx?txtYM=YYYYMM&txtR1=0` 給 286 ETF × 25 欄
+- 教訓:**.NET WebForms 站「主頁面 + chart iframe」是常見架構,iframe 直接吃 query param,跳過 form 機關**。Playwright 只當 recon 工具,真實同步用 httpx GET
+- 工時收益:Phase 3 從 4hr → 1.5hr(去掉 Playwright dep + form interaction debug)
+
+### 2026-05-04 / SVG sparkline 出框 bug(`height:auto` + `width:100%`)
+- prod 上線後 user 回報「sparkline 線跑出容器,畫到下方表格」
+- root cause:SVG 屬性 `style="...; height:auto;"` 配 `width:100%`,瀏覽器自動算 `height = width × (viewBox.h / viewBox.w)`。手機 343px 寬 viewBox 120×40 → SVG 變 ~114px 高,撞表格
+- 修法:屬性改 `width="100%" height="<H>" preserveAspectRatio="none"` + 容器 `overflow:hidden` 雙保險 + `vector-effect="non-scaling-stroke"` 防線粗被 stretch 壓變
+- 教訓:**inline SVG 響應式 width:100% 時務必固定 height 屬性**,不能 height:auto。否則自動 aspect ratio 算回來會超過容器
+
+### 2026-05-05 / Sparkline 視覺「不夠陡」— viewBox aspect 與容器 aspect 不一致
+- user 回報「線看起來太平,看不出高低幅度」
+- root cause:viewBox 120×70(aspect 1.71)stretched 到容器 ~340×70(aspect 4.85),X 比 Y 多 stretch 2.83x,線天然「橫向化」
+- 改善(無法根治,但加重視覺):
+  - pad 2 → 8(線不貼上下邊框,有呼吸空間)
+  - 純 L 線段 → Catmull-Rom-like 平滑 cubic Bezier
+  - stroke 1.5 → 2.2(線厚實易見)
+- 教訓:**寬扁容器內的 sparkline 視覺天然平**。要徹底救只能改 viewBox aspect 或加 area fill。本次改善已夠,user 接受
+- 規則:未來新加 sparkline 容器 aspect 接近 1:1 ~ 1.5:1 比較理想(2:1 以上開始扁)
+
+### 2026-05-05 / FinMind 美股 dataset 大半不可用(只技術面)
+- probe 11 個美股 dataset(USStockInfo / USStockPrice / USStockPriceMinute / Adj / Dividend / Split / MonthRevenue / Financial / BalanceSheet / CashFlow + 5 籌碼面 dataset)
+- **只 USStockInfo + USStockPrice 可用**,其他全 422 / 400
+- USStockPrice 已含 Adj_Close 欄,不需另外 USStockPriceAdj
+- 教訓:**做美股版「ETF 觀察室」只能做「K 棒走勢 + 績效比較 + 排行榜」薄版**。健康度系統(規模 / 受益人數 / 配息)無法複製
+- 美股一律保留意,**目前不做美股版**(差異化價值不夠)
 
 ---
 
@@ -2124,3 +2175,4 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
 2026-04-28 早上 | TAIEX toggle 對比大盤(預設關)| ✅ | detail chart header 右上加 CSS toggle switch + buildOption(showTaiex) + replaceMerge 'series' 動態切換;紀律 #1「白癡都看得懂」— 預設只一條線最直觀
 2026-05-03 上午 | Netmarble Launcher 殺乾淨(off-topic 系統管理)+ 3 個 housekeeping commit | ✅ | 順手 commit + push:D 槽鐵律入 CLAUDE.md / `scripts/_*.py` 慣例 gitignore + `build_etf_universe.py` 進 git / DCA tooltip TODO 改寫成事件層方向(舊「series 順序」推測作廢);保留 server 給後續 task
 2026-05-04 上午 | 錯誤回報系統 + 後台 OAuth 統一 + token leak 修復 | ✅ | 一日 3 commit push 上線。錯誤回報:migration 006 / `error_reports` table / `POST /api/error-report` rate-limit 直查 table 自身 / 8 頁浮動按鈕 + Modal(Alpine + 純 CSS,紀律 #18) / 後台收件匣雙 tab。後台 OAuth:砍密碼 / JWT 路徑(−69 行)/ 統一 Google OAuth / 修復 4 漏網 endpoint。token leak:httpx logger → WARNING 一行,堵住自開站以來 FinMind URL 進 log 的洩漏。紀律 #18 補驗收:Playwright 16 張手機截圖,4 頁浮動按鈕擋到核心數字 → user 實機可接受、維持現狀。教訓:任何 fixed bottom-right 浮動元件規劃時就要 Playwright 驗一輪,不是上線後補。
+2026-05-04 ~ 05-05 | ETF 健康度系統(規模與人氣)+ 後台手機 bug + 報酬率格式 | ✅ | 一日多 commit:Phase 1 schema(migration 007)/ Phase 2 受益人數 sync(FinMind 週更,254 ETF 1 年 backfill = 10,581 row)/ Phase 3 規模 sync(SITCA `etf_statement2.aspx?txtYM=` 單 GET,**Phase 0 PoC 從 Playwright 改 httpx,工時 4hr → 1.5hr**)/ Phase 4 前端整合(純 SVG sparkline + 2 卡 + 表格 + 紅綠箭頭)/ Phase 5 lazy load(content-visibility:auto + IO fallback)。順手:後台手機圓餅圖 outside label 撞圖外 + 多行 legend / 表格滑動提示 / `/compare` `/etf_detail` 報酬率 `+45.2% / -19.5%` 1 位小數 / 美股 probe(只 K 棒可拿,健康度 0)/ 臨時 backfill endpoint 觸發 prod 初始化後拿掉。Sparkline 多輪迭代:40px 太扁 / 70px sweet spot / pad 2→8 + L→Bezier + stroke 1.5→2.2(`height:auto` + `width:100%` 失控 bug 學到)。1 年前 row 拿掉(backfill 範圍剛好不夠永遠累積中)。教訓:.NET WebForms 站常見「主頁 + chart iframe」架構,iframe 直吃 query param;inline SVG 響應式 `width:100%` 必須固定 `height` 屬性。
