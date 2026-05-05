@@ -11,9 +11,7 @@
 #}
 {% if has_health_data %}
 <section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7 etf-health-section" data-lazy>
-  <h2 class="text-xl sm:text-2xl font-semibold flex items-center gap-2">
-    <span aria-hidden="true">📊</span> ETF 健康度
-  </h2>
+  <h2 class="text-xl sm:text-2xl font-semibold">規模與人氣</h2>
   <div class="text-sm text-muted mt-1 mb-4">受益人數(每週更新)+ 規模(每月更新),近 1 年走勢</div>
 
   <div class="health-cards">
@@ -128,6 +126,7 @@
     height: 40px;
     margin: 0.5rem 0 0.75rem 0;
     color: rgb(var(--c-fg));   /* fallback (SVG 內 stroke 已寫死色) */
+    overflow: hidden;          /* 雙保險:SVG 真的撐爆也不穿表格 */
   }
 
   .health-table {

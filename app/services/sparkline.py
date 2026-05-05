@@ -25,9 +25,11 @@ def render(
     n = len(values)
     if n < 2:
         return (
-            f'<svg viewBox="0 0 {width} {height}" '
+            f'<svg width="100%" height="{height}" '
+            f'viewBox="0 0 {width} {height}" '
+            f'preserveAspectRatio="none" '
             f'xmlns="http://www.w3.org/2000/svg" '
-            f'style="display:block; width:100%; height:auto;" aria-hidden="true">'
+            f'style="display:block;" aria-hidden="true">'
             f'</svg>'
         )
 
@@ -47,11 +49,19 @@ def render(
         pts.append(f"{x:.1f},{y:.1f}")
 
     path_d = "M " + " L ".join(pts)
+    # width=100% + height=固定 + preserveAspectRatio="none":SVG 服從容器尺寸,
+    # 不會自己撐到 width × ratio 撞下方表格(舊 height:auto 的 bug)。
+    # Y 已在 viewBox 內 normalize,stretch 不影響閱讀。
+    # vector-effect 確保線條粗細不被 stretch 壓變。
     return (
-        f'<svg viewBox="0 0 {width} {height}" '
+        f'<svg width="100%" height="{height}" '
+        f'viewBox="0 0 {width} {height}" '
+        f'preserveAspectRatio="none" '
         f'xmlns="http://www.w3.org/2000/svg" '
-        f'style="display:block; width:100%; height:auto;" aria-hidden="true">'
+        f'style="display:block;" aria-hidden="true">'
         f'<path d="{path_d}" fill="none" stroke="{stroke}" '
-        f'stroke-width="{stroke_width}" stroke-linejoin="round" stroke-linecap="round"/>'
+        f'stroke-width="{stroke_width}" '
+        f'vector-effect="non-scaling-stroke" '
+        f'stroke-linejoin="round" stroke-linecap="round"/>'
         f'</svg>'
     )
