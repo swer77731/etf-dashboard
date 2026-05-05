@@ -195,7 +195,8 @@ def build_ctx(etf_code: str) -> dict:
             "1 個月前": 4,    # 4 週 ≈ 1 月
             "3 個月前": 12,   # 12 週 ≈ 3 月
             "6 個月前": 26,
-            "1 年前": 52,
+            # 1 年前移除 — backfill 52 週,row 數通常 51-52,1y offset 永遠
+            # 缺資料顯示「資料累積中」,UI clutter。等資料累積夠再加回
         },
     )
     aum_card = _build_card(
@@ -209,7 +210,8 @@ def build_ctx(etf_code: str) -> dict:
             "1 個月前": 1,
             "3 個月前": 3,
             "6 個月前": 6,
-            "1 年前": 12,
+            # 1 年前移除 — SITCA 月報延遲 1-2 月,backfill 12 月實際 11 月,
+            # 1y offset 永遠缺資料顯示「資料累積中」。等資料累積夠再加回
         },
     )
 
