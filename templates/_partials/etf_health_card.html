@@ -1,0 +1,34 @@
+{# === ETF 健康度單卡 ===
+   variables: card (dict from app.services.etf_health._build_card)
+     kind / title / emoji / latest_display / arrow_pct_display / arrow_char / arrow_class
+     spark_svg / rows / data_count / is_accumulating
+#}
+<div class="health-card">
+  <div class="health-card-header">
+    <span class="health-emoji" aria-hidden="true">{{ card.emoji }}</span>
+    <span class="health-title">{{ card.title }}</span>
+    <span class="health-latest num">{{ card.latest_display }}</span>
+    {% if card.arrow_char != '—' %}
+      <span class="health-arrow {{ card.arrow_class }}">
+        <span class="health-arrow-char" aria-hidden="true">{{ card.arrow_char }}</span>
+        <span class="num">{{ card.arrow_pct_display }}</span>
+      </span>
+    {% endif %}
+  </div>
+
+  <div class="health-spark">{{ card.spark_svg | safe }}</div>
+
+  <table class="health-table">
+    {% for row in card.rows %}
+    <tr>
+      <td class="health-row-label">{{ row.label }}</td>
+      <td class="health-row-value num">{{ row.value_display }}</td>
+      <td class="health-row-pct num {{ row.pct_class }}">{{ row.pct_display }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  {% if card.is_accumulating %}
+    <div class="health-accumulating">資料累積中</div>
+  {% endif %}
+</div>

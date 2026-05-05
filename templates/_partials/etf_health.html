@@ -1,0 +1,113 @@
+{# === ETF 健康度區塊(受益人數 + 規模 兩張卡)===
+
+   variables(由 app.services.etf_health.build_ctx 產):
+     has_health_data  bool   — 兩張卡都 None 時整段不 render
+     holders_card     dict | None
+     aum_card         dict | None
+
+   紀律 #18 手機速度優先:
+     - SVG mini chart 純後端產字串,無 JS 函式庫
+     - 區塊用 content-visibility: auto + IntersectionObserver lazy(Phase 5)
+#}
+{% if has_health_data %}
+<section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7 etf-health-section">
+  <h2 class="text-xl sm:text-2xl font-semibold flex items-center gap-2">
+    <span aria-hidden="true">📊</span> ETF 健康度
+  </h2>
+  <div class="text-sm text-muted mt-1 mb-4">受益人數(每週更新)+ 規模(每月更新),近 1 年走勢</div>
+
+  <div class="health-cards">
+    {% if holders_card %}
+      {% with card = holders_card %}
+        {% include "_partials/etf_health_card.html" %}
+      {% endwith %}
+    {% endif %}
+    {% if aum_card %}
+      {% with card = aum_card %}
+        {% include "_partials/etf_health_card.html" %}
+      {% endwith %}
+    {% endif %}
+  </div>
+</section>
+
+<style>
+  .health-cards {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 640px) {
+    .health-cards { grid-template-columns: 1fr 1fr; }
+  }
+
+  .health-card {
+    background: rgb(var(--c-bg-soft) / 0.5);
+    border: 1px solid rgb(var(--c-border));
+    border-radius: 0.75rem;
+    padding: 1rem;
+  }
+
+  .health-card-header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+  }
+  .health-emoji { font-size: 1.25rem; line-height: 1; }
+  .health-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: rgb(var(--c-fg));
+  }
+  .health-latest {
+    margin-left: auto;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: rgb(var(--c-fg));
+  }
+  .health-arrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  .health-arrow-char { font-size: 0.75rem; }
+
+  /* 台股慣例:漲紅、跌綠、平灰 */
+  .health-pct-up   { color: #ef4444; }
+  .health-pct-down { color: #10b981; }
+  .health-pct-flat { color: rgb(var(--c-muted)); }
+
+  .health-spark {
+    height: 40px;
+    margin: 0.5rem 0 0.75rem 0;
+    color: rgb(var(--c-fg));   /* fallback (SVG 內 stroke 已寫死色) */
+  }
+
+  .health-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+  .health-table tr {
+    border-bottom: 1px dashed rgb(var(--c-border));
+  }
+  .health-table tr:last-child { border-bottom: none; }
+  .health-table td { padding: 0.4rem 0; }
+  .health-row-label { color: rgb(var(--c-muted)); width: 30%; }
+  .health-row-value { text-align: right; padding-right: 1rem; color: rgb(var(--c-fg)); }
+  .health-row-pct { text-align: right; width: 25%; }
+
+  .health-accumulating {
+    margin-top: 0.75rem;
+    padding: 0.4rem 0.75rem;
+    background: rgb(var(--c-warning) / 0.08);
+    border-left: 3px solid rgb(var(--c-warning));
+    font-size: 0.8rem;
+    color: rgb(var(--c-muted));
+    border-radius: 0.25rem;
+  }
+</style>
+{% endif %}

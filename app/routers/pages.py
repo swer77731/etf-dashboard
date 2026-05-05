@@ -732,12 +732,19 @@ async def holdings_page(
 
 
 def _build_etf_detail_payload(code: str):
-    """Heavy compute for /etf/{code} — 6 期間報酬 + K 棒走勢 + 配息歷史 + 相關新聞。"""
+    """Heavy compute for /etf/{code} — 6 期間報酬 + K 棒走勢 + 配息歷史 + 相關新聞 + 健康度。"""
     detail = etf_metrics.get_etf_detail(code)
     if not detail:
         return None
     related_news = news_sync.list_recent_news(etf_code=code.upper(), limit=10)
-    return {"etf": detail, "related_news": related_news}
+    # ETF 健康度 — 受益人數 + 規模 兩張卡片
+    from app.services import etf_health
+    health = etf_health.build_ctx(code.upper())
+    return {
+        "etf": detail,
+        "related_news": related_news,
+        **health,  # has_health_data / holders_card / aum_card
+    }
 
 
 @router.get("/etf/{code}", response_class=HTMLResponse)
