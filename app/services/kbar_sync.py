@@ -191,9 +191,24 @@ def sync_all(etfs: Iterable[ETF] | None = None, end: date | None = None) -> dict
 
     finmind.log_quota("after sync_all")
 
-    # 紀律 #20:expected/actual/missing → sync_status 持久化
-    missing = [c for c in expected_codes if c not in actual_codes]
+    # 紀律 #20 — 防呆 self-audit(2026-05-06 加,堵 04-27 ~ 05-05 那種洞)
+    # 觸發場景:sync_one_etf 沒 raise(raw 抓到)但 _merge_raw_adj 寫 NULL adj_close
+    # → sync_status 看似 success → 客戶網站長期報酬偏低 9-11pp 沒人發現
+    # 偵測:最近 3 天連續 ≥ 2 天 adj_close NULL 的 active 非 index ETF → 進 missing
+    audit_missing = _audit_recent_adj_nulls(end)
+    if audit_missing:
+        logger.warning(
+            "[kbar_sync] adj_close audit detected NULL ≥ 2 days for %d ETF(s): %s",
+            len(audit_missing),
+            ", ".join(audit_missing[:20]) + (" ..." if len(audit_missing) > 20 else ""),
+        )
+
+    # 合併 sync 失敗 + audit 缺漏(去重保序)
+    missing_set = set(expected_codes) - set(actual_codes)
+    missing_set.update(audit_missing)
+    missing = sorted(missing_set)
     success = len(missing) == 0 and not errors
+
     record_sync_attempt(
         source=SYNC_SOURCE,
         success=success,
@@ -204,6 +219,33 @@ def sync_all(etfs: Iterable[ETF] | None = None, end: date | None = None) -> dict
     summary["expected"] = len(expected_codes)
     summary["actual"] = len(actual_codes)
     summary["missing"] = missing
+    summary["audit_missing"] = audit_missing
 
     logger.info("[kbar_sync] done: %s", summary)
     return summary
+
+
+def _audit_recent_adj_nulls(end: date, days: int = 3, threshold: int = 2) -> list[str]:
+    """回最近 N 天 adj_close NULL ≥ threshold 的 ETF code 清單。
+
+    紀律 #20 — adj_close 跟 raw close 不對稱缺漏的事後偵測。
+    raw 正常 + adj NULL 是 FinMind dataset 釋出時序差或 fetch 失敗,
+    sync_one_etf 沒 raise 但 _merge_raw_adj 寫 NULL,要主動偵測。
+
+    排除 category='index'(指數沒 adj 是設計層面)。
+    """
+    start = end - timedelta(days=days)
+    with session_scope() as s:
+        rows = s.execute(
+            select(ETF.code)
+            .join(DailyKBar, DailyKBar.etf_id == ETF.id)
+            .where(DailyKBar.date >= start)
+            .where(DailyKBar.date <= end)
+            .where(DailyKBar.adj_close.is_(None))
+            .where(ETF.category != "index")
+            .where(ETF.is_active.is_(True))
+            .group_by(ETF.code)
+            .having(func.count(DailyKBar.id) >= threshold)
+            .order_by(ETF.code)
+        ).all()
+    return [r[0] for r in rows]

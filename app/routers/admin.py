@@ -512,6 +512,81 @@ async def trigger_daily_report(request: Request):
     return {"sent": ok, "preview": text}
 
 
+@router.get("/kbar_adj_backfill")
+def trigger_kbar_adj_backfill(request: Request, days: int = 10):
+    """強制重抓最近 N 天的 K 棒(raw + adj),UPSERT 蓋過 NULL adj_close。
+
+    用途:incremental sync 假設 adj 跟 raw 同步釋出 + 抓一次成功;實際上 FinMind
+    `TaiwanStockPriceAdj` 偶爾 lag,raw 抓到但 adj 為空,_merge_raw_adj 寫 NULL。
+    incremental 不會回頭重抓已存在的 row,缺口永遠補不到。
+
+    背景:2026-04-27 ~ 05-05 全市場 224 支 ETF adj_close 連續 NULL,造成詳情頁
+    長期報酬 / /compare / since_inception / DCA 全部偏低 9-11pp。本機已修,prod
+    需要呼叫此 endpoint 補洞。
+
+    參數:days(預設 10)— 重抓今天往前 N 天範圍
+
+    重要:寫成 `def`(非 async)讓 FastAPI 丟 threadpool。瀏覽器可能 504 timeout
+    但 server 會繼續跑完(255 ETF × 2 calls × 1 秒 throttle ≈ 9 分鐘)。
+    """
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
+
+    from datetime import date, timedelta
+
+    from sqlalchemy import select
+
+    from app.database import session_scope
+    from app.models.etf import ETF
+    from app.services import finmind
+    from app.services.kbar_sync import (
+        _fetch_adj, _fetch_raw, _merge_raw_adj, _persist_kbars,
+    )
+
+    days = max(1, min(days, 60))   # 限 1-60 天
+    end_date = date.today()
+    start_date = end_date - timedelta(days=days)
+
+    with session_scope() as s:
+        targets = list(
+            s.scalars(
+                select(ETF).where(ETF.is_active.is_(True)).where(ETF.category != "index")
+            ).all()
+        )
+        rows = [(e.id, e.code) for e in targets]
+
+    q0 = finmind.check_quota()
+    ok = 0
+    fail = 0
+    rows_written = 0
+    fail_codes: list[str] = []
+    for eid, code in rows:
+        try:
+            raw = _fetch_raw(code, start_date, end_date)
+            adj = _fetch_adj(code, start_date, end_date)
+            merged = _merge_raw_adj(raw, adj)
+            n = _persist_kbars(eid, merged)
+            rows_written += n
+            ok += 1
+        except Exception as e:
+            fail += 1
+            fail_codes.append(code)
+            logger.warning("[kbar_adj_backfill] %s failed: %s", code, str(e)[:100])
+
+    q1 = finmind.check_quota()
+    return {
+        "range": [start_date.isoformat(), end_date.isoformat()],
+        "target_etfs": len(rows),
+        "ok": ok,
+        "fail": fail,
+        "rows_written": rows_written,
+        "fail_codes": fail_codes,
+        "quota_before": f"{q0.used}/{q0.limit_hour} ({q0.ratio:.1%})",
+        "quota_after": f"{q1.used}/{q1.limit_hour} ({q1.ratio:.1%})",
+    }
+
+
 @router.get("/yearly_returns/backfill")
 def trigger_yearly_returns_backfill(request: Request):
     """手動觸發 etf_yearly_returns 全 80 支 backfill(免等 04:00 cron)。
