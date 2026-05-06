@@ -1622,6 +1622,21 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
     - lazy load:content-visibility:auto + IntersectionObserver fallback(紀律 #18 FCP 救 ~200ms)
 - [x] FinMind 美股 probe(2026-05-05)— 結論:只 USStockInfo + USStockPrice 可用,
   其他 8 個 dataset 全 422,無法做美股版健康度 / 配息 / 財報。詳情頁面只能做 K 棒走勢
+- [x] DB 備份系統 ✅ 2026-05-06(commit 54b3e20 + 7bf40e2)
+  - migration 008 + `app/models/backup_log.py`(backup_log 表 + index)
+  - `scripts/backup_to_github.py`:`sqlite3.Connection.backup()` 線上一致快照 → 掃所有 `email` 欄位 SHA-256 hash → gzip → GitHub Contents API PUT(`daily/YYYY-MM-DD_HHMM.db.gz` + 每月 1 號 `monthly/YYYY-MM.db.gz` + 每年 1/1 `yearly/YYYY.db.gz`)
+  - 90 天保留(只刪 `daily/`,monthly/yearly 永久),`DAILY_FILENAME_RE` 解析日期判刪除
+  - APScheduler 加 `backup_morning` / `backup_afternoon` 兩個 cron(04:00 / 15:00 Asia/Taipei),`backup_job` 包現有 `_try_lock` pattern + 失敗 swallow 不炸 cron
+  - 後台 `/admin/backup/status` RWD 監控頁(桌機 table、手機卡片堆疊)+ 失敗 row 紅底 + 最後成功 > 25h 紅色警示
+  - `/admin/analytics` 加備份卡片入口 + nav「備份狀態」連結(stale 時加 ⚠ icon)
+  - 「立刻備份」按鈕 `POST /admin/backup/trigger`:60s in-memory 限流(`_last_backup_trigger_at` + `threading.Lock`)+ 背景 daemon thread 跑(規避 Zeabur 30s timeout)+ 303 redirect ?triggered=1 / throttled banner
+  - Zeabur env var:`GITHUB_BACKUP_TOKEN` + `GITHUB_BACKUP_REPO`(`swer77731/etf-dashboard-backup`,本機 `.env` 不放)
+  - 紀律 #18 全程:`_redact()` 把 token / repo path 從 log / error message 打碼;httpx error 不暴露 URL token;commit message 不含 repo path
+- [x] 配息日曆改純列表(2026-05-06,commit f41abf1 → 90b2ac8)
+  - 起因:手機直向 380px 寬 7 欄 grid → 每格 ~50px 放不下 5+ 字 ETF 編號 + 殖利率,5/19 23 支「+19 支」還斷行
+  - **Phase A** f41abf1:RWD force-list view 修 — `(max-width:767px) and (orientation:portrait)` 強制 redirect 到 `?mode=list`(忽略 localStorage)+ `.js-mode-toggle` 隱藏切換按鈕 + dismissable hint banner(`calendar_mobile_hint_dismissed` localStorage)+ Playwright 4 viewport 全 PASS
+  - **Phase B** 90b2ac8(user 拍板「其實乾脆把月曆拿掉」):整個 cal 模式廢除,`_build_dividend_calendar_payload` 不再算 6×7 weeks、template 砍 cal-grid / cal-cell / cal-event-pill / hint banner / redirect script,純剩列表 — **砍 -270 行 / 加 +33 行**
+  - 舊書籤 `?mode=cal` / `?mode=list` 仍 200(FastAPI 預設忽略未宣告 query param)
 - [ ] Step 2.5 Phase 3 (etf 詳情頁):十大持股 + 產業分布(需爬蟲,獨立工程)
 - [ ] Step 6:會員系統(Step 5 TG 推播延後 / 訂閱金流 user 思考中)
 - [ ] 後台中文化(任務 B,排程中)
@@ -1825,6 +1840,24 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
   - stroke 1.5 → 2.2(線厚實易見)
 - 教訓:**寬扁容器內的 sparkline 視覺天然平**。要徹底救只能改 viewBox aspect 或加 area fill。本次改善已夠,user 接受
 - 規則:未來新加 sparkline 容器 aspect 接近 1:1 ~ 1.5:1 比較理想(2:1 以上開始扁)
+
+### 2026-05-06 / 配息日曆 / RWD hack 多到 4 段時應先想砍掉
+
+- 手機直向 7 欄月曆 380px 完全壞掉 → 我寫了 4 段 hack:
+  1. JS early redirect script(head 內,提早跑避免 flash)
+  2. CSS `(max-width:767px) and (orientation:portrait)` media query 隱藏切換按鈕
+  3. Alpine `is-dismissed` class 控制狀態
+  4. localStorage `calendar_mobile_hint_dismissed` 跨 session 記憶
+- 4 viewport Playwright 全 PASS,自我感覺良好,commit f41abf1
+- user 看完直接「其實乾脆把月曆拿掉」 → commit 90b2ac8 廢除 cal 模式 / -270 行 / +33 行 / 設計 + code 都清乾淨
+- 教訓:**RWD 修案累積到「JS + CSS + Alpine + localStorage」≥ 3 段時,先停下來明示複雜度給 user,問「砍 vs 修」,而非默默修**
+- 跟紀律 #14「不准用行動代替思考」呼應 — 寫多段 hack 容易,問值不值得難。寫到第 3 段時眼前已模糊,拐不回來
+
+### 2026-05-06 / DB 備份 / GitHub Contents API base64 上傳替代 git push
+- 起因:Zeabur 容器內無 git 二進位 / SSH key / Git LFS,push .db.gz 到 backup repo 不可行
+- 替代:`httpx PUT /repos/{repo}/contents/{path}` body = base64-encoded content,純 HTTP / 純 token,90 天保留也用 list+delete API 完成
+- 警示:Contents API 單檔上限 100MB(我們 85MB DB → 15-25MB gzip,餘裕大;但 DB > 500MB 時要重新評估)
+- 副作用:每次 PUT base64 多 33% 載荷(85MB raw → 25MB gz → 33MB base64 上傳 body),httpx timeout 給 60s 夠
 
 ### 2026-05-05 / FinMind 美股 dataset 大半不可用(只技術面)
 - probe 11 個美股 dataset(USStockInfo / USStockPrice / USStockPriceMinute / Adj / Dividend / Split / MonthRevenue / Financial / BalanceSheet / CashFlow + 5 籌碼面 dataset)
@@ -2161,6 +2194,30 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
 - 決定:把暗色配色 token(bg/card/border/fg/muted/up/down/accent)寫在 `base.html` 的 `tailwind.config` 區塊
 - 好處:每頁繼承自動拿到,不用手動引 CSS;改色一次改完
 
+### 2026-05-06 / DB 備份 / sqlite3.Connection.backup() + GitHub Contents API
+- 候選方案:
+  - **A. shutil.copy** — 寫入中可能拷到不一致快照(WAL 檔不同步)→ ❌
+  - **B. sqlite3.Connection.backup()** — SQLite 內建 BACKUP API,線上一致 → ✅ 採
+  - **C. git push 到 backup repo** — 需 Zeabur 容器內裝 git + SSH key,15-25MB gz 還碰 Git 二進位友好閾值 → ❌
+  - **D. GitHub Contents API base64 PUT** — 純 httpx + token,90 天保留可用 list+delete API → ✅ 採
+- 副作用:Contents API 單檔上限 100MB(我們 85MB DB → 15-25MB gz,base64 多 33% → 33MB body,餘裕大)
+- 紅線:DB 長到 500MB+ 要重新評估(可能要切回 git LFS 或 Zeabur volume snapshot)
+
+### 2026-05-06 / DB 備份 / Zeabur 30s timeout 規避 = 背景 daemon thread
+- 備份大檔走 GitHub API 一輪可能 30-60s(85MB DB 線上備份 + email hash + gzip + PUT base64),Zeabur 邊緣 30s timeout 會把 HTTP 砍掉 → 客戶端 504 但 server 仍跑(浪費)
+- 「立刻備份」按鈕(POST /admin/backup/trigger)模式:**HTTP 立刻 303 redirect,真正備份在 daemon thread 跑**
+- 60s in-memory 限流(`_last_backup_trigger_at` + `threading.Lock`)避免重複點擊洗 GitHub API quota
+- POST/Redirect/GET pattern 用 303 不用 302,瀏覽器一律改 GET 不會 re-POST
+
+### 2026-05-06 / 配息日曆 / 月曆模式廢除
+- 起因:7 欄硬擠手機直向 380px = 每格 ~50px 放不下 5+ 字 ETF 編號 + 殖利率
+- 兩條路:
+  - **A. RWD hack**(force list view + 隱藏 toggle + dismissable hint banner + localStorage 記憶)— 4 段 hack
+  - **B. 砍掉月曆只剩列表** — 砍 270 行 / 加 33 行
+- 先做 A(commit f41abf1),user 看複雜度反推「乾脆拿掉」→ 走 B(commit 90b2ac8)
+- 結論:列表本來就比月曆好讀(時間遞增 + 殖利率欄整齊 + 配息金額對齊),月曆只是「視覺感」沒實用優勢
+- 反思進「踩坑紀錄」(2026-05-06 條):**RWD hack 多到 ≥ 3 段時先停下來明示成本,問 user 砍 vs 修**
+
 ---
 
 # 📅 Session 歷程
@@ -2176,3 +2233,4 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
 2026-05-03 上午 | Netmarble Launcher 殺乾淨(off-topic 系統管理)+ 3 個 housekeeping commit | ✅ | 順手 commit + push:D 槽鐵律入 CLAUDE.md / `scripts/_*.py` 慣例 gitignore + `build_etf_universe.py` 進 git / DCA tooltip TODO 改寫成事件層方向(舊「series 順序」推測作廢);保留 server 給後續 task
 2026-05-04 上午 | 錯誤回報系統 + 後台 OAuth 統一 + token leak 修復 | ✅ | 一日 3 commit push 上線。錯誤回報:migration 006 / `error_reports` table / `POST /api/error-report` rate-limit 直查 table 自身 / 8 頁浮動按鈕 + Modal(Alpine + 純 CSS,紀律 #18) / 後台收件匣雙 tab。後台 OAuth:砍密碼 / JWT 路徑(−69 行)/ 統一 Google OAuth / 修復 4 漏網 endpoint。token leak:httpx logger → WARNING 一行,堵住自開站以來 FinMind URL 進 log 的洩漏。紀律 #18 補驗收:Playwright 16 張手機截圖,4 頁浮動按鈕擋到核心數字 → user 實機可接受、維持現狀。教訓:任何 fixed bottom-right 浮動元件規劃時就要 Playwright 驗一輪,不是上線後補。
 2026-05-04 ~ 05-05 | ETF 健康度系統(規模與人氣)+ 後台手機 bug + 報酬率格式 | ✅ | 一日多 commit:Phase 1 schema(migration 007)/ Phase 2 受益人數 sync(FinMind 週更,254 ETF 1 年 backfill = 10,581 row)/ Phase 3 規模 sync(SITCA `etf_statement2.aspx?txtYM=` 單 GET,**Phase 0 PoC 從 Playwright 改 httpx,工時 4hr → 1.5hr**)/ Phase 4 前端整合(純 SVG sparkline + 2 卡 + 表格 + 紅綠箭頭)/ Phase 5 lazy load(content-visibility:auto + IO fallback)。順手:後台手機圓餅圖 outside label 撞圖外 + 多行 legend / 表格滑動提示 / `/compare` `/etf_detail` 報酬率 `+45.2% / -19.5%` 1 位小數 / 美股 probe(只 K 棒可拿,健康度 0)/ 臨時 backfill endpoint 觸發 prod 初始化後拿掉。Sparkline 多輪迭代:40px 太扁 / 70px sweet spot / pad 2→8 + L→Bezier + stroke 1.5→2.2(`height:auto` + `width:100%` 失控 bug 學到)。1 年前 row 拿掉(backfill 範圍剛好不夠永遠累積中)。教訓:.NET WebForms 站常見「主頁 + chart iframe」架構,iframe 直吃 query param;inline SVG 響應式 `width:100%` 必須固定 `height` 屬性。
+2026-05-06 整天 | DB 備份系統 + 「立刻備份」按鈕 + 配息日曆改純列表 | ✅ | 4 commit push 上線。**備份**:migration 008 + `BackupLog` model / `scripts/backup_to_github.py`(`sqlite3.Connection.backup()` 線上一致快照 + email SHA-256 hash + gzip + GitHub Contents API base64 PUT + 90 天保留 list+delete)/ 04:00+15:00 cron / 後台 `/admin/backup/status` RWD 監控頁(失敗紅底 / >25h 紅色警示)/ analytics 加備份卡片入口。**「立刻備份」按鈕**:60s in-memory 限流 + 背景 daemon thread 規避 Zeabur 30s timeout + 303 redirect ?triggered=1/throttled banner + RWD button。**配息日曆**:先寫了 4 段 RWD hack(JS redirect / CSS media query / Alpine / localStorage hint banner),Playwright 4 viewport 全 PASS(commit f41abf1),user 看完直接「其實乾脆把月曆拿掉」→ commit 90b2ac8 廢除 cal 模式 / 砍 -270 行 / 加 +33 行 / 設計 + code 都清乾淨。教訓:**RWD hack 多到 ≥ 3 段時先停下來明示成本問 user 砍 vs 修**(寫進踩坑 + 重要決策 + memory feedback)。本機 .env 不放 `GITHUB_BACKUP_TOKEN`,Zeabur env var 已設,user 在後台按「立刻備份」即可第一次驗證。
