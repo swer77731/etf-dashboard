@@ -702,3 +702,157 @@ async def submit_error_report(
     session.add(rec)
     session.commit()
     return {"ok": True, "id": rec.id}
+
+
+# ─────────────────────────────────────────────────────────────
+# /api/_internal/* — no-auth diagnostic + repair endpoints
+#
+# 一次性 ops 工具,2026-05-06 補 04-27 ~ 05-05 全市場 adj_close NULL bug 用。
+# 只回讀公開市場 K 棒(close/adj_close/volume,公開資訊)+ 觸發 FinMind refetch。
+# 沒洩漏隱私資料、沒可寫入 user input;最壞情況有人狂打 → 浪費 FinMind quota,
+# 已加 60 秒 rate limit 緩解。
+# 修完可在下個 commit 拿掉。
+# ─────────────────────────────────────────────────────────────
+
+_KBAR_REPAIR_LAST_RUN_AT: float = 0.0
+_KBAR_REPAIR_LOCK_SEC = 60.0
+
+
+@router.get("/_internal/kbar_status")
+def internal_kbar_status(code: str = Query(...), days: int = Query(14, ge=1, le=60)):
+    """no-auth diagnostic — 看 prod DB 某 ETF 最近 N 天 close / adj_close / null 計數。"""
+    from datetime import date, timedelta as _td
+    from sqlalchemy import select as _select
+
+    code_norm = code.strip().upper()
+    cutoff = date.today() - _td(days=days)
+
+    with session_scope() as s:
+        etf = s.scalar(_select(ETF).where(ETF.code == code_norm))
+        if not etf:
+            return {"error": f"ETF {code_norm} not found"}
+        rows = s.execute(
+            _select(DailyKBar.date, DailyKBar.close, DailyKBar.adj_close)
+            .where(DailyKBar.etf_id == etf.id)
+            .where(DailyKBar.date >= cutoff)
+            .order_by(DailyKBar.date.asc())
+        ).all()
+
+    null_count = sum(1 for r in rows if r[2] is None)
+    return {
+        "code": code_norm,
+        "name": etf.name,
+        "category": etf.category,
+        "days_window": days,
+        "row_count": len(rows),
+        "adj_close_null_count": null_count,
+        "rows": [
+            {"date": r[0].isoformat(), "close": r[1], "adj_close": r[2]}
+            for r in rows
+        ],
+    }
+
+
+@router.get("/_internal/kbar_audit")
+def internal_kbar_audit(days: int = Query(14, ge=1, le=60), threshold: int = Query(2, ge=1, le=10)):
+    """no-auth — 全市場最近 N 天 adj_close NULL ≥ threshold 的 ETF 清單。"""
+    from datetime import date as _date
+    from app.services.kbar_sync import _audit_recent_adj_nulls
+
+    missing = _audit_recent_adj_nulls(_date.today(), days=days, threshold=threshold)
+    return {
+        "days_window": days,
+        "threshold": threshold,
+        "missing_count": len(missing),
+        "missing_codes": missing,
+    }
+
+
+@router.get("/_internal/kbar_repair")
+def internal_kbar_repair(days: int = Query(10, ge=1, le=30)):
+    """no-auth + 60s rate limit — 強制重抓最近 N 天 raw + adj,UPSERT 蓋 NULL。
+
+    跑完自動清掉 in-memory rendered-HTML cache(讓網站立即顯示新數字)。
+    Sync 在 threadpool 跑(def 非 async),~9 分鐘完成,client 可能 504。
+    """
+    import time as _time
+
+    from datetime import date, timedelta as _td
+
+    global _KBAR_REPAIR_LAST_RUN_AT
+    now = _time.monotonic()
+    if now - _KBAR_REPAIR_LAST_RUN_AT < _KBAR_REPAIR_LOCK_SEC:
+        return {
+            "ok": False,
+            "error": f"rate limited — wait {int(_KBAR_REPAIR_LOCK_SEC - (now - _KBAR_REPAIR_LAST_RUN_AT))}s",
+        }
+    _KBAR_REPAIR_LAST_RUN_AT = now
+
+    from sqlalchemy import select as _select
+
+    from app.services.kbar_sync import (
+        _fetch_adj, _fetch_raw, _merge_raw_adj, _persist_kbars,
+    )
+
+    end_date = date.today()
+    start_date = end_date - _td(days=days)
+
+    with session_scope() as s:
+        targets = list(
+            s.scalars(
+                _select(ETF).where(ETF.is_active.is_(True)).where(ETF.category != "index")
+            ).all()
+        )
+        rows = [(e.id, e.code) for e in targets]
+
+    q0 = finmind.check_quota()
+    ok_count = 0
+    fail_count = 0
+    rows_written = 0
+    fail_codes: list[str] = []
+    for eid, code in rows:
+        try:
+            raw = _fetch_raw(code, start_date, end_date)
+            adj = _fetch_adj(code, start_date, end_date)
+            merged = _merge_raw_adj(raw, adj)
+            n = _persist_kbars(eid, merged)
+            rows_written += n
+            ok_count += 1
+        except Exception as e:
+            fail_count += 1
+            fail_codes.append(code)
+
+    q1 = finmind.check_quota()
+
+    # 清 in-memory rendered-HTML cache,讓網站立即看到新數字
+    try:
+        from app.routers.pages import _ENDPOINT_CACHE
+        cache_n = len(_ENDPOINT_CACHE)
+        _ENDPOINT_CACHE.clear()
+    except Exception:
+        cache_n = -1
+
+    return {
+        "ok": True,
+        "range": [start_date.isoformat(), end_date.isoformat()],
+        "target_etfs": len(rows),
+        "ok_count": ok_count,
+        "fail_count": fail_count,
+        "rows_written": rows_written,
+        "fail_codes": fail_codes,
+        "quota_before": f"{q0.used}/{q0.limit_hour} ({q0.ratio:.1%})",
+        "quota_after": f"{q1.used}/{q1.limit_hour} ({q1.ratio:.1%})",
+        "cache_cleared": cache_n,
+    }
+
+
+@router.get("/_internal/cache_clear")
+def internal_cache_clear():
+    """no-auth — 強制清 in-memory rendered-HTML cache。"""
+    try:
+        from app.routers.pages import _ENDPOINT_CACHE
+        n = len(_ENDPOINT_CACHE)
+        _ENDPOINT_CACHE.clear()
+        return {"cleared_entries": n}
+    except Exception as e:
+        return {"error": str(e)[:200]}
