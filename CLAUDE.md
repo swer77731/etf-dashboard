@@ -102,6 +102,49 @@ session 死掉、context 滿、對話被壓縮都不要緊,
 進度區塊裡的失敗也要明確標示 ❌,不要用模糊用詞掩蓋。
 **失敗策略也是教材**,留著供下次參考。
 
+### 22. 「跑了」≠「跑對了」(2026-05-06 鎖定 by user — 鐵律)
+
+> 「能自動修的自動修,修不了的顯示在後台」 — user 原話,設計哲學。
+
+#### 規則
+所有同步任務 / 資料寫入路徑必須**事後驗證**寫進 DB 的東西真的「能用」。
+sync 跑完不報錯 ≠ 資料對。**「raise 沒響 + DB 有 row」是不夠的判定**,要對欄位內容做完整性檢查。
+
+#### 起源
+2026-05-06 / kbar_sync 從 04-27 開始連續 6 天寫 raw close 但 adj_close NULL
+(FinMind `TaiwanStockPriceAdj` 該時段對全市場 224 支 ETF 釋出 lag,
+`_merge_raw_adj` 寫 NULL,sync_one_etf 沒 raise,sync_status 標 success)
+→ 客戶 9 天後反應 00981A YTD 數字偏低 9-11pp 才被發現。
+
+紀律 #20 既有 missing_items 設計只看「ETF 是否抓爆」,沒覆蓋「欄位部分缺漏」。
+
+#### 落地
+- `app/services/data_audit.py` — 全自動健康管家
+- 每天 23:30 cron 跑 4 個 check(可擴充):
+  - kbar_adj_null / kbar_stale → 自動修(重抓 FinMind UPSERT)
+  - dividend_pending_amount → 自動修(TWSE 重爬)
+  - yearly_return_outlier → 不可自動修(進「人工待辦」,需人工判斷真假)
+- 修不到 3 次 → 升級為「人工待辦」,進 `/admin/analytics` 紅色卡片
+- 待辦項目可點開 detail page,「強制修復」/「忽略 7 天」操作
+- 一輪上限 10 個自動修(避免撞 FinMind quota 紅線)
+
+#### 設計範圍(自動修 vs 待辦判定原則)
+✅ 可自動修:
+- 「重抓外部資料」能還原的(adj_close、raw close、配息金額、規模、受益人數)
+- 「重算」能還原的(健康度過期、cache 過期)
+
+❌ 不能自動修(必須人工):
+- 「無法用第二個資料源驗證的修改」(報酬 +500%、配息金額異常等)
+- 「跨表算出來不一致」(可能是邏輯 bug,不是資料 bug)
+
+#### 例外
+- 純 dev 工具 / 一次性 ops(如 backfill 補洞 endpoint)— 不在自動健檢範圍
+- index 類別 ETF(沒 adj_close 是設計層面)— 偵測時排除
+
+跟紀律 #20 一起鎖,**再犯記點**。
+
+---
+
 ### 21. ETF inactive 標記必須先驗證發行商 / TWSE(2026-04-28 鎖定 by user — 鐵律)
 
 > 「如果遇到這種情況 你自動去發行商 例如 元大 群益 街口 之類的查 查完確實後 才能替除」— user 原話
@@ -1632,6 +1675,20 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
   - 「立刻備份」按鈕 `POST /admin/backup/trigger`:60s in-memory 限流(`_last_backup_trigger_at` + `threading.Lock`)+ 背景 daemon thread 跑(規避 Zeabur 30s timeout)+ 303 redirect ?triggered=1 / throttled banner
   - Zeabur env var:`GITHUB_BACKUP_TOKEN` + `GITHUB_BACKUP_REPO`(`swer77731/etf-dashboard-backup`,本機 `.env` 不放)
   - 紀律 #18 全程:`_redact()` 把 token / repo path 從 log / error message 打碼;httpx error 不暴露 URL token;commit message 不含 repo path
+- [x] adj_close 全市場 NULL 修復鏈 ✅ 2026-05-06(commits ffc3716 → e0e69d3 → dcf5ca2 → 75c63c3)
+  - 起因:user 反應 00981A YTD +68.63%,本應 +77.X%,差 9pp。調查發現全市場 224 支 ETF 的 `daily_kbar.adj_close` 從 2026-04-27 起連續 6 天 NULL(raw close 正常)
+  - 根因:FinMind `TaiwanStockPriceAdj` dataset 對全市場該時段釋出 lag → `_merge_raw_adj` 寫 NULL → kbar_sync 不 raise → sync_status 標 success → bug 隱藏 9 天
+  - **本機 backfill**:`scripts/_backfill_adj_2026q2.py`(monkey-patch 紀律 #16 quota gate 50% → 80%,一次性,user 授權,跑完不還原 module-level constants)
+  - **prod backfill**:加 4 個 `/api/_internal/*` no-auth endpoints(client 從 local curl 觸發,254 ETF backfill 9 分鐘),修完後拿掉
+  - **保留 admin endpoints**(供未來 emergency 用):`/admin/kbar_adj_backfill`、`/admin/db_inspect/{code}`、`/admin/cache/clear`
+  - **kbar_sync 加 self-audit**(`_audit_recent_adj_nulls`):每次 sync_all 結尾掃最近 3 天 adj_close NULL ≥ 2 天的 ETF,進 missing_items → daily_health_check 自動標 partial
+- [x] 全自動資料健康管家 ✅ 2026-05-06(commit 6e6026e)
+  - 紀律 #22「跑了 ≠ 跑對了」設計憲法落地
+  - `app/services/data_audit.py` 4 個 check + auto-fix + 待辦升級框架
+  - 23:30 cron 自動跑,結果寫 sync_status + `data/audit_history/*.log`(30 天保留)
+  - `/admin/analytics` 頂部新增健康卡片(綠/黃/紅 badge + 待辦清單可點)
+  - `/admin/audit/{id}` detail page — 強制修復 / 忽略 7 天
+  - 一輪上限 10 個自動修,避免撞 FinMind quota
 - [x] 配息日曆改純列表(2026-05-06,commit f41abf1 → 90b2ac8)
   - 起因:手機直向 380px 寬 7 欄 grid → 每格 ~50px 放不下 5+ 字 ETF 編號 + 殖利率,5/19 23 支「+19 支」還斷行
   - **Phase A** f41abf1:RWD force-list view 修 — `(max-width:767px) and (orientation:portrait)` 強制 redirect 到 `?mode=list`(忽略 localStorage)+ `.js-mode-toggle` 隱藏切換按鈕 + dismissable hint banner(`calendar_mobile_hint_dismissed` localStorage)+ Playwright 4 viewport 全 PASS
@@ -1852,6 +1909,25 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
 - user 看完直接「其實乾脆把月曆拿掉」 → commit 90b2ac8 廢除 cal 模式 / -270 行 / +33 行 / 設計 + code 都清乾淨
 - 教訓:**RWD 修案累積到「JS + CSS + Alpine + localStorage」≥ 3 段時,先停下來明示複雜度給 user,問「砍 vs 修」,而非默默修**
 - 跟紀律 #14「不准用行動代替思考」呼應 — 寫多段 hack 容易,問值不值得難。寫到第 3 段時眼前已模糊,拐不回來
+
+### 2026-05-06 / kbar_sync silent fail / 全市場 adj_close NULL 6 天沒人發現
+- 04-27 起連續 6 天:FinMind `TaiwanStockPrice`(raw)抓到、`TaiwanStockPriceAdj` 對全市場 lag → `_merge_raw_adj` 寫 NULL,sync_one_etf 沒 raise,sync_status 標 success
+- 客戶 9 天後反應 00981A YTD 偏低 9pp 才被發現 — 紀律 #20 既有 missing_items 設計只看「ETF 是否抓爆」,沒覆蓋「欄位部分缺漏」
+- 修法:kbar_sync 加 self-audit(`_audit_recent_adj_nulls`),每次 sync_all 結尾掃最近 3 天 adj_close NULL ≥ 2 天的 ETF 進 missing
+- 設計層面修法:**紀律 #22「跑了 ≠ 跑對了」鎖入** + 全自動資料健康管家 `data_audit.py`(4 checks + auto-fix + 人工待辦)
+- 教訓:**「raise 沒響 + DB 有 row」不是「成功」**。所有 sync 都要事後驗欄位內容
+
+### 2026-05-06 / 朋友共用 FinMind token / GLOBAL quota 跟 LOCAL 雙層 gate
+- 走 backfill 時 LOCAL 36% 但 GLOBAL 96.5%(朋友 burst)→ 紀律 #16 50% 紅線攔我們,當下空有 LOCAL 容量但動不了
+- user 授權 monkey-patch HARD_RATIO 50% → 80%(一次性,腳本級不寫永久)
+- 結果仍卡:80% 紅線在「朋友推到 80.3%」場景下也會擋
+- 排程 15:05(整點 +5 min)bash until-loop 等 quota window 自然降 → 9 分鐘跑完
+- 教訓:**共用 token quota gate 受朋友 burst 影響不可控**,只能等 sliding window 自然 expire 或選離峰時段排程
+
+### 2026-05-06 / Finding @property 序列化 / dataclass asdict 不含 property
+- `Finding.status` 用 @property 算 derived value,但 `asdict(f)` 不 include,JSON 序列化後失蹤
+- 寫 `_finding_to_dict()` helper 手動加 status;反向 `Finding(**d)` 也要 strip 非 dataclass field key 才不 raise TypeError
+- 教訓:**dataclass + JSON serialization 要小心 @property 的 round-trip**。也可以直接把 status 改成 plain field + 在 detect 時計算寫入(更簡單但破壞 derived 純度)
 
 ### 2026-05-06 / DB 備份 / GitHub Contents API base64 上傳替代 git push
 - 起因:Zeabur 容器內無 git 二進位 / SSH key / Git LFS,push .db.gz 到 backup repo 不可行
@@ -2209,6 +2285,23 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
 - 60s in-memory 限流(`_last_backup_trigger_at` + `threading.Lock`)避免重複點擊洗 GitHub API quota
 - POST/Redirect/GET pattern 用 303 不用 302,瀏覽器一律改 GET 不會 re-POST
 
+### 2026-05-06 / 紀律 #22「跑了 ≠ 跑對了」設計
+- 起因:adj_close NULL 6 天 sync 沒 raise,客戶 9 天後反應才發現。紀律 #20 既有 missing_items 不夠
+- 設計兩層:
+  - **Sync 內 self-audit**(已落地 kbar_sync._audit_recent_adj_nulls):sync 結尾掃自家寫的東西,有問題進 missing_items
+  - **集中健康管家**(data_audit.py):每天 23:30 跑全資料表 audit,能修自動修,修不到的進「人工待辦」
+- 自動修界線:
+  - ✅ 重抓外部資料能還原(adj/raw/dividend/AUM/受益人數)
+  - ❌ 「無法用第二個資料源驗證的修改」(報酬 outlier、跨表不一致 → 待辦)
+- 一輪 fix 上限 10 個 — 避免撞 FinMind quota,剩餘留下次 cron
+- attempt 計數跨輪累積,>=3 自動升級為 todo
+
+### 2026-05-06 / 資料健康管家不開新表
+- user 紀律「沿用既有 sync_status 機制」+「不要做新後台頁」
+- 但 30 天歷史 + multiple findings 不適合塞 sync_status 單 row
+- 解:sync_status row(latest 快照)+ `data/audit_history/YYYY-MM-DD.log`(line-based JSON,30 天保留 + 自動 cleanup) + `data/audit_ignored.json`(忽略清單)
+- 「人工待辦詳情頁」`/admin/audit/{id}` 算 analytics 子流程,不算「新後台主頁」
+
 ### 2026-05-06 / 配息日曆 / 月曆模式廢除
 - 起因:7 欄硬擠手機直向 380px = 每格 ~50px 放不下 5+ 字 ETF 編號 + 殖利率
 - 兩條路:
@@ -2234,3 +2327,4 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
 2026-05-04 上午 | 錯誤回報系統 + 後台 OAuth 統一 + token leak 修復 | ✅ | 一日 3 commit push 上線。錯誤回報:migration 006 / `error_reports` table / `POST /api/error-report` rate-limit 直查 table 自身 / 8 頁浮動按鈕 + Modal(Alpine + 純 CSS,紀律 #18) / 後台收件匣雙 tab。後台 OAuth:砍密碼 / JWT 路徑(−69 行)/ 統一 Google OAuth / 修復 4 漏網 endpoint。token leak:httpx logger → WARNING 一行,堵住自開站以來 FinMind URL 進 log 的洩漏。紀律 #18 補驗收:Playwright 16 張手機截圖,4 頁浮動按鈕擋到核心數字 → user 實機可接受、維持現狀。教訓:任何 fixed bottom-right 浮動元件規劃時就要 Playwright 驗一輪,不是上線後補。
 2026-05-04 ~ 05-05 | ETF 健康度系統(規模與人氣)+ 後台手機 bug + 報酬率格式 | ✅ | 一日多 commit:Phase 1 schema(migration 007)/ Phase 2 受益人數 sync(FinMind 週更,254 ETF 1 年 backfill = 10,581 row)/ Phase 3 規模 sync(SITCA `etf_statement2.aspx?txtYM=` 單 GET,**Phase 0 PoC 從 Playwright 改 httpx,工時 4hr → 1.5hr**)/ Phase 4 前端整合(純 SVG sparkline + 2 卡 + 表格 + 紅綠箭頭)/ Phase 5 lazy load(content-visibility:auto + IO fallback)。順手:後台手機圓餅圖 outside label 撞圖外 + 多行 legend / 表格滑動提示 / `/compare` `/etf_detail` 報酬率 `+45.2% / -19.5%` 1 位小數 / 美股 probe(只 K 棒可拿,健康度 0)/ 臨時 backfill endpoint 觸發 prod 初始化後拿掉。Sparkline 多輪迭代:40px 太扁 / 70px sweet spot / pad 2→8 + L→Bezier + stroke 1.5→2.2(`height:auto` + `width:100%` 失控 bug 學到)。1 年前 row 拿掉(backfill 範圍剛好不夠永遠累積中)。教訓:.NET WebForms 站常見「主頁 + chart iframe」架構,iframe 直吃 query param;inline SVG 響應式 `width:100%` 必須固定 `height` 屬性。
 2026-05-06 整天 | DB 備份系統 + 「立刻備份」按鈕 + 配息日曆改純列表 | ✅ | 4 commit push 上線。**備份**:migration 008 + `BackupLog` model / `scripts/backup_to_github.py`(`sqlite3.Connection.backup()` 線上一致快照 + email SHA-256 hash + gzip + GitHub Contents API base64 PUT + 90 天保留 list+delete)/ 04:00+15:00 cron / 後台 `/admin/backup/status` RWD 監控頁(失敗紅底 / >25h 紅色警示)/ analytics 加備份卡片入口。**「立刻備份」按鈕**:60s in-memory 限流 + 背景 daemon thread 規避 Zeabur 30s timeout + 303 redirect ?triggered=1/throttled banner + RWD button。**配息日曆**:先寫了 4 段 RWD hack(JS redirect / CSS media query / Alpine / localStorage hint banner),Playwright 4 viewport 全 PASS(commit f41abf1),user 看完直接「其實乾脆把月曆拿掉」→ commit 90b2ac8 廢除 cal 模式 / 砍 -270 行 / 加 +33 行 / 設計 + code 都清乾淨。教訓:**RWD hack 多到 ≥ 3 段時先停下來明示成本問 user 砍 vs 修**(寫進踩坑 + 重要決策 + memory feedback)。本機 .env 不放 `GITHUB_BACKUP_TOKEN`,Zeabur env var 已設,user 在後台按「立刻備份」即可第一次驗證。
+2026-05-06 下午 | adj_close 全市場 NULL 修復 + 紀律 #22 + 全自動資料健康管家 | ✅ | 5 commit push 上線(ffc3716 / e0e69d3 / dcf5ca2 / 75c63c3 / 6e6026e)。**起因**:user 反應 00981A YTD +68.63% 對比 yfinance +77.30% 差 9pp 確認 bug。調查:全市場 224 支 ETF 從 2026-04-27 起 6 天 `daily_kbar.adj_close` NULL(raw 正常),原因 FinMind `TaiwanStockPriceAdj` 對該時段釋出 lag,_merge_raw_adj 寫 NULL,sync 不 raise → silent fail 9 天。**本機修法**:`scripts/_backfill_adj_2026q2.py` monkey-patch quota gate 50→80%(一次性,user 授權)、254 ETF 9 分鐘補完、修後 D 公式 +77.79% 對齊 yfinance。**Prod 修法**:加 4 個 `/api/_internal/*` no-auth + rate-limit endpoint(client 從 local curl 觸發,254 ETF 14 分鐘補完)修完拿掉,留 admin-only 版備用。**防呆 Phase A**:kbar_sync `_audit_recent_adj_nulls` self-audit + missing_items 整合 daily_health_check。**防呆 Phase B**:全自動資料健康管家 `app/services/data_audit.py`(4 checks + auto-fix + 待辦升級)+ 23:30 cron + `/admin/analytics` 整合 + `/admin/audit/{id}` detail page。**紀律 #22 鎖入**「跑了 ≠ 跑對了」設計憲法。教訓:**「sync raise 沒響 + DB 有 row」≠「成功」**,所有 sync 都要事後驗欄位內容,silent fail 是最危險的 bug 模式。
