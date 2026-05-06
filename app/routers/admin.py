@@ -280,6 +280,8 @@ async def analytics_page(request: Request, range_days: int = 7):
     member_stats = _member_stats()   # 會員註冊統計(2026-05-02 併入)
     pending_reports = _pending_error_reports_count()  # nav 入口顯示待處理筆數
     backup_summary = _backup_status_summary()         # 備份狀態卡入口用
+    from app.services import data_audit
+    audit_summary = data_audit.get_latest()           # 資料健康管家(2026-05-06)
 
     return templates.TemplateResponse(
         request, "admin/analytics.html",
@@ -299,6 +301,7 @@ async def analytics_page(request: Request, range_days: int = 7):
             members=member_stats,
             pending_reports_count=pending_reports,
             backup_summary=backup_summary,
+            audit_summary=audit_summary,
             current_user=user,
         ),
     )
@@ -639,6 +642,63 @@ def db_inspect_etf(request: Request, code: str, days: int = 14):
             for r in rows
         ],
     }
+
+
+# ─────────────────────────────────────────────────────────────
+# /admin/audit/* — 資料健康管家(2026-05-06)
+# ─────────────────────────────────────────────────────────────
+
+@router.get("/audit/run")
+def admin_audit_run(request: Request):
+    """立刻重跑健檢 + 自動修。回 JSON summary。"""
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
+    from app.services import data_audit
+    result = data_audit.run_all_checks(auto_fix=True)
+    # 跑完導回 analytics
+    return RedirectResponse(url="/admin/analytics", status_code=303)
+
+
+@router.get("/audit/{finding_id:path}", response_class=HTMLResponse)
+def admin_audit_detail(request: Request, finding_id: str):
+    """單一 finding 的詳情頁(待辦操作:強制修 / 忽略)。"""
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
+    from app.services import data_audit
+    finding = data_audit.get_finding(finding_id)
+    if not finding:
+        raise HTTPException(404, f"找不到 finding: {finding_id}")
+    is_admin, user = _is_site_admin(request)
+    return templates.TemplateResponse(
+        request, "admin/audit_detail.html",
+        _admin_ctx(request, finding=finding, current_user=user),
+    )
+
+
+@router.post("/audit/{finding_id:path}/ignore")
+def admin_audit_ignore(request: Request, finding_id: str, days: int = Form(7)):
+    """忽略此 finding N 天(預設 7)。"""
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
+    from app.services import data_audit
+    days = max(1, min(days, 90))
+    data_audit.ignore_finding(finding_id, days=days)
+    return RedirectResponse(url="/admin/analytics", status_code=303)
+
+
+@router.post("/audit/{finding_id:path}/force-fix")
+def admin_audit_force_fix(request: Request, finding_id: str):
+    """強制嘗試修一次(無視 attempt 上限)。"""
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
+    from app.services import data_audit
+    ok, msg = data_audit.force_fix(finding_id)
+    logger.info("[audit] force-fix %s → ok=%s msg=%s", finding_id, ok, msg)
+    return RedirectResponse(url=f"/admin/audit/{finding_id}", status_code=303)
 
 
 @router.get("/cache/clear")

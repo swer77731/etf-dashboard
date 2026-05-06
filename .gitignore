@@ -46,8 +46,8 @@ Thumbs.db
 # Debug / scratch outputs
 scripts/out/
 
-# One-off probe / scratch scripts(命名慣例:scripts/_*.py 不進 git)
-scripts/_*.py
+# One-off probe / scratch scripts(命名慣例:scripts/_* 不進 git,任何附檔名)
+scripts/_*
 
 # Mobile / verification screenshots(每次驗收會重產生,不進 repo)
 screenshots/

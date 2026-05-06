@@ -66,6 +66,7 @@ _locks: dict[str, threading.Lock] = {
     "beneficial": threading.Lock(),
     "aum": threading.Lock(),
     "backup": threading.Lock(),
+    "data_audit": threading.Lock(),
 }
 
 # 5 分鐘後 retry 用 — APScheduler 有 max_instances=1 + coalesce 防併發
@@ -358,6 +359,29 @@ def backup_job() -> None:
         _release("backup")
 
 
+def data_audit_job() -> None:
+    """每天 23:30 (Taipei) — 全自動資料健康管家。
+
+    跑完 11 個 check + 自動修能修的 + 修不到 3 次升級為人工待辦。
+    結果寫進 sync_status source='data_audit',/admin/analytics 卡片顯示。
+    """
+    if not _try_lock("data_audit"):
+        return
+    try:
+        logger.info("[data_audit_job] start")
+        from app.services import data_audit
+        result = data_audit.run_all_checks(auto_fix=True)
+        logger.info(
+            "[data_audit_job] done — total=%d fixed=%d todo=%d ignored=%d (%ss)",
+            result["total"], result["fixed"], result["todo"],
+            result["ignored"], result["elapsed_sec"],
+        )
+    except Exception:
+        logger.exception("[data_audit_job] failed")
+    finally:
+        _release("data_audit")
+
+
 def analytics_cleanup_job() -> None:
     """每天 03:00 (Taipei) 刪 90 天前的 analytics / search / compare / online_snapshots。"""
     if not _try_lock("analytics_cleanup"):
@@ -476,6 +500,10 @@ def start_scheduler() -> AsyncIOScheduler:
          CronTrigger(hour=4, minute=0, timezone=tz)),
         ("backup_afternoon", backup_job,
          CronTrigger(hour=15, minute=0, timezone=tz)),
+        # 每天 23:30 — 資料健康管家(全自動健檢 + 自動修 + 待辦升級)
+        # 23:00 已被 health_daily 占,挪 30 分鐘避開
+        ("data_audit_daily", data_audit_job,
+         CronTrigger(hour=23, minute=30, timezone=tz)),
     ]
 
     for job_id, fn, trig in jobs:
