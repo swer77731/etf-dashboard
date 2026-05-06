@@ -587,6 +587,77 @@ def trigger_kbar_adj_backfill(request: Request, days: int = 10):
     }
 
 
+@router.get("/db_inspect/{code}")
+def db_inspect_etf(request: Request, code: str, days: int = 14):
+    """直接查 prod DB 某支 ETF 最近 N 天的 close / adj_close,診斷用。
+
+    用例:確認 backfill 是否真的有寫進 prod DB。
+    """
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
+
+    from datetime import date, timedelta
+
+    from sqlalchemy import select
+
+    from app.database import session_scope
+    from app.models.etf import ETF
+    from app.models.kbar import DailyKBar
+
+    days = max(1, min(days, 60))
+    cutoff = date.today() - timedelta(days=days)
+    code_norm = code.strip().upper()
+
+    with session_scope() as s:
+        etf = s.scalar(select(ETF).where(ETF.code == code_norm))
+        if not etf:
+            return {"error": f"ETF {code_norm} not found"}
+        rows = s.execute(
+            select(DailyKBar.date, DailyKBar.close, DailyKBar.adj_close,
+                   DailyKBar.volume)
+            .where(DailyKBar.etf_id == etf.id)
+            .where(DailyKBar.date >= cutoff)
+            .order_by(DailyKBar.date.asc())
+        ).all()
+
+    null_count = sum(1 for r in rows if r[2] is None)
+    return {
+        "code": code_norm,
+        "name": etf.name,
+        "category": etf.category,
+        "days_window": days,
+        "row_count": len(rows),
+        "adj_close_null_count": null_count,
+        "rows": [
+            {
+                "date": r[0].isoformat(),
+                "close": r[1],
+                "adj_close": r[2],
+                "volume": r[3],
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.get("/cache/clear")
+def admin_cache_clear(request: Request):
+    """強制清掉 in-memory rendered-HTML cache。
+
+    用例:剛跑完 backfill,等 60-300s TTL 太慢 → 點此一次清乾淨。
+    """
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
+
+    from app.routers.pages import _ENDPOINT_CACHE
+    n = len(_ENDPOINT_CACHE)
+    _ENDPOINT_CACHE.clear()
+    logger.info("[admin] cache cleared by admin (%d entries)", n)
+    return {"cleared_entries": n}
+
+
 @router.get("/yearly_returns/backfill")
 def trigger_yearly_returns_backfill(request: Request):
     """手動觸發 etf_yearly_returns 全 80 支 backfill(免等 04:00 cron)。
