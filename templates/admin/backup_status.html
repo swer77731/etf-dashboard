@@ -13,21 +13,57 @@
   <p class="text-sm text-muted">每天 04:00、15:00 自動備份 etf.db 到 GitHub 私人 repo。</p>
 </section>
 
-{# === 最後一次成功備份(Hero) === #}
+{# === 觸發提示 banner === #}
+{% if triggered == '1' %}
+  <div class="mb-4 px-4 py-3 rounded-md text-sm flex items-start gap-2"
+       style="background:#064e3b40; border:1px solid #047857aa; color:#a7f3d0;">
+    <span class="text-base leading-none mt-0.5">✅</span>
+    <div>
+      <div class="font-semibold text-fg">備份已觸發</div>
+      <div class="text-xs mt-0.5">請等 30~60 秒後重新整理此頁查看結果(備份在背景執行中)</div>
+    </div>
+  </div>
+{% elif triggered == 'throttled' %}
+  <div class="mb-4 px-4 py-3 rounded-md text-sm flex items-start gap-2"
+       style="background:#7f1d1d40; border:1px solid #b91c1c80; color:#fecaca;">
+    <span class="text-base leading-none mt-0.5">⚠️</span>
+    <div>
+      <div class="font-semibold text-fg">60 秒內已觸發過備份</div>
+      <div class="text-xs mt-0.5">請稍候再試,避免重複洗 GitHub API</div>
+    </div>
+  </div>
+{% endif %}
+
+{# === 最後一次成功備份(Hero)+ 立刻備份按鈕 === #}
 <section class="card mb-5 px-5 py-5"
          style="border-left: 4px solid {% if summary.stale %}#ef4444{% else %}#10b981{% endif %};">
-  <div class="text-xs text-muted mb-1">最後一次成功備份</div>
-  {% if summary.last_success_at %}
-    <div class="text-xl sm:text-2xl font-semibold num">
-      {{ summary.last_success_at.isoformat(timespec='seconds')|replace('T', ' ') }}
-      <span class="text-base text-muted ml-2">(世界時)</span>
+  <div class="flex items-start justify-between gap-3 flex-wrap">
+    <div class="flex-1 min-w-0">
+      <div class="text-xs text-muted mb-1">最後一次成功備份</div>
+      {% if summary.last_success_at %}
+        <div class="text-xl sm:text-2xl font-semibold num break-all">
+          {{ summary.last_success_at.isoformat(timespec='seconds')|replace('T', ' ') }}
+          <span class="text-base text-muted ml-2">(世界時)</span>
+        </div>
+        <div class="text-sm mt-1 {% if summary.stale %}text-up{% else %}text-down{% endif %}">
+          {{ summary.last_success_human }}
+        </div>
+      {% else %}
+        <div class="text-xl sm:text-2xl font-semibold text-muted">尚無備份紀錄</div>
+      {% endif %}
     </div>
-    <div class="text-sm mt-1 {% if summary.stale %}text-up{% else %}text-down{% endif %}">
-      {{ summary.last_success_human }}
-    </div>
-  {% else %}
-    <div class="text-xl sm:text-2xl font-semibold text-muted">尚無備份紀錄</div>
-  {% endif %}
+
+    {# 立刻備份按鈕(form POST,RWD — flex-wrap 在窄螢幕會自然換行到下一列)#}
+    <form method="POST" action="/admin/backup/trigger" class="flex-shrink-0">
+      <button type="submit"
+              class="px-4 py-2 rounded-md text-sm font-semibold transition
+                     bg-accent text-white hover:opacity-90
+                     focus:outline-none focus:ring-2 focus:ring-accent/50
+                     min-h-[40px]">
+        立刻備份
+      </button>
+    </form>
+  </div>
 
   {% if summary.stale %}
     <div class="mt-3 px-3 py-2 rounded-md text-sm"

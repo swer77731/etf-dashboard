@@ -14,6 +14,8 @@
 from __future__ import annotations
 
 import logging
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Form, HTTPException, Request
@@ -394,13 +396,21 @@ async def handle_error_report(
 
 # ─────────────────────────────────────────────────────────────
 # /admin/backup/status — 資料庫備份監控
+# /admin/backup/trigger — 手動觸發(60 秒限流 + 背景 thread)
 # ─────────────────────────────────────────────────────────────
 
+# In-memory 限流(Zeabur 單 worker 夠用,不需 Redis)
+_BACKUP_TRIGGER_COOLDOWN_SEC = 60
+_last_backup_trigger_at: float = 0.0
+_backup_trigger_lock = threading.Lock()
+
+
 @router.get("/backup/status", response_class=HTMLResponse)
-async def backup_status_page(request: Request):
+async def backup_status_page(request: Request, triggered: str | None = None):
     """資料庫備份狀態 — 顯示最近 7 次備份 + 失敗警示。
 
     最後成功備份超過 25 小時 → 紅色警示「備份異常,請檢查」。
+    triggered 參數:'1' = 剛觸發,'throttled' = 60 秒限流命中。
     """
     redirect = _require_admin(request)
     if redirect is not None:
@@ -434,14 +444,59 @@ async def backup_status_page(request: Request):
     summary = _backup_status_summary()
     is_admin, user = _is_site_admin(request)
 
+    # triggered 只接受白名單值,避免反射型 XSS / 雜訊
+    triggered_value = triggered if triggered in ("1", "throttled") else None
+
     return templates.TemplateResponse(
         request, "admin/backup_status.html",
         _admin_ctx(
             request,
             items=items,
             summary=summary,
+            triggered=triggered_value,
             current_user=user,
         ),
+    )
+
+
+@router.post("/backup/trigger")
+async def trigger_backup(request: Request):
+    """手動觸發備份 — 60 秒限流 + 背景 thread 跑(避免 Zeabur 30s timeout)。
+
+    成功觸發 → 303 redirect /admin/backup/status?triggered=1
+    限流命中 → 303 redirect /admin/backup/status?triggered=throttled
+    """
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
+
+    global _last_backup_trigger_at
+    now = time.monotonic()
+    with _backup_trigger_lock:
+        if now - _last_backup_trigger_at < _BACKUP_TRIGGER_COOLDOWN_SEC:
+            return RedirectResponse(
+                url="/admin/backup/status?triggered=throttled",
+                status_code=303,
+            )
+        _last_backup_trigger_at = now
+
+    def _run_in_background():
+        try:
+            from scripts.backup_to_github import run_backup
+            run_backup()
+        except Exception:
+            logger.exception("[manual_backup] failed")
+
+    threading.Thread(
+        target=_run_in_background,
+        name="manual-backup",
+        daemon=True,
+    ).start()
+    logger.info("[manual_backup] triggered by admin")
+
+    return RedirectResponse(
+        url="/admin/backup/status?triggered=1",
+        status_code=303,
     )
 
 
