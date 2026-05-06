@@ -98,7 +98,67 @@
     .list-day-li > * { width: 100%; }
     .list-day-li-cash { text-align: left !important; }
   }
+
+  /* 手機直向 — list 卡片進一步緊湊化(避免 23 支翻太久)*/
+  @media (max-width: 767px) and (orientation: portrait) {
+    .list-day-header {
+      padding: 0.4rem 0.6rem;
+      margin-top: 0.6rem;
+      font-size: 1rem !important;
+    }
+    .list-day-li {
+      padding-top: 0.6rem !important;
+      padding-bottom: 0.6rem !important;
+      gap: 0.25rem !important;
+    }
+  }
+
+  /* === 手機直向自動切列表 — RWD 修(2026-05-06)=== */
+  /* 月曆有 7 欄硬擠在 380px 寬度內每格只 50px 放不下 ETF 編號,
+     直向手機強制切列表;切換按鈕也藏起來避免使用者誤切回月曆 */
+  @media (max-width: 767px) and (orientation: portrait) {
+    .js-mode-toggle { display: none !important; }
+  }
+
+  /* 提示橫幅 — Alpine 控制「是否 dismissed」,CSS 控制「viewport 是否該顯示」
+     用 :not(.is-dismissed) 避開 Alpine x-show 與 media query 衝突 */
+  .mobile-list-hint { display: none; }
+  @media (max-width: 767px) and (orientation: portrait) {
+    .mobile-list-hint:not(.is-dismissed) {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      justify-content: space-between;
+    }
+  }
 </style>
+
+{# Early redirect — head 區塊提早跑,避免月曆閃現後再 redirect #}
+<script>
+  (function () {
+    var KEY = 'dividend_cal_view';
+    var url = new URL(window.location.href);
+    var currentMode = url.searchParams.get('mode') || 'cal';
+    var mqPortrait = window.matchMedia('(max-width: 767px) and (orientation: portrait)');
+
+    // 1. 手機直向 — 強制 list,**忽略 localStorage**(這次 RWD bug 的修法)
+    if (mqPortrait.matches && currentMode !== 'list') {
+      url.searchParams.set('mode', 'list');
+      window.location.replace(url.toString());
+      return;
+    }
+
+    // 2. 桌面 / 平板 / 手機橫向 — 維持原本 localStorage 偏好邏輯
+    if (!mqPortrait.matches) {
+      var userPref = null;
+      try { userPref = localStorage.getItem(KEY); } catch (e) {}
+      if (userPref && userPref !== currentMode && (userPref === 'cal' || userPref === 'list')) {
+        url.searchParams.set('mode', userPref);
+        window.location.replace(url.toString());
+      }
+    }
+  })();
+</script>
 {% endblock %}
 
 {% block content %}
@@ -140,8 +200,8 @@
     {% endif %}
   </div>
 
-  {# 模式切換 #}
-  <div class="flex gap-2">
+  {# 模式切換(手機直向時整組隱藏 — class js-mode-toggle 由 CSS media query 控制)#}
+  <div class="flex gap-2 js-mode-toggle">
     <a href="/dividend-calendar?ym={{ '%04d-%02d'|format(year, month) }}&mode=cal"
        class="px-4 py-2 rounded-md text-sm sm:text-base border transition
               {% if mode == 'cal' %}bg-accent text-white border-accent font-semibold
@@ -219,6 +279,21 @@
 
 {% else %}
 {# === 列表模式 === #}
+
+{# 手機直向 RWD 提示 — 只當畫面是手機直向且使用者沒按 ✕ 才出現
+   (CSS media query 控制 viewport 顯隱,Alpine 控制 dismissed 狀態) #}
+<div x-data="{ dismissed: (function(){ try { return localStorage.getItem('calendar_mobile_hint_dismissed') === '1'; } catch (e) { return false; } })() }"
+     :class="{ 'is-dismissed': dismissed }"
+     class="mobile-list-hint mb-3 px-3 py-2 rounded-md text-xs"
+     style="background: rgb(var(--c-bg-soft)); border: 1px solid rgb(var(--c-border)); color: rgb(var(--c-muted));">
+  <span>📱 手機直向已自動切換為列表模式,橫向手機可看完整月曆</span>
+  <button type="button"
+          @click="dismissed = true; try { localStorage.setItem('calendar_mobile_hint_dismissed','1'); } catch (e) {}"
+          aria-label="關閉提示"
+          class="text-base leading-none px-1 hover:opacity-100 opacity-70 cursor-pointer flex-shrink-0"
+          style="background: transparent; border: none; color: inherit;">✕</button>
+</div>
+
 <section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7">
   <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
   <div class="card-content">
@@ -286,36 +361,16 @@
   未來除息日依 ETF 發行商最新公告為準
 </section>
 
-{# === 手機自動切列表 + localStorage 記憶使用者選擇 === #}
+{# === 點月曆/列表 button → 記住偏好(redirect 邏輯已移到 head 提早跑)=== #}
 <script>
   (function () {
     var KEY = 'dividend_cal_view';
-    var url = new URL(window.location.href);
-    var currentMode = url.searchParams.get('mode') || 'cal';
-    var userPref = null;
-    try { userPref = localStorage.getItem(KEY); } catch (e) { /* 私密模式忽略 */ }
-    var isMobile = window.matchMedia('(max-width: 640px)').matches;
-
-    // 1. user 點月曆/列表 button → 記到 localStorage(視為明確偏好)
     document.querySelectorAll('a[href*="mode=cal"], a[href*="mode=list"]').forEach(function (a) {
       a.addEventListener('click', function () {
         var m = a.href.indexOf('mode=cal') >= 0 ? 'cal' : 'list';
-        try { localStorage.setItem(KEY, m); } catch (e) { /* ignore */ }
+        try { localStorage.setItem(KEY, m); } catch (e) { /* private mode ignore */ }
       });
     });
-
-    // 2. 手機第一次進來、無偏好、目前是 cal → 自動 redirect 到 list
-    if (!userPref && isMobile && currentMode === 'cal') {
-      url.searchParams.set('mode', 'list');
-      window.location.replace(url.toString());
-      return;
-    }
-
-    // 3. user 有明確偏好但 URL 不符 → 一次 redirect 到偏好(跨裝置一致)
-    if (userPref && userPref !== currentMode && (userPref === 'cal' || userPref === 'list')) {
-      url.searchParams.set('mode', userPref);
-      window.location.replace(url.toString());
-    }
   })();
 </script>
 
