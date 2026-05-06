@@ -225,20 +225,8 @@ def _build_index_payload() -> dict:
             logger.exception("[index] category %s failed", cat_code)
             sections.append({"kind": "category", "category": cat_code, "title": cat_label, "data": None})
 
-    for direction, kind, title in [
-        ("positive", "leverage_pos", "槓桿型(高風險)"),
-        ("inverse",  "leverage_neg", "反向型(高風險)"),
-    ]:
-        try:
-            sections.append({
-                "kind": kind,
-                "category": kind,
-                "title": title,
-                "data": ranking.get_leverage_ranking("3m", direction, limit=5),
-            })
-        except Exception:
-            logger.exception("[index] leverage %s failed", direction)
-            sections.append({"kind": kind, "category": kind, "title": title, "data": None})
+    # 2026-05-06 拿掉首頁槓桿/反向 sections,首頁只留主動 / 市值 / 高股息 + 近月最火
+    # /ranking/leverage 與 /ranking/inverse 路由仍保留(從 nav / 直接打網址可進)
 
     # Phase 1B 配息公布欄 — 未來 14 天「即將除息」
     try:

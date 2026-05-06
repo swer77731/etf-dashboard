@@ -226,12 +226,18 @@ def _index_period_return(session, period_start: date) -> float | None:
 
 
 def get_market_overview(today: date | None = None) -> dict:
-    """頂部「市場概況」卡片 — 大盤 TAIEX 即時點位 + 1m / 3m / YTD 報酬。
+    """頂部「市場概況」卡片 — 大盤 TAIEX 收盤點位 + 今日漲跌(對前一日)+ 1m / 3m / YTD 報酬。
 
     用一個地方取代每個排行 section 的「對照大盤」,符合 user 要求的統一原則。
     """
     today = today or date.today()
-    out: dict = {"taiex_close": None, "taiex_date": None, "returns": {}}
+    out: dict = {
+        "taiex_close": None,
+        "taiex_date": None,
+        "today_change_pts": None,    # 跟前一日點數差
+        "today_change_pct": None,    # 跟前一日百分比
+        "returns": {},
+    }
 
     with session_scope() as session:
         taiex = session.scalar(select(ETF).where(ETF.code == TAIEX_CODE))
@@ -247,6 +253,12 @@ def get_market_overview(today: date | None = None) -> dict:
         if last:
             out["taiex_date"] = last[0].isoformat()
             out["taiex_close"] = last[1]
+
+            # 今日漲跌 = 對前一個交易日(同 _prev_close 邏輯)
+            prev = _prev_close(session, taiex.id, last[0])
+            if prev and prev > 0:
+                out["today_change_pts"] = last[1] - prev
+                out["today_change_pct"] = (last[1] / prev - 1) * 100
 
         for key in ("1m", "3m", "ytd"):
             ps = _start_date_for(key, today)

@@ -34,33 +34,50 @@
   <div class="text-xs sm:text-sm text-muted tracking-[0.3em] font-medium">{{ brand_en }}</div>
 </section>
 
-{# === 市場概況(TAIEX 大盤一處呈現) === #}
+{# === 市場概況(TAIEX 大盤超大字 + 今日漲跌)=== #}
 {% if market and market.taiex_close %}
 <section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7">
   <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
 
   <div class="card-content">
-    <header class="mb-5 flex items-baseline justify-between gap-4 flex-wrap">
-      <div class="flex items-center gap-3">
-        <div class="w-1 h-7 bg-accent rounded-full" style="box-shadow: 0 0 8px var(--c-accent-glow);"></div>
-        <div>
-          <h2 class="text-xl sm:text-2xl font-semibold">市場概況</h2>
-          <div class="text-sm text-muted mt-1">大盤(TAIEX)收盤點位與各期間漲跌</div>
-        </div>
-      </div>
-      <div class="text-xs sm:text-sm text-muted num">截至 {{ market.taiex_date }}</div>
+    <header class="mb-4 flex items-baseline gap-3 flex-wrap">
+      <div class="w-1 h-6 bg-accent rounded-full" style="box-shadow: 0 0 8px var(--c-accent-glow);"></div>
+      <h2 class="text-lg sm:text-xl font-semibold">大盤(TAIEX)</h2>
     </header>
 
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-      <div class="bg-bg-soft border border-border rounded-lg p-4 transition hover:border-accent/40">
-        <div class="text-xs sm:text-sm text-muted mb-1">大盤收盤</div>
-        <div class="text-xl sm:text-2xl font-semibold num text-fg">{{ "%.2f"|format(market.taiex_close) }}</div>
+    {# 主視覺:超大點位 + 今日漲跌(紅漲綠跌)#}
+    {% set chg_pts = market.today_change_pts %}
+    {% set chg_pct = market.today_change_pct %}
+    {% set chg_class = (
+        'text-up'   if (chg_pct is not none and chg_pct > 0) else
+        ('text-down' if (chg_pct is not none and chg_pct < 0) else 'text-muted')
+    ) %}
+    {% set chg_arrow = (
+        '▲' if (chg_pct is not none and chg_pct > 0) else
+        ('▼' if (chg_pct is not none and chg_pct < 0) else '—')
+    ) %}
+    <div class="text-center sm:text-left mb-5 sm:mb-6">
+      <div class="num font-bold leading-none tracking-tight text-fg taiex-hero">
+        {{ "%.2f"|format(market.taiex_close) }}
       </div>
+      {% if chg_pct is not none %}
+        <div class="num font-semibold mt-2 sm:mt-3 {{ chg_class }} text-xl sm:text-2xl">
+          <span class="mr-1">{{ chg_arrow }}</span>
+          {%- if chg_pts > 0 -%}+{%- endif -%}{{ "%.2f"|format(chg_pts) }}
+          <span class="ml-2">
+            ({%- if chg_pct > 0 -%}+{%- endif -%}{{ "%.2f"|format(chg_pct) }}%)
+          </span>
+        </div>
+      {% endif %}
+    </div>
+
+    {# 期間漲跌:3 格小卡,當配角 #}
+    <div class="grid grid-cols-3 gap-2 sm:gap-3">
       {% for key in ["1m", "3m", "ytd"] %}
         {% set r = market.returns[key] %}
-        <div class="bg-bg-soft border border-border rounded-lg p-4 transition hover:border-accent/40">
-          <div class="text-xs sm:text-sm text-muted mb-1">{{ r.label }}</div>
-          <div class="text-xl sm:text-2xl font-semibold num
+        <div class="bg-bg-soft border border-border rounded-lg p-3 sm:p-4 text-center sm:text-left">
+          <div class="text-xs text-muted mb-1">{{ r.label }}</div>
+          <div class="text-base sm:text-lg font-semibold num
             {% if r.value is none %}text-muted
             {% elif r.value > 0 %}text-up
             {% elif r.value < 0 %}text-down
@@ -73,10 +90,23 @@
         </div>
       {% endfor %}
     </div>
+
+    <div class="text-xs text-muted mt-4 text-center sm:text-left">
+      ※ 收盤資料 · 截至 <span class="num">{{ market.taiex_date }}</span>
+    </div>
   </div>
 
   <div class="card-watermark">ETF Watch</div>
 </section>
+<style>
+  /* 大盤點位超大字(紀律 #19 設計核心:大一點點 + 視覺主角)
+     手機 380px 寬要塞下 41,138.85 = 8 字元 + 等寬 → text-5xl(48px)約撐住,
+     大螢幕拉到 text-7xl(72px)當主視覺 */
+  .taiex-hero { font-size: 3rem; }                /* 48px = text-5xl */
+  @media (min-width: 480px) { .taiex-hero { font-size: 3.75rem; } }   /* 60px */
+  @media (min-width: 640px) { .taiex-hero { font-size: 4.5rem; } }    /* 72px */
+  @media (min-width: 1024px) { .taiex-hero { font-size: 5rem; } }     /* 80px */
+</style>
 {% endif %}
 
 {# === Phase 1B 配息公布欄 === #}
