@@ -483,9 +483,11 @@ def _month_range(year: int, month: int) -> tuple[date, date, int, int]:
     return first, last, year, month
 
 
-def _build_dividend_calendar_payload(year: int, month: int, today: date) -> dict:
-    """Heavy compute for /dividend-calendar — get_dividends_in_range + 月曆網格組裝。"""
-    import calendar as _cal
+def _build_dividend_calendar_payload(year: int, month: int) -> dict:
+    """Heavy compute for /dividend-calendar — events 按日期分組。
+
+    2026-05-06 純列表化:不再算 6×7 月曆網格,events_by_day 給列表分組顯示用。
+    """
     first, last, _, _ = _month_range(year, month)
 
     try:
@@ -498,26 +500,7 @@ def _build_dividend_calendar_payload(year: int, month: int, today: date) -> dict
     for e in events:
         events_by_day.setdefault(e["ex_date"], []).append(e)
 
-    cal = _cal.Calendar(firstweekday=6)
-    weeks: list[list[dict | None]] = []
-    for week in cal.monthdatescalendar(year, month):
-        row: list[dict | None] = []
-        for day in week:
-            if day.month != month:
-                row.append(None)
-                continue
-            iso = day.isoformat()
-            row.append({
-                "iso": iso,
-                "day": day.day,
-                "is_today": (day == today),
-                "weekday": day.weekday(),
-                "events": events_by_day.get(iso, []),
-            })
-        weeks.append(row)
-
     return {
-        "weeks": weeks,
         "events": events,
         "events_by_day": events_by_day,
         "total_events": len(events),
@@ -528,19 +511,18 @@ def _build_dividend_calendar_payload(year: int, month: int, today: date) -> dict
 async def dividend_calendar(
     request: Request,
     ym: str | None = None,
-    mode: str = "cal",
 ) -> HTMLResponse:
-    """配息日曆 — 月曆 / 列表雙模式(Phase 3)。
+    """配息日曆 — 純列表版(Phase 3)。
 
-    URL: /dividend-calendar?ym=2026-04&mode=cal
-    mode: cal(月曆) / list(列表)
-    TTL=60s rendered-HTML cache — 月曆網格 6×7 × 多 events render 偏重。
-    Key 含 today_iso → 跨日「is_today」紅框自動失效。
+    2026-05-06 月曆模式拿掉(7 欄硬擠在手機 380px 寬讀不出來),改純列表。
+    舊書籤的 ?mode=cal / ?mode=list 仍能進此頁(額外 query 被 FastAPI 忽略)。
+
+    URL: /dividend-calendar?ym=2026-04
+    TTL=300s rendered-HTML cache。Key 含 today_iso → 跨日「· 今天」標記自動失效。
     """
     today = date.today()
     today_iso = today.isoformat()
     year, month = _parse_ym(ym, today)
-    mode_norm = mode if mode in ("cal", "list") else "cal"
     prev_y, prev_m = (year - 1, 12) if month == 1 else (year, month - 1)
     next_y, next_m = (year + 1, 1) if month == 12 else (year, month + 1)
 
@@ -549,8 +531,7 @@ async def dividend_calendar(
             **_common_ctx(request),
             "year": year,
             "month": month,
-            "mode": mode_norm,
-            **_build_dividend_calendar_payload(year, month, today),
+            **_build_dividend_calendar_payload(year, month),
             "prev_ym": f"{prev_y:04d}-{prev_m:02d}",
             "next_ym": f"{next_y:04d}-{next_m:02d}",
             "today_ym": f"{today.year:04d}-{today.month:02d}",
@@ -560,7 +541,7 @@ async def dividend_calendar(
         }
 
     return _render_cached(
-        ("div_cal_html", year, month, mode_norm, today_iso),
+        ("div_cal_html", year, month, today_iso),
         "dividend_calendar.html",
         _build,
         ttl=300.0,   # 5 分鐘 — 配息日曆內容只有除息日當天有效,變動慢
