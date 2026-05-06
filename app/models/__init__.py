@@ -12,3 +12,4 @@ from app.models.user import User  # noqa: F401
 from app.models.error_report import ErrorReport  # noqa: F401
 from app.models.etf_beneficial_count import EtfBeneficialCount  # noqa: F401
 from app.models.etf_aum import EtfAum  # noqa: F401
+from app.models.backup_log import BackupLog  # noqa: F401

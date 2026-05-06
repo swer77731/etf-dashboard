@@ -80,6 +80,54 @@ def _pending_error_reports_count() -> int:
         ) or 0
 
 
+def _backup_status_summary() -> dict:
+    """analytics 入口卡用 — 最後一次成功備份時間 / 是否異常。
+
+    回:{
+        last_success_at: datetime | None,
+        last_success_human: '2 小時前' / '尚無紀錄',
+        stale: bool,                 # 超過 25 小時沒成功 = 異常
+        last_status: 'success'/'failed'/None  (最後一筆,不論成敗)
+    }
+    """
+    from app.database import session_scope
+    from app.models.backup_log import BackupLog
+    with session_scope() as s:
+        last_success = s.scalars(
+            select(BackupLog)
+            .where(BackupLog.status == "success")
+            .order_by(desc(BackupLog.backup_at)).limit(1)
+        ).first()
+        last_any = s.scalars(
+            select(BackupLog)
+            .order_by(desc(BackupLog.backup_at)).limit(1)
+        ).first()
+        ts = last_success.backup_at if last_success else None
+        last_status = last_any.status if last_any else None
+    now_utc = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    if ts is None:
+        return {
+            "last_success_at": None,
+            "last_success_human": "尚無紀錄",
+            "stale": True,
+            "last_status": last_status,
+        }
+    delta = now_utc - ts
+    hours = delta.total_seconds() / 3600
+    if hours < 1:
+        human = f"{int(delta.total_seconds() / 60)} 分鐘前"
+    elif hours < 48:
+        human = f"{int(hours)} 小時前"
+    else:
+        human = f"{int(hours / 24)} 天前"
+    return {
+        "last_success_at": ts,
+        "last_success_human": human,
+        "stale": hours > 25,
+        "last_status": last_status,
+    }
+
+
 def _is_site_admin(request: Request) -> tuple[bool, dict | None]:
     """檢查 request.state.user(由 CurrentUserMiddleware 注入)是否為站長。
 
@@ -229,6 +277,7 @@ async def analytics_page(request: Request, range_days: int = 7):
     visits = admin_analytics.recent_visits(limit=100)
     member_stats = _member_stats()   # 會員註冊統計(2026-05-02 併入)
     pending_reports = _pending_error_reports_count()  # nav 入口顯示待處理筆數
+    backup_summary = _backup_status_summary()         # 備份狀態卡入口用
 
     return templates.TemplateResponse(
         request, "admin/analytics.html",
@@ -247,6 +296,7 @@ async def analytics_page(request: Request, range_days: int = 7):
             visits=visits,
             members=member_stats,
             pending_reports_count=pending_reports,
+            backup_summary=backup_summary,
             current_user=user,
         ),
     )
@@ -340,6 +390,59 @@ async def handle_error_report(
         rec.handled_note = (note or "").strip()[:1000] or None
 
     return RedirectResponse(url="/admin/error-reports?tab=pending", status_code=303)
+
+
+# ─────────────────────────────────────────────────────────────
+# /admin/backup/status — 資料庫備份監控
+# ─────────────────────────────────────────────────────────────
+
+@router.get("/backup/status", response_class=HTMLResponse)
+async def backup_status_page(request: Request):
+    """資料庫備份狀態 — 顯示最近 7 次備份 + 失敗警示。
+
+    最後成功備份超過 25 小時 → 紅色警示「備份異常,請檢查」。
+    """
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
+
+    from app.database import session_scope
+    from app.models.backup_log import BackupLog
+
+    with session_scope() as s:
+        rows = s.scalars(
+            select(BackupLog)
+            .order_by(desc(BackupLog.backup_at))
+            .limit(7)
+        ).all()
+        items = [
+            {
+                "id": r.id,
+                "backup_at": r.backup_at.isoformat(timespec="seconds") if r.backup_at else "",
+                "backup_type": r.backup_type or "—",
+                "file_path": r.file_path or "—",
+                "file_size_kb": (
+                    f"{r.file_size_bytes / 1024:.1f}" if r.file_size_bytes else "—"
+                ),
+                "duration": f"{r.duration_seconds:.1f}" if r.duration_seconds is not None else "—",
+                "status": r.status,
+                "error_message": r.error_message,
+            }
+            for r in rows
+        ]
+
+    summary = _backup_status_summary()
+    is_admin, user = _is_site_admin(request)
+
+    return templates.TemplateResponse(
+        request, "admin/backup_status.html",
+        _admin_ctx(
+            request,
+            items=items,
+            summary=summary,
+            current_user=user,
+        ),
+    )
 
 
 # Debug endpoint — 即時觸發日報(只給已登入 admin 用)

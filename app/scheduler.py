@@ -12,6 +12,9 @@
                   抓最近 2 週覆寫,FinMind 該 dataset 約週末釋出該週交易日資料
 - 每月 5 號 03:00: ETF 規模月更(aum_sync.sync_latest_month)
                   SITCA 月報 1-5 號公告上月,5 號抓最穩
+- 每天 04:00/15:00: DB 備份(scripts/backup_to_github.py)
+                   推 email-hashed etf.db.gz 到 GitHub 私人 repo,
+                   每月 1 號 + 每年 1/1 額外存 monthly/yearly 永久檔
 
 每個 sync 內已落實紀律 #20(record_sync_attempt + missing 清單)。
 若 sync 跑完 missing 不為空,scheduler 會 5 分鐘後 one-shot retry 一次,
@@ -62,6 +65,7 @@ _locks: dict[str, threading.Lock] = {
     "yearly_returns": threading.Lock(),
     "beneficial": threading.Lock(),
     "aum": threading.Lock(),
+    "backup": threading.Lock(),
 }
 
 # 5 分鐘後 retry 用 — APScheduler 有 max_instances=1 + coalesce 防併發
@@ -329,6 +333,31 @@ def yearly_returns_job() -> None:
         _release("yearly_returns")
 
 
+def backup_job() -> None:
+    """每天 04:00 / 15:00 (Taipei) — etf.db 備份到 GitHub 私人 repo。
+
+    腳本內已有 try/except 把錯誤吞下,所以這層只負責 lock + log。
+    每月 1 號 / 每年 1/1 由腳本自己決定要不要多上 monthly/ yearly/(看當天日期)。
+    """
+    if not _try_lock("backup"):
+        return
+    try:
+        logger.info("[backup_job] start")
+        # 延遲 import 避免 startup 時 httpx 多載一份
+        from scripts.backup_to_github import run_backup
+        result = run_backup()
+        ok_count = sum(1 for u in result.get("uploads", []) if u.get("status") == "success")
+        fail_count = sum(1 for u in result.get("uploads", []) if u.get("status") != "success")
+        logger.info(
+            "[backup_job] done — ok=%s, uploads_success=%d, uploads_failed=%d",
+            result.get("ok"), ok_count, fail_count,
+        )
+    except Exception:
+        logger.exception("[backup_job] failed")
+    finally:
+        _release("backup")
+
+
 def analytics_cleanup_job() -> None:
     """每天 03:00 (Taipei) 刪 90 天前的 analytics / search / compare / online_snapshots。"""
     if not _try_lock("analytics_cleanup"):
@@ -440,6 +469,13 @@ def start_scheduler() -> AsyncIOScheduler:
         # 03:00 已被 analytics_cleanup_daily 占,挪 04:00 真正避開
         ("yearly_returns_daily", yearly_returns_job,
          CronTrigger(hour=4, minute=0, timezone=tz)),
+        # 每天 04:00 / 15:00 — DB 備份到 GitHub 私人 repo(scripts/backup_to_github.py)
+        # 04:00 同時段有 yearly_returns_daily,但兩者各自 lock 不衝突
+        # backup 自己處理 monthly / yearly 分支(每月 1 號 / 每年 1/1)
+        ("backup_morning", backup_job,
+         CronTrigger(hour=4, minute=0, timezone=tz)),
+        ("backup_afternoon", backup_job,
+         CronTrigger(hour=15, minute=0, timezone=tz)),
     ]
 
     for job_id, fn, trig in jobs:

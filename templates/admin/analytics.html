@@ -19,6 +19,12 @@
     {% endif %}
   </a>
   <span class="text-muted">|</span>
+  <a href="/admin/backup/status" class="text-muted hover:text-fg transition">
+    備份狀態{% if backup_summary and backup_summary.stale %}
+      <span class="ml-1 num text-up">⚠</span>
+    {% endif %}
+  </a>
+  <span class="text-muted">|</span>
   <a href="/admin/send_daily_report" class="text-muted hover:text-fg transition" title="即時推一次今日 TG 日報">推送日報</a>
 {% endblock %}
 
@@ -77,6 +83,43 @@
     (依「近 30 天尖峰」決定)
   </div>
 </section>
+
+{# === 資料庫備份狀態(2026-05-06 加)=== #}
+{% if backup_summary is defined and backup_summary %}
+<a href="/admin/backup/status" class="block mb-5 group">
+  <section class="card p-4 transition group-hover:bg-card-hi"
+           style="border-left: 4px solid {% if backup_summary.stale %}#ef4444{% else %}#10b981{% endif %};">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <div>
+        <h2 class="text-base font-semibold flex items-center gap-2">
+          <span>💾 資料庫備份</span>
+          {% if backup_summary.stale %}
+            <span class="text-xs px-2 py-0.5 rounded text-up"
+                  style="background:#7f1d1d40; border:1px solid #b91c1c80;">
+              ⚠️ 異常
+            </span>
+          {% else %}
+            <span class="text-xs px-2 py-0.5 rounded text-down"
+                  style="background:#064e3b40; border:1px solid #047857aa;">
+              正常
+            </span>
+          {% endif %}
+        </h2>
+        <p class="text-sm text-muted mt-1">
+          最後成功備份:
+          {% if backup_summary.last_success_at %}
+            <span class="num text-fg/85">{{ backup_summary.last_success_at.isoformat(timespec='minutes')|replace('T', ' ') }}</span>
+            <span class="ml-2 {% if backup_summary.stale %}text-up{% else %}text-down{% endif %}">{{ backup_summary.last_success_human }}</span>
+          {% else %}
+            <span class="text-muted">尚無紀錄</span>
+          {% endif %}
+        </p>
+      </div>
+      <span class="text-sm text-muted group-hover:text-fg transition">查看詳情 →</span>
+    </div>
+  </section>
+</a>
+{% endif %}
 
 {# === 會員註冊(2026-05-02 從 /admin 併入)=== #}
 {% if members is defined and members %}
