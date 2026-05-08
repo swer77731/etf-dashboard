@@ -51,6 +51,7 @@ IGNORED_FILE = DATA_DIR / "audit_ignored.json"
 HISTORY_RETAIN_DAYS = 30
 MAX_FIX_ATTEMPTS = 3
 MAX_FIXES_PER_RUN = 10   # 一輪 audit 最多自動修 N 個(避免撞 FinMind quota)
+_MAX_FINDINGS_JSON_BYTES = 1_000_000   # missing_items JSON 上限(SQLite TEXT 上限 1GB,1MB sanity)
 
 HISTORY_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -457,10 +458,23 @@ def _findings_from_json(s: str) -> list[Finding]:
 
 
 def _persist_to_sync_status(findings: list[Finding]) -> None:
-    """寫進 sync_status source='data_audit',missing_items 存 JSON list。"""
+    """寫進 sync_status source='data_audit',missing_items 存 JSON list。
+
+    紀律 #16(2026-05-08 修)— 之前 cap 設 64KB 過度防呆,causes 「資料健康狀態
+    全部正常」假象:當 findings 序列化超過 64KB(255 ETF × 多 check ≈ 100-200KB)
+    JSON 被切壞 → `_findings_from_json` parse 失敗 → admin UI 拿到空 list →
+    錯顯「全部正常」。SQLite TEXT 實際上限是 SQLITE_MAX_LENGTH(1GB),拉到
+    1MB 是極寬鬆的 sanity 保護(找到極端 bug 才會撞)。
+    """
     json_str = _findings_to_json(findings)
     todo_n = sum(1 for f in findings if f.status == "todo")
     fixed_n = sum(1 for f in findings if f.status == "fixed")
+    capped = json_str[:_MAX_FINDINGS_JSON_BYTES]
+    if len(json_str) > _MAX_FINDINGS_JSON_BYTES:
+        logger.warning(
+            "[audit] findings JSON %d bytes exceeds %d cap — truncated",
+            len(json_str), _MAX_FINDINGS_JSON_BYTES,
+        )
 
     # 直接走 raw SQL 因為 record_sync_attempt 不接受長 JSON
     from sqlalchemy import select as _sel
@@ -478,14 +492,14 @@ def _persist_to_sync_status(findings: list[Finding]) -> None:
                 rows_synced=len(findings),
                 retry_count=0,
                 missing_count=todo_n,
-                missing_items=json_str[:64000],   # cap to avoid bloat (Text field)
+                missing_items=capped,
             )
             s.add(row)
         else:
             row.last_attempt_at = now
             row.rows_synced = len(findings)
             row.missing_count = todo_n
-            row.missing_items = json_str[:64000]
+            row.missing_items = capped
             if todo_n == 0:
                 row.last_success_at = now
                 row.last_error = None
