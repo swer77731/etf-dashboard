@@ -166,6 +166,76 @@ def _detect_kbar_stale() -> list[Finding]:
     return out
 
 
+def _detect_etf_likely_delisted() -> list[Finding]:
+    """ETF 90 天無新 K 棒 + 曾經有過資料 → 疑似下市候選。
+
+    紀律 #21:不直接自動 inactive。只進待辦清單,由 admin 點「強制修」
+    觸發 _fix_etf_likely_delisted() 才實際 UPDATE is_active=False。
+    這層架在 kbar_stale(>7 天)之上,用 90 天當「絕對下市」門檻。
+    """
+    today = date.today()
+    threshold = today - timedelta(days=90)
+    out: list[Finding] = []
+    with session_scope() as s:
+        rows = s.execute(
+            select(
+                ETF.code, ETF.name, ETF.category,
+                func.max(DailyKBar.date).label("last_d"),
+                func.count(DailyKBar.id).label("kbar_count"),
+            )
+            .join(DailyKBar, DailyKBar.etf_id == ETF.id, isouter=True)
+            .where(ETF.is_active.is_(True))
+            .where(ETF.category != "index")
+            .group_by(ETF.code, ETF.name, ETF.category)
+        ).all()
+    now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    for code, name, cat, last_d, kbar_count in rows:
+        # 條件:有過 kbar(kbar_count > 0)+ 最後 K 棒 < 90 天前
+        # 沒過 kbar 的(全市場新發行 < 1 週的)不誤殺
+        if kbar_count == 0 or last_d is None:
+            continue
+        if last_d >= threshold:
+            continue
+        days_ago = (today - last_d).days
+        out.append(Finding(
+            id=f"etf_likely_delisted:{code}",
+            kind="etf_likely_delisted",
+            label="ETF 疑似下市(90 天無新 K 棒)",
+            severity="warn",
+            code=code,
+            detail=(
+                f"{code} {name} 最後 K 棒 {last_d} ({days_ago} 天前)"
+                f"— 強制修可自動標 inactive"
+            ),
+            auto_fixable=False,    # 不自動跑,需 admin 確認
+            created_at=now_iso,
+            metadata={
+                "name": name,
+                "last_kbar_date": last_d.isoformat(),
+                "days_ago": days_ago,
+                "category": cat,
+                "kbar_count": kbar_count,
+            },
+        ))
+    return out
+
+
+def _fix_etf_likely_delisted(finding: Finding) -> tuple[bool, str]:
+    """將 etf_list.is_active 設為 False。force_fix 才會跑。"""
+    code = finding.code
+    if not code:
+        return False, "no code"
+    try:
+        from sqlalchemy import update as _upd
+        with session_scope() as s:
+            r = s.execute(
+                _upd(ETF).where(ETF.code == code).values(is_active=False)
+            )
+            return r.rowcount > 0, f"set is_active=False (rows={r.rowcount})"
+    except Exception as e:
+        return False, f"{type(e).__name__}: {str(e)[:120]}"
+
+
 def _detect_dividend_pending_amount() -> list[Finding]:
     """配息已公告但 cash_dividend NULL 超過 30 天 — 應該重抓。"""
     today = date.today()
@@ -305,6 +375,16 @@ CHECKS: list[dict] = [
         "auto_fixable": True,
         "detect_fn": _detect_kbar_stale,
         "fix_fn": _fix_kbar_stale,
+    },
+    {
+        # 預埋:90 天無 K 棒 → 進「人工待辦」候選下市清單
+        # auto_fixable=False:不自動 inactive,需 admin 在 detail page 點「強制修復」
+        # 確認後才 UPDATE。force_fix 會用 fix_fn 即使 auto_fixable=False。
+        "id": "etf_likely_delisted",
+        "label": "ETF 疑似下市(90 天無新 K 棒)",
+        "auto_fixable": False,
+        "detect_fn": _detect_etf_likely_delisted,
+        "fix_fn": _fix_etf_likely_delisted,
     },
     {
         "id": "dividend_pending_amount",
