@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import logging
+import secrets
+import string
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Request
@@ -12,6 +14,20 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from app.auth.oauth import is_google_oauth_enabled, oauth
 from app.database import session_scope
 from app.models.user import User
+
+# Cookie 給前端 JS 讀取,拼分享連結 ?ref=XXX 用(非敏感,允許 JS 讀)
+_COOKIE_REF_CODE = "evw_my_ref"
+_REF_ALPHABET = string.ascii_uppercase + string.digits  # 36^6 = 2.18B
+
+
+def _gen_unique_ref_code(s) -> str:
+    """產 6 字元 [A-Z0-9],撞機率近 0;collision retry 20 次安全網。"""
+    for _ in range(20):
+        code = "".join(secrets.choice(_REF_ALPHABET) for _ in range(6))
+        dup = s.scalar(select(User).where(User.referral_code == code))
+        if not dup:
+            return code
+    raise RuntimeError("failed to gen unique referral_code after 20 tries")
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -62,6 +78,8 @@ async def google_callback(request: Request):
     now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
 
     # UPSERT — 同 google_id 第二次登入只更新 display_name / avatar_url / last_login_at
+    # 同時補洞:既有 user 沒 referral_code 補一個(2026-05-08 重做分享系統)
+    user_ref_code: str | None = None
     with session_scope() as s:
         existing = s.scalar(select(User).where(User.google_id == google_id))
         if existing:
@@ -69,8 +87,11 @@ async def google_callback(request: Request):
             existing.display_name = display_name
             existing.avatar_url = avatar_url
             existing.last_login_at = now
+            if not existing.referral_code:
+                existing.referral_code = _gen_unique_ref_code(s)
             s.flush()
             user_id = existing.id
+            user_ref_code = existing.referral_code
         else:
             new_user = User(
                 google_id=google_id,
@@ -78,10 +99,12 @@ async def google_callback(request: Request):
                 display_name=display_name,
                 avatar_url=avatar_url,
                 last_login_at=now,
+                referral_code=_gen_unique_ref_code(s),
             )
             s.add(new_user)
             s.flush()
             user_id = new_user.id
+            user_ref_code = new_user.referral_code
 
     # 紀律:log 只印 user_id,不印 email
     logger.info("[auth] login success user_id=%s", user_id)
@@ -89,8 +112,18 @@ async def google_callback(request: Request):
     # 寫進 session(SessionMiddleware 簽章後寫進 cookie)
     request.session["user_id"] = user_id
 
-    # 跳回首頁
-    return RedirectResponse(url="/", status_code=302)
+    # 跳回首頁 + 設 evw_my_ref cookie 給前端 JS 拼分享連結用(1 年)
+    # HttpOnly=False:JS 必須讀(referral_code 不是敏感 token)
+    resp = RedirectResponse(url="/", status_code=302)
+    if user_ref_code:
+        resp.set_cookie(
+            key=_COOKIE_REF_CODE,
+            value=user_ref_code,
+            max_age=365 * 24 * 3600,
+            samesite="lax",
+            httponly=False,
+        )
+    return resp
 
 
 @router.post("/logout")
@@ -99,4 +132,6 @@ async def logout(request: Request):
     user_id = request.session.pop("user_id", None)
     if user_id:
         logger.info("[auth] logout user_id=%s", user_id)
-    return RedirectResponse(url="/", status_code=302)
+    resp = RedirectResponse(url="/", status_code=302)
+    resp.delete_cookie(_COOKIE_REF_CODE, path="/")
+    return resp
