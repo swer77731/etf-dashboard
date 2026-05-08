@@ -53,7 +53,7 @@
       <summary class="px-4 py-3 cursor-pointer flex items-start gap-3 list-none
                       hover:bg-card-hi transition" style="user-select: none;">
         <span class="text-muted text-xs num flex-shrink-0 mt-0.5">
-          {{ item.created_at|replace('T', ' ') }}
+          {{ item.created_at|tw_time }}
         </span>
         <span class="text-accent text-xs num flex-shrink-0 mt-0.5 truncate max-w-[180px] sm:max-w-[260px]">
           {{ item.page_url }}
@@ -76,7 +76,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
           <div>
             <span class="text-muted">回報時間:</span>
-            <span class="num text-fg/80">{{ item.created_at|replace('T', ' ') }}(世界時)</span>
+            <span class="num text-fg/80">{{ item.created_at|tw_time }}(台灣)</span>
           </div>
           <div>
             <span class="text-muted">頁面網址:</span>
@@ -114,7 +114,7 @@
           <div class="pt-2 border-t border-border space-y-2">
             <div class="text-xs">
               <span class="text-muted">處理時間:</span>
-              <span class="num text-down">{{ item.handled_at|replace('T', ' ') if item.handled_at else '—' }}(世界時)</span>
+              <span class="num text-down">{{ (item.handled_at|tw_time) if item.handled_at else '—' }}(台灣)</span>
             </div>
             {% if item.handled_note %}
             <div>

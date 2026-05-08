@@ -72,13 +72,13 @@
       <td class="num font-mono">{{ finding.fix_attempts }} / 3</td>
     </tr>
     <tr class="border-b border-border">
-      <td class="py-2 text-muted">偵測時間(世界時)</td>
-      <td class="num font-mono text-xs">{{ finding.created_at }}</td>
+      <td class="py-2 text-muted">偵測時間(台灣)</td>
+      <td class="num font-mono text-xs">{{ finding.created_at|tw_time }}</td>
     </tr>
     {% if finding.ignored_until %}
     <tr class="border-b border-border">
-      <td class="py-2 text-muted">忽略到</td>
-      <td class="num font-mono">{{ finding.ignored_until }}</td>
+      <td class="py-2 text-muted">忽略到(台灣)</td>
+      <td class="num font-mono">{{ finding.ignored_until|tw_time('%Y-%m-%d %H:%M') }}</td>
     </tr>
     {% endif %}
   </table>

@@ -129,7 +129,7 @@
       {% endif %}
     </h2>
     {% if audit_summary.last_run_at %}
-      <span class="text-xs text-muted num">最後健檢:{{ audit_summary.last_run_at|replace('T', ' ') }}(世界時)</span>
+      <span class="text-xs text-muted num">最後健檢:{{ audit_summary.last_run_at|tw_time }}(台灣時間)</span>
     {% else %}
       <span class="text-xs text-muted">尚未跑過健檢</span>
     {% endif %}
@@ -236,7 +236,7 @@
         <p class="text-sm text-muted mt-1">
           最後成功備份:
           {% if backup_summary.last_success_at %}
-            <span class="num text-fg/85">{{ backup_summary.last_success_at.isoformat(timespec='minutes')|replace('T', ' ') }}</span>
+            <span class="num text-fg/85">{{ backup_summary.last_success_at|tw_time('%Y-%m-%d %H:%M') }}</span>
             <span class="ml-2 {% if backup_summary.stale %}text-up{% else %}text-down{% endif %}">{{ backup_summary.last_success_human }}</span>
           {% else %}
             <span class="text-muted">尚無紀錄</span>
@@ -295,7 +295,7 @@
           <tr class="text-xs text-muted uppercase tracking-wider border-b border-border">
             <th class="text-left py-2 px-3 sm:px-2 admin-mem-cell">電子郵件</th>
             <th class="text-left py-2 px-3 sm:px-2 admin-mem-cell">暱稱</th>
-            <th class="text-left py-2 px-3 sm:px-2 admin-mem-cell whitespace-nowrap">註冊時間(世界時)</th>
+            <th class="text-left py-2 px-3 sm:px-2 admin-mem-cell whitespace-nowrap">註冊時間(台灣)</th>
           </tr>
         </thead>
         <tbody>
@@ -303,7 +303,7 @@
           <tr class="border-b border-border last:border-b-0">
             <td class="py-2 px-3 sm:px-2 font-mono text-fg/90 admin-mem-cell admin-mem-cell-email whitespace-nowrap">{{ u.email_masked }}</td>
             <td class="py-2 px-3 sm:px-2 text-fg/85 admin-mem-cell">{{ u.display_name }}</td>
-            <td class="py-2 px-3 sm:px-2 text-muted admin-mem-cell admin-mem-cell-time whitespace-nowrap">{{ u.created_at }}</td>
+            <td class="py-2 px-3 sm:px-2 text-muted admin-mem-cell admin-mem-cell-time whitespace-nowrap">{{ u.created_at|tw_time('%Y-%m-%d %H:%M') }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -506,7 +506,7 @@
       <table class="admin-table min-w-[720px]">
         <thead>
           <tr>
-            <th>時間(世界時)</th>
+            <th>時間(台灣)</th>
             <th>訪問階段</th>
             <th>位址</th>
             <th>頁面</th>
@@ -518,7 +518,7 @@
         <tbody>
           {% for v in visits %}
             <tr>
-              <td class="num-col text-xs">{{ v.ts_utc|replace('T', ' ')|truncate(19, true, '') }}</td>
+              <td class="num-col text-xs">{{ v.ts_utc|tw_time }}</td>
               <td class="num-col text-xs text-muted">{{ v.session_id_short }}</td>
               <td class="num-col text-xs">{{ v.ip_masked or '—' }}</td>
               <td class="text-fg/90">{{ v.label }}</td>

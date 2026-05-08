@@ -25,11 +25,13 @@ from sqlalchemy import desc, func, select
 
 from app.config import PROJECT_ROOT, settings
 from app.services import admin_analytics
+from app.services.time_utils import tw_time
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 templates = Jinja2Templates(directory=str(PROJECT_ROOT / "templates"))
+templates.env.filters["tw_time"] = tw_time
 
 
 # 沒有 settings.app_brand_full 等於 user 沒設定 → fallback;但 _common_ctx 在 pages.py

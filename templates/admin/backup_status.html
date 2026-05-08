@@ -42,8 +42,8 @@
       <div class="text-xs text-muted mb-1">最後一次成功備份</div>
       {% if summary.last_success_at %}
         <div class="text-xl sm:text-2xl font-semibold num break-all">
-          {{ summary.last_success_at.isoformat(timespec='seconds')|replace('T', ' ') }}
-          <span class="text-base text-muted ml-2">(世界時)</span>
+          {{ summary.last_success_at|tw_time }}
+          <span class="text-base text-muted ml-2">(台灣)</span>
         </div>
         <div class="text-sm mt-1 {% if summary.stale %}text-up{% else %}text-down{% endif %}">
           {{ summary.last_success_human }}
@@ -91,7 +91,7 @@
       <table class="admin-table min-w-[680px]">
         <thead>
           <tr>
-            <th>時間(世界時)</th>
+            <th>時間(台灣)</th>
             <th>類型</th>
             <th>檔案路徑</th>
             <th class="text-right">大小</th>
@@ -102,7 +102,7 @@
         <tbody>
           {% for it in items %}
             <tr {% if it.status == 'failed' %}style="background: #7f1d1d33;"{% endif %}>
-              <td class="num-col text-xs">{{ it.backup_at|replace('T', ' ') }}</td>
+              <td class="num-col text-xs">{{ it.backup_at|tw_time }}</td>
               <td>
                 {% if it.backup_type == 'monthly' %}
                   <span class="px-2 py-0.5 rounded text-xs"
@@ -145,7 +145,7 @@
              style="border-color: {% if it.status == 'failed' %}#b91c1c80{% else %}#1f2937{% endif %};
                     background: {% if it.status == 'failed' %}#7f1d1d20{% else %}#0a0e1a{% endif %};">
           <div class="flex items-baseline justify-between gap-2 mb-2">
-            <span class="num text-xs text-fg/85">{{ it.backup_at|replace('T', ' ') }}</span>
+            <span class="num text-xs text-fg/85">{{ it.backup_at|tw_time }}</span>
             {% if it.status == 'success' %}
               <span class="text-down text-xs font-semibold">成功</span>
             {% else %}

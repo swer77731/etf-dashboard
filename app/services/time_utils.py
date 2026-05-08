@@ -81,3 +81,36 @@ def is_fresh_news(value, hours: int = 6) -> bool:
     now = datetime.now(tz=_TZ)
     diff_sec = (now - dt).total_seconds()
     return 0 <= diff_sec < hours * 3600
+
+
+_UTC = ZoneInfo("UTC")
+
+
+def tw_time(value, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
+    """後台時間顯示專用 — UTC naive / aware datetime / ISO 字串 → Taipei 格式字串。
+
+    與 humanize_relative 不同點:naive 視為 **UTC**(因為 admin DB 統一存 UTC naive,
+    例:User.created_at、AnalyticsLog.ts、BackupLog.backup_at、ErrorReport.created_at)。
+    FinMind 那種 naive=Taipei 的場景請走 humanize_relative。
+
+    支援:
+    - datetime(naive 視 UTC,aware 自動 astimezone)
+    - "2026-05-08T01:23:45"     (admin DB ISO format)
+    - "2026-05-08 01:23:45"
+    - "2026-05-08T01:23:45Z" / "+00:00"
+    """
+    if value is None or value == "":
+        return ""
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        s = str(value).strip().replace(" ", "T")
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        try:
+            dt = datetime.fromisoformat(s)
+        except (ValueError, TypeError):
+            return ""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=_UTC)
+    return dt.astimezone(_TZ).strftime(fmt)
