@@ -1,0 +1,50 @@
+{% extends "admin/base.html" %}
+
+{% block title %}維護模式 — {{ brand_full }}{% endblock %}
+
+{% block nav %}
+  <span class="text-muted">|</span>
+  <a href="/admin/analytics" class="text-muted hover:text-fg transition">流量後台</a>
+{% endblock %}
+
+{% block content %}
+
+<section class="card p-5 mb-5"
+         style="border-left: 4px solid {% if maintenance_active or not app_ready %}#ef4444{% else %}#10b981{% endif %};">
+  <h1 class="text-xl font-semibold mb-3">維護模式</h1>
+
+  <div class="space-y-2 text-sm mb-5">
+    <div class="flex items-baseline gap-3">
+      <span class="text-muted w-32">啟動就緒(app ready)</span>
+      {% if app_ready %}
+        <span class="text-down font-semibold">YES</span>
+      {% else %}
+        <span class="text-up font-semibold">NO(lifespan 還沒跑完)</span>
+      {% endif %}
+    </div>
+    <div class="flex items-baseline gap-3">
+      <span class="text-muted w-32">手動維護模式</span>
+      {% if maintenance_active %}
+        <span class="text-up font-semibold">ON — 全站訪客看到維護頁</span>
+      {% else %}
+        <span class="text-down font-semibold">OFF — 全站正常</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <form method="POST"
+        action="{% if maintenance_active %}/admin/maintenance/off{% else %}/admin/maintenance/on{% endif %}">
+    <button type="submit"
+            class="px-4 py-2 rounded-md text-sm font-semibold transition
+                   {% if maintenance_active %}bg-down text-white hover:opacity-90{% else %}bg-card border border-border text-fg hover:border-up hover:text-up{% endif %}">
+      {% if maintenance_active %}關閉維護模式(恢復正常){% else %}開啟維護模式{% endif %}
+    </button>
+  </form>
+
+  <div class="mt-5 text-xs text-muted leading-relaxed border-t border-border pt-3">
+    <p class="mb-1"><strong class="text-fg/80">本頁是 self-rescue 落地頁</strong> — 即使其他後台頁面被維護模式攔下,這裡仍可進來切換。</p>
+    <p>白名單路徑:<code class="bg-bg-soft px-1.5 py-0.5 rounded text-fg/85">/api/health</code> · <code class="bg-bg-soft px-1.5 py-0.5 rounded text-fg/85">/admin/maintenance/*</code> · <code class="bg-bg-soft px-1.5 py-0.5 rounded text-fg/85">/favicon.ico</code></p>
+  </div>
+</section>
+
+{% endblock %}

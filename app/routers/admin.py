@@ -758,6 +758,29 @@ def admin_audit_force_fix(request: Request, finding_id: str):
 # /admin/maintenance/* — 手動切換維護模式(2026-05-08)
 # ─────────────────────────────────────────────────────────────
 
+@router.get("/maintenance", response_class=HTMLResponse)
+def admin_maintenance_page(request: Request):
+    """Whitelisted 落地頁 — 維護模式期間 admin 仍可進來關閉。
+
+    紀律:萬一誤按開啟維護後 /admin/analytics 進不去,網址列直接打
+    /admin/maintenance 就有狀態 + 切換 form,避免 self-lockout。
+    """
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
+    from app.maintenance import is_manual_maintenance, is_app_ready
+    is_admin, user = _is_site_admin(request)
+    return templates.TemplateResponse(
+        request, "admin/maintenance.html",
+        _admin_ctx(
+            request,
+            maintenance_active=is_manual_maintenance(),
+            app_ready=is_app_ready(),
+            current_user=user,
+        ),
+    )
+
+
 @router.post("/maintenance/on")
 def admin_maintenance_on(request: Request):
     """手動開啟維護模式 — middleware 看到旗標 → 全站(除白名單)回 503。
