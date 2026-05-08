@@ -702,3 +702,55 @@ async def submit_error_report(
     session.add(rec)
     session.commit()
     return {"ok": True, "id": rec.id}
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 分享系統 endpoints(2026-05-08 — 紀律 #18 IP/UA 全程 hash)
+# ─────────────────────────────────────────────────────────────────────
+
+
+@router.post("/share/click")
+async def share_button_click(
+    request: Request,
+    payload: dict = Body(...),
+) -> dict:
+    """用戶按分享按鈕(FB / LINE / Threads / 複製)→ 寫一筆紀錄。
+
+    - 已登入 → 同步 update users.last_share_at
+    - 未登入 → user_id NULL,仍記錄(不強制登入)
+    - platform 白名單外 → 400
+    """
+    from app.services import share_service
+
+    platform = (payload.get("platform") or "").strip().lower()
+    if platform not in share_service.PLATFORMS:
+        raise HTTPException(400, "unknown platform")
+
+    page_url = (payload.get("page_url") or "").strip()[:512] or None
+
+    user = getattr(request.state, "user", None)
+    user_id = user["id"] if user else None
+
+    rid = share_service.record_button_click(user_id, platform, page_url)
+    return {"ok": rid is not None, "id": rid}
+
+
+@router.post("/share/visit-valid")
+async def share_visit_valid(request: Request) -> dict:
+    """訪客在頁面停留 > 30s → JS 呼叫 → mark share_clicks.is_valid=1。
+
+    Cookie evw_ref_click 帶 click_id;server 端比對 IP hash 防偽造。
+    """
+    from app.services import share_service
+
+    raw_id = request.cookies.get("evw_ref_click")
+    if not raw_id:
+        return {"ok": False, "reason": "no_cookie"}
+    try:
+        click_id = int(raw_id)
+    except ValueError:
+        return {"ok": False, "reason": "bad_cookie"}
+
+    ip = share_service.extract_visitor_ip(request)
+    ok = share_service.mark_visit_valid(click_id, ip)
+    return {"ok": ok}
