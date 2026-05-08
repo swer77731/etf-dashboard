@@ -8,9 +8,11 @@
 
 Whitelist(必須能通,否則 Zeabur 健檢失敗或 admin 救不回)
 ==========================================================
-- /api/health         — Zeabur 健檢 endpoint
-- /admin/maintenance/ — admin 切換 endpoints(off 必須能呼叫,否則卡死)
-- /favicon.ico        — 避免 console 噪音 / log spam
+- /api/health   — Zeabur 健檢 endpoint
+- /admin/       — admin 維護期間仍可進整個後台(切換 / 排查 / 改設定)
+                  user 開維護模式是要「擋一般用戶、自己繼續做事」,
+                  不是「把自己也鎖在外面」
+- /favicon.ico  — 避免 console 噪音 / log spam
 
 模板處理
 ========
@@ -44,7 +46,7 @@ _FALLBACK_HTML = (
 class MaintenanceMiddleware:
     """純 ASGI middleware。註冊順序要最後 add(LIFO → 第一個跑)。"""
 
-    EXEMPT_PREFIXES = ("/api/health", "/admin/maintenance/", "/favicon.ico")
+    EXEMPT_PREFIXES = ("/api/health", "/admin/", "/favicon.ico")
 
     def __init__(self, app: ASGIApp, template_path: Path) -> None:
         self.app = app
