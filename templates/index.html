@@ -109,10 +109,6 @@
 </style>
 {% endif %}
 
-{# === 分享按鈕(2026-05-08)— 不接廣告,只先收集數據 === #}
-{% from "_partials/share_buttons.html" import share_buttons, share_styles_and_script %}
-{{ share_buttons(default_path='/') }}
-
 {# === Phase 1B 配息公布欄 === #}
 {{ div_board(upcoming_dividends, upcoming_group_labels, compact=True, max_per_group=5) }}
 
@@ -134,7 +130,4 @@
 </section>
 
 {# 相對時間 / fresh 標記由 Jinja filter humanize_relative + is_fresh_news 在 server 端 render(Asia/Taipei),JS 不再重算 #}
-
-{# 分享按鈕 styles + JS — 一頁一次 #}
-{{ share_styles_and_script() }}
 {% endblock %}

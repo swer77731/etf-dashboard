@@ -13,7 +13,6 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.analytics_middleware import AnalyticsMiddleware
 from app.auth.middleware import CurrentUserMiddleware
-from app.share_middleware import RefVisitorMiddleware
 from app.config import PROJECT_ROOT, settings
 from app.database import init_db
 from app.routers import admin as admin_router
@@ -198,10 +197,6 @@ app.add_middleware(AnalyticsMiddleware)
 # Auth — 從 session cookie 撈 user → 掛 request.state.user
 # 必須在 SessionMiddleware 之後執行(LIFO 註冊 = 在 SessionMiddleware 之前 add)
 app.add_middleware(CurrentUserMiddleware)
-
-# Ref visitor — 攔 ?ref=XXX,寫 share_clicks + 設 evw_ref_click cookie。
-# 不依賴 session,純粹處理外部 inbound 連結。skip /api /admin /static /auth。
-app.add_middleware(RefVisitorMiddleware)
 
 # Session cookie(SessionMiddleware 內建用 itsdangerous 簽章)
 # - secure=True 在 production(HTTPS only)

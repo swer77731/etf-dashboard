@@ -32,12 +32,5 @@ class User(Base):
         nullable=False,
     )
 
-    # 分享 + ad_free 預埋(migration 009)
-    ad_free_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    last_share_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    referral_code: Mapped[str | None] = mapped_column(
-        String(8), unique=True, nullable=True
-    )
-
     def __repr__(self) -> str:  # pragma: no cover
         return f"<User id={self.id} google_id={self.google_id[:8]}…>"
