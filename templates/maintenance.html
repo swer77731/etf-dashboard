@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta http-equiv="refresh" content="30">
+  <title>維護中 — ETF 觀察室</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      background: #0a0e1a;
+      color: #e5e7eb;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
+                   "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap {
+      text-align: center;
+      max-width: 32rem;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      color: #6b7280;
+      margin-bottom: 3rem;
+      font-size: 0.85rem;
+      letter-spacing: 0.18em;
+      font-weight: 500;
+    }
+    .brand svg {
+      width: 22px;
+      height: 22px;
+      stroke: #6b7280;
+    }
+    h1 {
+      font-size: 2.25rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: #f3f4f6;
+      margin-bottom: 1.25rem;
+      line-height: 1.3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.7rem;
+      flex-wrap: wrap;
+    }
+    h1 .dot {
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #3b82f6;
+      box-shadow: 0 0 12px rgba(59, 130, 246, 0.55);
+      animation: pulse 1.6s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+    p {
+      font-size: 1rem;
+      color: #6b7280;
+      letter-spacing: 0.06em;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.35; transform: scale(0.92); }
+      50%      { opacity: 1;    transform: scale(1.08); }
+    }
+    /* 數字感裝飾 — 細網格淡淡浮現 */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(to right, rgba(255,255,255,0.018) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.018) 1px, transparent 1px);
+      background-size: 64px 64px;
+      mask-image: radial-gradient(circle at center, black 30%, transparent 75%);
+      -webkit-mask-image: radial-gradient(circle at center, black 30%, transparent 75%);
+    }
+    @media (max-width: 640px) {
+      h1 {
+        font-size: 1.65rem;
+        gap: 0.5rem;
+      }
+      p { font-size: 0.92rem; }
+      .brand {
+        margin-bottom: 2.25rem;
+        font-size: 0.78rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap" role="main">
+    <div class="brand" aria-label="ETF 觀察室">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polyline points="3 17 8 12 12 14 16 8 21 11"/>
+      </svg>
+      <span>ETF 觀察室</span>
+    </div>
+    <h1><span class="dot" aria-hidden="true"></span>網站更新維護中</h1>
+    <p>請稍後再試</p>
+  </main>
+</body>
+</html>

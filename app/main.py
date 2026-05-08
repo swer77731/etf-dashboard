@@ -13,6 +13,8 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.analytics_middleware import AnalyticsMiddleware
 from app.auth.middleware import CurrentUserMiddleware
+from app.maintenance import set_app_ready
+from app.maintenance_middleware import MaintenanceMiddleware
 from app.share_middleware import RefVisitorMiddleware
 from app.config import PROJECT_ROOT, settings
 from app.database import init_db
@@ -162,6 +164,8 @@ def _reset_finmind_quota_on_boot() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Booting %s (env=%s)", settings.app_name, settings.app_env)
+    # readiness flag — middleware 看到 False → 503 + 維護頁
+    set_app_ready(False)
     init_db()
     # 紀律 #16 — Zeabur 部署不會自動跑 migration。push 新程式時若 ORM 加欄位
     # 但 DB schema 沒升級 → SELECT 缺欄位炸 → 全站 500。每個 migration
@@ -178,11 +182,14 @@ async def lifespan(app: FastAPI):
     _reset_finmind_quota_on_boot()
     start_scheduler()
     startup_sync_if_needed()  # 背景跑,不卡 web 啟動
+    set_app_ready(True)
     logger.info("Startup complete — listening on %s:%s", settings.host, settings.port)
     try:
         yield
     finally:
         logger.info("Shutting down…")
+        # 關機時 block new requests,避免 in-flight 請求遇到 partial state
+        set_app_ready(False)
         shutdown_scheduler()
 
 
@@ -229,8 +236,15 @@ app.add_middleware(
 )
 
 # 紀律 #16 — swer-etf.zeabur.app → etf-watch.com 301 全站重導(SEO 權重轉移)。
-# 註冊順序最後 = request 進來第一站,redirect 不浪費下游 middleware 計算。
 app.add_middleware(HostRedirectMiddleware)
+
+# Maintenance — 部署期間 / 手動模式回 503 + 維護頁。
+# 註冊順序最後 = request 進來第一站,優先攔下游避免在 boot 階段觸發未就緒邏輯。
+# Whitelist:/api/health(Zeabur 健檢)、/admin/maintenance/*(admin 切換)、/favicon.ico
+app.add_middleware(
+    MaintenanceMiddleware,
+    template_path=PROJECT_ROOT / "templates" / "maintenance.html",
+)
 
 app.mount(
     "/static",

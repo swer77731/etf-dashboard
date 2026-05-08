@@ -260,6 +260,7 @@ async def analytics_page(
     request: Request,
     range_days: int = 7,
     audit_triggered: str | None = None,
+    maintenance: str | None = None,
 ):
     """流量後台 — 整合容量監控 / 會員註冊 / 訪客數據 / 熱門 ETF / 熱門搜尋 全套。"""
     redirect = _require_admin(request)
@@ -273,6 +274,9 @@ async def analytics_page(
 
     # audit_triggered 白名單(避免反射型 XSS)
     audit_triggered_value = audit_triggered if audit_triggered in ("1", "throttled") else None
+    maintenance_value = maintenance if maintenance in ("on", "off") else None
+    from app.maintenance import is_manual_maintenance
+    maintenance_active = is_manual_maintenance()
 
     today = admin_analytics.today_taipei_date()
     yesterday = today - timedelta(days=1)
@@ -314,6 +318,8 @@ async def analytics_page(
             audit_summary=audit_summary,
             audit_triggered=audit_triggered_value,
             share_stats=share_stats,
+            maintenance_active=maintenance_active,
+            maintenance_toggled=maintenance_value,
             current_user=user,
         ),
     )
@@ -746,6 +752,36 @@ def admin_audit_force_fix(request: Request, finding_id: str):
     ok, msg = data_audit.force_fix(finding_id)
     logger.info("[audit] force-fix %s → ok=%s msg=%s", finding_id, ok, msg)
     return RedirectResponse(url=f"/admin/audit/{finding_id}", status_code=303)
+
+
+# ─────────────────────────────────────────────────────────────
+# /admin/maintenance/* — 手動切換維護模式(2026-05-08)
+# ─────────────────────────────────────────────────────────────
+
+@router.post("/maintenance/on")
+def admin_maintenance_on(request: Request):
+    """手動開啟維護模式 — middleware 看到旗標 → 全站(除白名單)回 503。
+
+    白名單:/api/health / /admin/maintenance/* / /favicon.ico
+    所以 admin 仍可 OFF 切回。
+    """
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
+    from app.maintenance import set_manual_maintenance
+    set_manual_maintenance(True)
+    return RedirectResponse(url="/admin/analytics?maintenance=on", status_code=303)
+
+
+@router.post("/maintenance/off")
+def admin_maintenance_off(request: Request):
+    """手動關閉維護模式。"""
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
+    from app.maintenance import set_manual_maintenance
+    set_manual_maintenance(False)
+    return RedirectResponse(url="/admin/analytics?maintenance=off", status_code=303)
 
 
 @router.get("/cache/clear")

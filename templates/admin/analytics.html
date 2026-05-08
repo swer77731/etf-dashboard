@@ -84,6 +84,47 @@
   </div>
 </section>
 
+{# === 維護模式狀態 + 切換(2026-05-08)=== #}
+{% if maintenance_toggled == 'on' %}
+<div class="card p-3 mb-4" style="border-left: 4px solid #ef4444; background: rgba(239,68,68,0.08);">
+  <div class="text-sm text-fg/90">已開啟維護模式 — 全站訪客看到「網站更新維護中」頁面。</div>
+</div>
+{% elif maintenance_toggled == 'off' %}
+<div class="card p-3 mb-4" style="border-left: 4px solid #10b981; background: rgba(16,185,129,0.06);">
+  <div class="text-sm text-fg/90">已關閉維護模式 — 全站恢復正常。</div>
+</div>
+{% endif %}
+
+<section class="card p-4 mb-5"
+         style="border-left: 4px solid {% if maintenance_active %}#ef4444{% else %}#10b981{% endif %};">
+  <div class="flex items-center justify-between gap-3 flex-wrap">
+    <div>
+      <h2 class="text-base font-semibold flex items-center gap-2">
+        <span>維護模式</span>
+        {% if maintenance_active %}
+          <span class="text-xs px-2 py-0.5 rounded text-up"
+                style="background:#7f1d1d40; border:1px solid #b91c1c80;">手動 ON</span>
+        {% else %}
+          <span class="text-xs px-2 py-0.5 rounded text-down"
+                style="background:#064e3b40; border:1px solid #047857aa;">正常</span>
+        {% endif %}
+      </h2>
+      <p class="text-xs text-muted mt-1 leading-relaxed">
+        部署期間 lifespan 跑完前自動顯示維護頁;手動切換用於緊急維護(例:DB migration、改設定)。
+      </p>
+    </div>
+    <form method="POST"
+          action="{% if maintenance_active %}/admin/maintenance/off{% else %}/admin/maintenance/on{% endif %}">
+      <button type="submit"
+              class="px-3 py-1.5 rounded-md text-xs font-semibold
+                     {% if maintenance_active %}bg-down text-white{% else %}bg-card border border-border text-fg hover:border-up hover:text-up{% endif %}
+                     transition">
+        {% if maintenance_active %}關閉維護模式{% else %}開啟維護模式{% endif %}
+      </button>
+    </form>
+  </div>
+</section>
+
 {# === 健檢觸發 toast(2026-05-08 加 — 同備份按鈕模式)=== #}
 {% if audit_triggered == '1' %}
 <div class="card p-3 mb-4" style="border-left: 4px solid #10b981; background: rgba(16,185,129,0.06);">
