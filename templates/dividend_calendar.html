@@ -14,7 +14,7 @@
     margin-bottom: 0.5rem;
     margin-top: 1rem;
   }
-  .list-day-header:first-child { margin-top: 0; }
+  .cal-day-group:first-child .list-day-header { margin-top: 0; }
 
   /* 列表 row 手機 stack(避免代號名稱被切)*/
   @media (max-width: 640px) {
@@ -39,6 +39,72 @@
       padding-bottom: 0.6rem !important;
       gap: 0.25rem !important;
     }
+  }
+
+  /* 搜尋框 */
+  .cal-search-wrap {
+    position: relative;
+    width: 100%;
+  }
+  .cal-search-input {
+    width: 100%;
+    background: rgb(var(--c-bg-soft));
+    border: 1px solid rgb(var(--c-border));
+    border-radius: 0.5rem;
+    padding: 0.65rem 2.4rem 0.65rem 2.6rem;
+    font-size: 1rem;
+    color: rgb(var(--c-fg));
+    transition: border-color 0.15s ease;
+  }
+  .cal-search-input:focus {
+    outline: none;
+    border-color: rgb(var(--c-accent));
+  }
+  .cal-search-input::placeholder { color: rgb(var(--c-muted) / 0.7); }
+  .cal-search-input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+  .cal-search-icon {
+    position: absolute;
+    left: 0.85rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: rgb(var(--c-muted));
+    pointer-events: none;
+  }
+  .cal-search-clear {
+    position: absolute;
+    right: 0.55rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: rgb(var(--c-muted));
+    background: transparent;
+    border: 0;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 9999px;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    line-height: 1;
+  }
+  .cal-search-clear:hover { color: rgb(var(--c-fg)); background: rgb(var(--c-border) / 0.4); }
+  .cal-search-input:not(:placeholder-shown) ~ .cal-search-clear { display: flex; }
+
+  /* 手機直向 — 搜尋框略小一點省空間 */
+  @media (max-width: 767px) and (orientation: portrait) {
+    .cal-search-input {
+      padding: 0.55rem 2.3rem 0.55rem 2.4rem;
+      font-size: 0.95rem;
+    }
+  }
+
+  .cal-no-result {
+    display: none;
+    padding: 2.5rem 1rem;
+    text-align: center;
+    color: rgb(var(--c-muted));
+    font-size: 0.95rem;
   }
 </style>
 {% endblock %}
@@ -80,10 +146,25 @@
   {% endif %}
 </section>
 
-{# === 統計摘要 === #}
-<section class="mb-6">
+{# === 搜尋 + 統計 === #}
+<section class="mb-5">
+  <div class="cal-search-wrap mb-3">
+    <span class="cal-search-icon" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="M21 21l-4.35-4.35"></path></svg>
+    </span>
+    <input
+      id="cal-search"
+      type="text"
+      class="cal-search-input num"
+      placeholder="搜尋 ETF 代號或名稱(例:0050、98、高股息)"
+      autocomplete="off"
+      spellcheck="false"
+      aria-label="搜尋本月配息 ETF"
+    />
+    <button type="button" class="cal-search-clear" id="cal-search-clear" aria-label="清除">×</button>
+  </div>
   <div class="text-sm sm:text-base text-muted">
-    本月共 <span class="text-accent font-semibold num">{{ total_events }}</span> 筆除息事件
+    本月共 <span class="text-accent font-semibold num">{{ total_events }}</span> 筆除息事件<span id="cal-search-summary"></span>
     {% if total_events == 0 %}
       · <span class="text-muted/80">未來資料目前由公開公告補充,如尚未公告則顯示空白</span>
     {% endif %}
@@ -93,56 +174,59 @@
 {# === 列表 === #}
 <section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7">
   <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
-  <div class="card-content">
-    {% if events %}
-      {% set ns = namespace(last_day="") %}
-      {% for ev in events %}
-        {% if ev.ex_date != ns.last_day %}
-          {% if not loop.first %}</ul>{% endif %}
+  <div class="card-content" id="cal-list-root">
+    {% if events_by_day %}
+      {% for day, day_events in events_by_day.items() %}
+        <div class="cal-day-group" data-cal-day="{{ day }}">
           <div class="list-day-header text-lg sm:text-xl num">
-            {{ ev.ex_date }}
+            {{ day }}
             <span class="ml-2 text-base text-muted font-normal">
-              ({{ events_by_day[ev.ex_date]|length }} 支)
+              (<span data-day-count-total="{{ day_events|length }}">{{ day_events|length }}</span> 支)
             </span>
-            {% if ev.ex_date == today_iso %}
+            {% if day == today_iso %}
             <span class="ml-2 text-sm text-accent font-normal">· 今天</span>
             {% endif %}
           </div>
           <ul class="divide-y divide-border/40">
-          {% set ns.last_day = ev.ex_date %}
-        {% endif %}
-
-          <li class="list-day-li py-3.5 flex items-center gap-4 num">
-            <a href="/etf/{{ ev.code }}" class="flex-1 min-w-0 hover:underline group">
-              <div class="flex items-baseline gap-3 flex-wrap">
-                <span class="font-mono text-lg sm:text-xl font-semibold text-accent">{{ ev.code }}</span>
-                <span class="text-base sm:text-lg text-fg/90">{{ ev.name }}</span>
-              </div>
-            </a>
-            {% if ev.yield_pct %}
-            <div class="text-right sm:whitespace-nowrap">
-              <div class="text-lg sm:text-xl font-bold text-up">
-                {{ "%.2f"|format(ev.yield_pct) }}%
-              </div>
-              <div class="text-xs text-muted">單次殖利率</div>
-            </div>
-            {% endif %}
-            <div class="list-day-li-cash text-right sm:whitespace-nowrap sm:min-w-[7rem]">
-              {% if ev.cash_dividend %}
-                <div class="text-lg sm:text-xl font-semibold text-fg">
-                  {{ "%.4f"|format(ev.cash_dividend) }} 元
+            {% for ev in day_events %}
+            <li class="list-day-li py-3.5 flex items-center gap-4 num"
+                data-cal-row
+                data-code="{{ ev.code|lower }}"
+                data-name="{{ ev.name|lower }}">
+              <a href="/etf/{{ ev.code }}" class="flex-1 min-w-0 hover:underline group">
+                <div class="flex items-baseline gap-3 flex-wrap">
+                  <span class="font-mono text-lg sm:text-xl font-semibold text-accent">{{ ev.code }}</span>
+                  <span class="text-base sm:text-lg text-fg/90">{{ ev.name }}</span>
                 </div>
-              {% else %}
-                <div class="text-sm text-muted italic">金額未公告</div>
+              </a>
+              {% if ev.yield_pct %}
+              <div class="text-right sm:whitespace-nowrap">
+                <div class="text-lg sm:text-xl font-bold text-up">
+                  {{ "%.2f"|format(ev.yield_pct) }}%
+                </div>
+                <div class="text-xs text-muted">單次殖利率</div>
+              </div>
               {% endif %}
-              {% if ev.payment_date %}
-                <div class="text-sm text-muted">入帳 {{ ev.payment_date }}</div>
-              {% endif %}
-            </div>
-          </li>
-
-        {% if loop.last %}</ul>{% endif %}
+              <div class="list-day-li-cash text-right sm:whitespace-nowrap sm:min-w-[7rem]">
+                {% if ev.cash_dividend %}
+                  <div class="text-lg sm:text-xl font-semibold text-fg">
+                    {{ "%.4f"|format(ev.cash_dividend) }} 元
+                  </div>
+                {% else %}
+                  <div class="text-sm text-muted italic">金額未公告</div>
+                {% endif %}
+                {% if ev.payment_date %}
+                  <div class="text-sm text-muted">入帳 {{ ev.payment_date }}</div>
+                {% endif %}
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
       {% endfor %}
+      <div class="cal-no-result" id="cal-no-result">
+        找不到符合的 ETF。試試別的代號或名稱關鍵字。
+      </div>
     {% else %}
       <div class="text-sm sm:text-base text-muted py-12 text-center">
         本月尚無已公告的除息事件。
@@ -155,5 +239,59 @@
 <section class="text-xs text-muted text-center mt-12 mb-6 max-w-2xl mx-auto leading-relaxed px-4">
   未來除息日依 ETF 發行商最新公告為準
 </section>
+
+<script>
+(function() {
+  const input = document.getElementById('cal-search');
+  if (!input) return;
+
+  const clearBtn = document.getElementById('cal-search-clear');
+  const noResult = document.getElementById('cal-no-result');
+  const summary = document.getElementById('cal-search-summary');
+  const rows = Array.from(document.querySelectorAll('[data-cal-row]'));
+  const groups = Array.from(document.querySelectorAll('.cal-day-group'));
+
+  function applyFilter() {
+    const q = input.value.trim().toLowerCase();
+    let visibleRows = 0;
+
+    rows.forEach(row => {
+      const code = row.dataset.code || '';
+      const name = row.dataset.name || '';
+      const match = !q || code.includes(q) || name.includes(q);
+      row.style.display = match ? '' : 'none';
+      if (match) visibleRows++;
+    });
+
+    groups.forEach(g => {
+      const visibleInGroup = g.querySelectorAll('[data-cal-row]:not([style*="display: none"])').length;
+      g.style.display = visibleInGroup > 0 ? '' : 'none';
+      const countEl = g.querySelector('[data-day-count-total]');
+      if (countEl) {
+        const total = countEl.dataset.dayCountTotal;
+        countEl.textContent = q ? (visibleInGroup + ' / ' + total) : total;
+      }
+    });
+
+    if (noResult) {
+      noResult.style.display = (q && visibleRows === 0) ? 'block' : 'none';
+    }
+    if (summary) {
+      summary.textContent = q
+        ? '・符合搜尋:' + visibleRows + ' 筆'
+        : '';
+    }
+  }
+
+  input.addEventListener('input', applyFilter);
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      input.value = '';
+      input.focus();
+      applyFilter();
+    });
+  }
+})();
+</script>
 
 {% endblock %}
