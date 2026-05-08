@@ -254,7 +254,11 @@ async def login_page(request: Request):
 # ─────────────────────────────────────────────────────────────
 
 @router.get("/analytics", response_class=HTMLResponse)
-async def analytics_page(request: Request, range_days: int = 7):
+async def analytics_page(
+    request: Request,
+    range_days: int = 7,
+    audit_triggered: str | None = None,
+):
     """流量後台 — 整合容量監控 / 會員註冊 / 訪客數據 / 熱門 ETF / 熱門搜尋 全套。"""
     redirect = _require_admin(request)
     if redirect is not None:
@@ -264,6 +268,9 @@ async def analytics_page(request: Request, range_days: int = 7):
     # range 限制
     if range_days not in (7, 30):
         range_days = 7
+
+    # audit_triggered 白名單(避免反射型 XSS)
+    audit_triggered_value = audit_triggered if audit_triggered in ("1", "throttled") else None
 
     today = admin_analytics.today_taipei_date()
     yesterday = today - timedelta(days=1)
@@ -302,6 +309,7 @@ async def analytics_page(request: Request, range_days: int = 7):
             pending_reports_count=pending_reports,
             backup_summary=backup_summary,
             audit_summary=audit_summary,
+            audit_triggered=audit_triggered_value,
             current_user=user,
         ),
     )
@@ -648,16 +656,51 @@ def db_inspect_etf(request: Request, code: str, days: int = 14):
 # /admin/audit/* — 資料健康管家(2026-05-06)
 # ─────────────────────────────────────────────────────────────
 
+# 健檢按鈕限流(同備份按鈕模式 — Zeabur 30s timeout 規避)
+_AUDIT_RUN_COOLDOWN_SEC = 60
+_last_audit_run_at: float = 0.0
+_audit_run_lock = threading.Lock()
+
+
 @router.get("/audit/run")
 def admin_audit_run(request: Request):
-    """立刻重跑健檢 + 自動修。回 JSON summary。"""
+    """立刻重跑健檢 + 自動修(背景 daemon thread,避免 Zeabur 30s timeout)。
+
+    紀律 #16:健檢含 auto_fix 會重抓 FinMind,N 個 ETF × 數秒 = 分鐘級,
+    同步跑必爆 504 → user 看「一直在讀」。改背景跑 + 60 秒限流 + 立即 303。
+    """
     redirect = _require_admin(request)
     if redirect is not None:
         return redirect
-    from app.services import data_audit
-    result = data_audit.run_all_checks(auto_fix=True)
-    # 跑完導回 analytics
-    return RedirectResponse(url="/admin/analytics", status_code=303)
+
+    global _last_audit_run_at
+    now = time.monotonic()
+    with _audit_run_lock:
+        if now - _last_audit_run_at < _AUDIT_RUN_COOLDOWN_SEC:
+            return RedirectResponse(
+                url="/admin/analytics?audit_triggered=throttled",
+                status_code=303,
+            )
+        _last_audit_run_at = now
+
+    def _run_in_background():
+        try:
+            from app.services import data_audit
+            data_audit.run_all_checks(auto_fix=True)
+        except Exception:
+            logger.exception("[manual_audit] failed")
+
+    threading.Thread(
+        target=_run_in_background,
+        name="manual-audit",
+        daemon=True,
+    ).start()
+    logger.info("[manual_audit] triggered by admin")
+
+    return RedirectResponse(
+        url="/admin/analytics?audit_triggered=1",
+        status_code=303,
+    )
 
 
 @router.get("/audit/{finding_id:path}", response_class=HTMLResponse)
