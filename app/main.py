@@ -163,17 +163,6 @@ def _reset_finmind_quota_on_boot() -> None:
 async def lifespan(app: FastAPI):
     logger.info("Booting %s (env=%s)", settings.app_name, settings.app_env)
     init_db()
-    # 紀律 #16 — Zeabur 部署不會自動跑 migration。
-    # push 新程式時若 ORM 加欄位但 DB schema 沒升級 → SELECT 缺欄位炸 → 全站 500。
-    # 每個 migration idempotent(已套用就 skip),開機跑全部沒問題。
-    try:
-        from app.migrations import apply_pending_migrations
-        result = apply_pending_migrations()
-        if result["ran"]:
-            logger.info("[migration] auto-applied %d on boot: %s",
-                        len(result["ran"]), ", ".join(result["ran"]))
-    except Exception:
-        logger.exception("[migration] auto-apply raised — continuing startup anyway")
     _reset_finmind_quota_on_boot()
     start_scheduler()
     startup_sync_if_needed()  # 背景跑,不卡 web 啟動
