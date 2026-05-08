@@ -82,6 +82,23 @@
   <span class="text-fg num">{{ etf.code }}</span>
 </nav>
 
+{# === 已下市 banner(2026-05-08)— 仍可進入查歷史,只警示已下市 === #}
+{% if etf.is_active is defined and not etf.is_active %}
+<section class="mb-6 rounded-lg p-4 sm:p-5"
+         style="background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.45);">
+  <div class="flex items-start gap-3">
+    <div class="flex-shrink-0 w-1 self-stretch rounded-full" style="background:#ef4444;"></div>
+    <div class="flex-1 min-w-0">
+      <div class="text-base sm:text-lg font-semibold text-up">此 ETF 已下市</div>
+      <div class="text-sm text-fg/80 mt-1 leading-relaxed">
+        此檔已停止交易,本頁保留供您查詢歷史資料。
+        排行榜 / 比較 / 配息日曆等其他頁面已自動排除。
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
 {# === 1. 基本資訊 + 即時報價(Hero 區) === #}
 <section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7">
   <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>

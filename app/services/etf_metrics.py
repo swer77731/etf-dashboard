@@ -229,6 +229,7 @@ def get_etf_detail(code: str, today: date | None = None) -> dict | None:
         "category_label": label_of(etf.category),
         "issuer": etf.issuer,
         "index_tracked": etf.index_tracked,
+        "is_active": bool(etf.is_active),
         "first_data_date": first_kbar.isoformat() if first_kbar else None,
         "last_kbar": {
             "date": last_kbar[0].isoformat() if last_kbar else None,
