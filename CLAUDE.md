@@ -1906,13 +1906,6 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
 - 教訓:**寬扁容器內的 sparkline 視覺天然平**。要徹底救只能改 viewBox aspect 或加 area fill。本次改善已夠,user 接受
 - 規則:未來新加 sparkline 容器 aspect 接近 1:1 ~ 1.5:1 比較理想(2:1 以上開始扁)
 
-### 2026-05-08 / migration / 本機跑過 ≠ prod 完成 → 全站登入 500
-- 起因:推 `ba8b52f`(分享系統 + migration 009)後 prod 全站登入 500
-- 根因:Zeabur container restart 只跑 `init_db()`(`CREATE TABLE IF NOT EXISTS`,只能加新表,**不會 ALTER 既有表加欄位**)。ORM 已宣告 3 個新欄位(ad_free_until / last_share_at / referral_code),prod DB 卻沒這些 column → SQLAlchemy auto-SELECT 全欄位 → `OperationalError: no such column: users.referral_code`
-- 影響面:任何走 `CurrentUserMiddleware` 撈 user 的請求(= 所有有 session 的用戶)都 500;匿名訪客打首頁因不 SELECT users 看似正常 → 假象「prod 還活著」
-- 修法:`f93e3e2` 加 `app/migrations/__init__.py:apply_pending_migrations()`,lifespan 啟動時自動掃所有 `NNN_xxx.py` 跑(每個 idempotent → 已套用就 skip)
-- 教訓:紀律 #22「跑了 ≠ 跑對了」我落實在資料層,但**部署層沒做同樣的把關**。本機 migration 通過 ≠ prod 完成。之前的 migration(001~008)都加新表沒撞到,009 是第一個 ALTER 既有 + hot-path table 才爆 → 沒覆蓋到的風險其實累積了 8 次。下次 ORM 改欄位 push 上 prod 後,**必驗** prod 真的套了 migration
-
 ### 2026-05-06 / 配息日曆 / RWD hack 多到 4 段時應先想砍掉
 
 - 手機直向 7 欄月曆 380px 完全壞掉 → 我寫了 4 段 hack:
@@ -2317,18 +2310,7 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
 - 解:sync_status row(latest 快照)+ `data/audit_history/YYYY-MM-DD.log`(line-based JSON,30 天保留 + 自動 cleanup) + `data/audit_ignored.json`(忽略清單)
 - 「人工待辦詳情頁」`/admin/audit/{id}` 算 analytics 子流程,不算「新後台主頁」
 
-### 2026-05-08 / migration / 開機 auto-apply 取代「手動跑」
-- 起因:2026-05-08 ba8b52f 全站 500 事故 — 本機跑過 migration,prod 沒跑就推上去
-- 候選方案:
-  - **A. 加 alembic + envs.yaml** — 業界標配,但專案沒在用 alembic,引入要重寫所有既有 NNN_xxx 檔
-  - **B. 加 Zeabur build-step / pre-deploy hook** — 沒在用 zeabur.json 客製化,部署 pipeline 改動風險大
-  - **C. 開機自動掃 `app/migrations/NNN_xxx.py` 跑全部**(已落地 `f93e3e2`)— 每個 migration 已 idempotent,新 deploy 自動套
-- 走 C,理由:
-  1. 既有 8 個 migration 都已寫 `_table_exists` / `_column_exists` 檢查 + status='skipped' return — 開機跑全部沒額外風險
-  2. 失敗 log + 繼續啟動,不卡 web(寧可既有功能照跑也不要 migration 卡死全站)
-  3. 0 額外配置,改 2 個檔案就上線
-- 紀律 #16 配套:任何新 migration 一律維持 idempotent pattern,新欄位 / 新表都先 `_exists()` 檢查
-- 之後如果移轉到 alembic 再 phase out — 但目前看不到必要
+### 2026-05-06 / 配息日曆 / 月曆模式廢除
 - 起因:7 欄硬擠手機直向 380px = 每格 ~50px 放不下 5+ 字 ETF 編號 + 殖利率
 - 兩條路:
   - **A. RWD hack**(force list view + 隱藏 toggle + dismissable hint banner + localStorage 記憶)— 4 段 hack
@@ -2356,5 +2338,3 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
 2026-05-06 下午 | adj_close 全市場 NULL 修復 + 紀律 #22 + 全自動資料健康管家 | ✅ | 5 commit push 上線(ffc3716 / e0e69d3 / dcf5ca2 / 75c63c3 / 6e6026e)。**起因**:user 反應 00981A YTD +68.63% 對比 yfinance +77.30% 差 9pp 確認 bug。調查:全市場 224 支 ETF 從 2026-04-27 起 6 天 `daily_kbar.adj_close` NULL(raw 正常),原因 FinMind `TaiwanStockPriceAdj` 對該時段釋出 lag,_merge_raw_adj 寫 NULL,sync 不 raise → silent fail 9 天。**本機修法**:`scripts/_backfill_adj_2026q2.py` monkey-patch quota gate 50→80%(一次性,user 授權)、254 ETF 9 分鐘補完、修後 D 公式 +77.79% 對齊 yfinance。**Prod 修法**:加 4 個 `/api/_internal/*` no-auth + rate-limit endpoint(client 從 local curl 觸發,254 ETF 14 分鐘補完)修完拿掉,留 admin-only 版備用。**防呆 Phase A**:kbar_sync `_audit_recent_adj_nulls` self-audit + missing_items 整合 daily_health_check。**防呆 Phase B**:全自動資料健康管家 `app/services/data_audit.py`(4 checks + auto-fix + 待辦升級)+ 23:30 cron + `/admin/analytics` 整合 + `/admin/audit/{id}` detail page。**紀律 #22 鎖入**「跑了 ≠ 跑對了」設計憲法。教訓:**「sync raise 沒響 + DB 有 row」≠「成功」**,所有 sync 都要事後驗欄位內容,silent fail 是最危險的 bug 模式。
 
 2026-05-06 傍晚 | 首頁市場概況 hero 改版 + 拿掉槓桿/反向 sections | ✅ | commit facbbe6 push 上線。**改版**:大盤(TAIEX)點位 text-2xl → 響應式 text-5xl 手機 / text-7xl 桌面 變視覺主角; 多算 today_change_pts/pct(對前一交易日);▲/▼ + 點數差 + 百分比 紅漲綠跌(text-up/down);期間漲跌 4-col → 3-col 縮成配角;加備註「※ 收盤資料 · 截至 YYYY-MM-DD」。**精簡**:_build_index_payload 移除 leverage_pos / leverage_neg sections,首頁只剩近月最火 + 主動/市值/高股息;/ranking/leverage_pos / leverage_neg routes 不動仍可從 nav 進。Playwright 4 viewport(桌面 1280 / iPhone 14 / iPhone SE / ranking page)全 PASS。
-
-2026-05-08 早上 | 配息日曆搜尋框 + 分享系統 + prod migration P0 修復 | ✅ | 3 commit push 上線(9d6296e / ba8b52f / f93e3e2)。**配息日曆搜尋**(commit 9d6296e):純前端 vanilla JS 即時模糊比對,代號 + 名稱命中,日期 group 計數動態變「visible / total」,3 viewport Playwright 全 PASS。**分享系統**(commit ba8b52f):migration 009(users 加 ad_free_until / last_share_at / referral_code 三欄 + share_clicks + share_button_clicks 兩表 + 既有 user backfill 6 字元 [A-Z0-9])/ share_service.py(generate_referral_code / process_ref_visit / mark_visit_valid / record_button_click / get_admin_share_stats / should_show_ad / grant_ad_free_days)/ RefVisitorMiddleware 攔 ?ref=XXX 寫 share_clicks + 設 evw_ref_click cookie / auth callback 設 evw_my_ref cookie / 4 鈕 partial(FB / LINE / Threads / 複製,純文字無 emoji)嵌入 index.html + etf_detail.html / 後台 /admin/analytics 加分享統計區塊(4 平台今日點擊 + 3 卡引流 + Top 10 表格)/ 預埋 should_show_ad / grant_ad_free_days 不接到任何模板。**prod migration P0**(commit f93e3e2):ba8b52f push 上線後全站 500,根因 Zeabur init_db() 不 ALTER 既有表加新欄位 → ORM SELECT users.referral_code 缺欄位 → 任何走 CurrentUserMiddleware 的請求(所有有 session 的用戶)都炸,匿名訪客打首頁 OK 是假象。修法:`app/migrations/__init__.py:apply_pending_migrations()` 開機掃 NNN_xxx.py 全跑(每個 idempotent → skipped),lifespan 接進去失敗 log + 繼續啟動。教訓鎖入紀律:**本機 migration 通過 ≠ prod 完成**,部署層也要事後驗證(寫進踩坑 / 重要決策 / memory feedback_migration_prod_verify)。
