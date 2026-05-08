@@ -1918,6 +1918,40 @@ header / sidebar 左上目前是「E」方塊 placeholder,設計感差,需要正
 - 教訓:**RWD 修案累積到「JS + CSS + Alpine + localStorage」≥ 3 段時,先停下來明示複雜度給 user,問「砍 vs 修」,而非默默修**
 - 跟紀律 #14「不准用行動代替思考」呼應 — 寫多段 hack 容易,問值不值得難。寫到第 3 段時眼前已模糊,拐不回來
 
+### 2026-05-08 / prod 連 2 次 502 事故 / 三條教訓鎖入
+
+#### 事件
+- 09:25 push `ba8b52f`(分享系統 + migration 009)→ Zeabur init_db() 不 ALTER 既有 users 表 → ORM SELECT 缺欄位 → 全站 500
+- 09:38 push `f93e3e2`(auto-migration runner)修了上面
+- 10:14 push `2a5e135`(audit 背景化)→ admin.py 多了 `from app.services.time_utils import tw_time` 但 time_utils.py 加 `def tw_time` 的 edit 沒 stage → ImportError → 容器無限重啟 → Zeabur **auto-suspend** → 全站 502 整 21 分鐘
+- 10:14 緊急 push `669d142`(revert 4 commits)
+- 10:35 user 在 Zeabur dashboard 手動「重新啟用」→ deploy → 200 恢復
+
+#### 教訓 1 — ORM 改欄位後本機 migration 跑過 ≠ prod 完成
+- Zeabur container restart 只跑 `init_db()`(`CREATE TABLE IF NOT EXISTS`),**不會 ALTER 既有表加欄位**
+- 任何 ORM `Mapped[]` 加欄位的 commit,push 之前必驗:有沒有 `apply_pending_migrations()` 在 lifespan 跑、寫的 migration idempotent
+- push 之後第一個動作:**驗 prod 真的套了**(打會 SELECT 新欄位的 endpoint)
+- 萬一發現 prod 沒套 → 寧可暫時把 ORM 新欄位拿掉讓站先活,再補 migration
+
+#### 教訓 2 — import 跟對應的定義必須 atomic commit
+- 加 `from local_module import new_func` 進 commit 時,**`new_func` 的定義必須在同一筆 diff 裡**,否則 prod boot ImportError → 全站 502
+- 本機開發看不出來:working dir 兩個改動都在,跑 server OK;只有 git 看到的版本才是壞的
+- commit 前必跑兩道驗證:
+  1. **本機 import 測試**:`python -c "from app.main import app"` 通過(catch ImportError)
+  2. **新 import grep**:`git diff --cached | grep "^+.*import "` 列出新加 imports → 對每個檢查 target 是否也在 staged diff 裡
+- 容易漏的工作流:多任務交錯時(用 `git stash`、edit 多檔案 → 部分 stage)
+
+#### 教訓 3 — 連推多 commit 是地雷,一次推一個等 prod 200 再下一個
+- 一天連推 5 個 commit 觸發 redeploy chain → 中間炸了沒立刻發現 → Zeabur 偵測到連續多次 unhealthy → auto-suspend → 全站長時間 502
+- 紀律:push commit X → 開 monitor `until [ "$(curl -s -o /dev/null -w '%{http_code}' https://etf-watch.com/api/health)" = "200" ]; do sleep 15; done` → 才 push commit X+1
+- 例外:純 docs commit(只動 .md)可連推
+- 例外:revert + hotfix 緊急狀況可連推(已經爆了,要快止血)
+
+#### 落地
+- `app/migrations/__init__.py:apply_pending_migrations()` — lifespan 自動跑,新欄位 push 後 Zeabur 自動套
+- 三條 memory:`feedback_migration_prod_verify.md` / `feedback_atomic_import_commit.md` / `feedback_one_commit_per_push.md`(永久)
+- 紀律 #22「跑了 ≠ 跑對了」擴張到部署層 + commit 層
+
 ### 2026-05-06 / kbar_sync silent fail / 全市場 adj_close NULL 6 天沒人發現
 - 04-27 起連續 6 天:FinMind `TaiwanStockPrice`(raw)抓到、`TaiwanStockPriceAdj` 對全市場 lag → `_merge_raw_adj` 寫 NULL,sync_one_etf 沒 raise,sync_status 標 success
 - 客戶 9 天後反應 00981A YTD 偏低 9pp 才被發現 — 紀律 #20 既有 missing_items 設計只看「ETF 是否抓爆」,沒覆蓋「欄位部分缺漏」
