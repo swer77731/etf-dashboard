@@ -157,6 +157,10 @@
   <div class="card-watermark">ETF Watch</div>
 </section>
 
+{# === 分享 strip(2026-05-08 redesign — 工具列風) === #}
+{% from "_partials/share_buttons.html" import share_strip, share_strip_styles_and_script %}
+{{ share_strip(default_path='/etf/' ~ etf.code) }}
+
 {# === 2. 多期間報酬卡片 === #}
 <section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7">
   <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
@@ -676,4 +680,7 @@
     window.addEventListener('resize', function () { chart.resize(); });
   });
 </script>
+
+{# 分享 strip styles + JS — 一頁一次 #}
+{{ share_strip_styles_and_script() }}
 {% endblock %}

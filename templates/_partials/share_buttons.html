@@ -1,0 +1,302 @@
+{# ============================================================
+   分享按鈕 partial — 極簡 icon strip(2026-05-08 redesign)
+   ------------------------------------------------------------
+   設計
+   ----
+   - 不是 card,不是 CTA — 而是「工具列 / 元資訊條」
+   - 4 個 monochrome SVG icon(28-32px),全 muted 色,hover 才染主色
+   - 左上角極小 「SHARE / 分享」label(uppercase letter-spacing)
+   - 不用品牌色(避免 AI 感)、不用 emoji、不寫 VIP 提示
+   - Tooltip(只 desktop)hover 顯示平台名
+   - 複製按鈕:點擊圖示變勾、tooltip 改「已複製」、1.5s 復原
+   - 手機:icon 拉到 36px,tooltip 隱藏(保留純 icon 視覺)
+   - 整體 padding 緊湊,不佔垂直空間
+
+   使用方式
+   --------
+   {% from "_partials/share_buttons.html" import share_strip,
+        share_strip_styles_and_script %}
+   {{ share_strip(default_path='/etf/' ~ etf.code) }}
+
+   頁面底部一次:
+   {{ share_strip_styles_and_script() }}
+============================================================ #}
+
+{% macro share_strip(default_path='/') %}
+<div class="share-strip" data-share-default-path="{{ default_path }}"
+     role="group" aria-label="分享頁面">
+  <span class="share-strip-label" aria-hidden="true">分享</span>
+  <div class="share-strip-actions">
+
+    {# Facebook #}
+    <button type="button" class="share-strip-btn js-share-btn"
+            data-platform="fb" aria-label="分享到 Facebook">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M22 12.07C22 6.51 17.52 2 12 2S2 6.51 2 12.07c0 5.02 3.66 9.18 8.44 9.93v-7.02H7.9v-2.91h2.54V9.85c0-2.51 1.49-3.9 3.77-3.9 1.09 0 2.24.2 2.24.2v2.47H15.2c-1.24 0-1.63.77-1.63 1.56v1.88h2.78l-.44 2.91h-2.34V22c4.78-.75 8.43-4.91 8.43-9.93z"/>
+      </svg>
+      <span class="share-strip-tip">Facebook</span>
+    </button>
+
+    {# LINE #}
+    <button type="button" class="share-strip-btn js-share-btn"
+            data-platform="line" aria-label="分享到 LINE">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M19.36 9.91c0-3.32-3.33-6.02-7.42-6.02-4.09 0-7.42 2.7-7.42 6.02 0 2.97 2.64 5.46 6.21 5.93.24.05.57.16.65.37.07.18.05.46.02.65l-.1.62c-.03.18-.15.72.63.39.78-.33 4.21-2.48 5.74-4.24 1.06-1.16 1.69-2.34 1.69-3.72zM8.4 11.83H6.95c-.21 0-.39-.17-.39-.39V8.6c0-.21.17-.39.39-.39.21 0 .39.17.39.39v2.45h1.06c.21 0 .39.17.39.39 0 .21-.18.39-.39.39zm1.55-.39c0 .21-.17.39-.39.39-.21 0-.39-.17-.39-.39V8.6c0-.21.17-.39.39-.39.21 0 .39.17.39.39v2.84zm3.42 0c0 .17-.11.32-.27.37-.04.01-.08.02-.13.02-.13 0-.24-.05-.31-.16l-1.49-2.03v1.8c0 .21-.17.39-.39.39-.21 0-.39-.17-.39-.39V8.6c0-.17.11-.32.27-.37.04-.01.08-.02.13-.02.12 0 .24.07.31.16l1.49 2.03v-1.8c0-.21.17-.39.39-.39.21 0 .39.17.39.39v2.84zm2.28-1.81c.21 0 .39.17.39.39 0 .21-.17.39-.39.39h-1.06v.66h1.06c.21 0 .39.17.39.39 0 .21-.17.39-.39.39h-1.45c-.21 0-.39-.17-.39-.39V8.6c0-.21.17-.39.39-.39h1.45c.21 0 .39.17.39.39 0 .21-.17.39-.39.39h-1.06v.66h1.06z"/>
+      </svg>
+      <span class="share-strip-tip">LINE</span>
+    </button>
+
+    {# Threads #}
+    <button type="button" class="share-strip-btn js-share-btn"
+            data-platform="threads" aria-label="分享到 Threads">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M17.32 11.13c-.08-.04-.16-.07-.24-.11-.14-2.55-1.53-4.01-3.87-4.03h-.04c-1.4 0-2.56.6-3.28 1.69l1.29.88c.54-.81 1.38-.99 1.99-.99h.02c.76.01 1.34.23 1.71.66.27.31.45.74.54 1.27a8.7 8.7 0 0 0-2.32-.13c-2.34.15-3.85 1.51-3.75 3.41.05.96.53 1.79 1.36 2.34.7.46 1.6.69 2.54.64 1.24-.07 2.21-.54 2.89-1.4.51-.65.84-1.5 1-2.56.61.37.99.85 1.18 1.43.32 1 .31 2.66-1.23 4.18-1.34 1.32-2.96 1.9-4.81 1.71-2.32-.24-4.07-1.41-4.97-3.21A9.36 9.36 0 0 1 4.7 12c0-2.5.62-4.5 1.84-5.96C7.66 4.66 9.42 3.96 11.85 3.96c2.45 0 4.31.71 5.51 2.11.85.99 1.5 2.27 1.74 3.94l1.5-.4c-.31-2-1.13-3.66-2.25-4.94C16.97 2.86 14.74 2 11.84 2 8.84 2 6.5 2.94 4.93 4.79 3.45 6.55 2.7 8.95 2.7 12c0 3.04.75 5.45 2.23 7.21 1.57 1.85 3.91 2.79 6.91 2.79h.05c2.61-.02 4.49-.71 5.99-2.19 2.18-2.15 2.13-4.86 1.42-6.51-.5-1.16-1.46-2.04-2.78-2.6l-.2-.07zM12.4 16.32c-1.05.06-2.13-.42-2.18-1.43-.04-.74.51-1.58 2.27-1.69h.36c.59 0 1.14.06 1.65.17-.21 2.42-1.34 2.89-2.1 2.95z"/>
+      </svg>
+      <span class="share-strip-tip">Threads</span>
+    </button>
+
+    {# 複製連結 — 兩組 SVG(預設 link / 複製成功 check)互換 #}
+    <button type="button" class="share-strip-btn js-share-btn"
+            data-platform="copy" aria-label="複製連結">
+      <svg class="js-copy-icon-default" width="18" height="18"
+           viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+      </svg>
+      <svg class="js-copy-icon-success" width="18" height="18" style="display:none"
+           viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+      <span class="share-strip-tip js-copy-tip">複製連結</span>
+    </button>
+  </div>
+</div>
+{% endmacro %}
+
+
+{% macro share_strip_styles_and_script() %}
+<style>
+  .share-strip {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.85rem;
+    margin-bottom: 1.5rem;
+    background: rgb(var(--c-bg-soft) / 0.5);
+    border: 1px solid rgb(var(--c-border) / 0.55);
+    border-radius: 0.5rem;
+  }
+  .share-strip-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    color: rgb(var(--c-muted));
+    text-transform: uppercase;
+    user-select: none;
+    flex-shrink: 0;
+  }
+  .share-strip-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.125rem;
+    margin-left: auto;
+  }
+  .share-strip-btn {
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.375rem;
+    color: rgb(var(--c-muted));
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+    flex-shrink: 0;
+  }
+  .share-strip-btn:hover {
+    color: rgb(var(--c-fg));
+    background: rgb(var(--c-border) / 0.45);
+  }
+  .share-strip-btn:active { transform: scale(0.92); }
+  .share-strip-btn.is-copied {
+    color: rgb(var(--c-up));
+    background: rgb(var(--c-up) / 0.12);
+  }
+  .share-strip-btn.is-copied:hover { background: rgb(var(--c-up) / 0.18); }
+
+  /* Tooltip — 只 desktop 顯示 */
+  .share-strip-tip {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translate(-50%, 4px);
+    background: rgb(var(--c-bg-soft));
+    border: 1px solid rgb(var(--c-border));
+    color: rgb(var(--c-fg));
+    font-size: 0.7rem;
+    padding: 0.225rem 0.5rem;
+    border-radius: 0.25rem;
+    opacity: 0;
+    pointer-events: none;
+    white-space: nowrap;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    z-index: 10;
+    font-weight: 500;
+  }
+  .share-strip-btn:hover .share-strip-tip {
+    opacity: 1;
+    transform: translate(-50%, 8px);
+  }
+
+  /* 手機:icon 拉大,tooltip 隱藏(沒 hover) */
+  @media (max-width: 640px) {
+    .share-strip {
+      padding: 0.5rem 0.75rem;
+      gap: 0.5rem;
+    }
+    .share-strip-label { font-size: 0.6rem; letter-spacing: 0.2em; }
+    .share-strip-btn { width: 36px; height: 36px; }
+    .share-strip-btn .share-strip-tip { display: none; }
+  }
+</style>
+
+<script>
+(function() {
+  'use strict';
+
+  function readCookie(name) {
+    var prefix = name + '=';
+    var parts = (document.cookie || '').split(';');
+    for (var i = 0; i < parts.length; i++) {
+      var c = parts[i].trim();
+      if (c.indexOf(prefix) === 0) return decodeURIComponent(c.substring(prefix.length));
+    }
+    return '';
+  }
+
+  function buildShareUrl(defaultPath) {
+    var origin = location.origin;
+    var path = location.pathname || (defaultPath || '/');
+    var ref = readCookie('evw_my_ref');
+    var url = origin + path;
+    if (ref && /^[A-Z0-9]{6}$/.test(ref)) {
+      url += (url.indexOf('?') >= 0 ? '&' : '?') + 'ref=' + encodeURIComponent(ref);
+    }
+    return url;
+  }
+
+  function recordClick(platform, pageUrl) {
+    try {
+      fetch('/api/share/click', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform: platform, page_url: pageUrl })
+      }).catch(function() {});
+    } catch (e) { /* fire-and-forget */ }
+  }
+
+  function openPopup(url) {
+    var w = 600, h = 520;
+    var left = (screen.width - w) / 2;
+    var top = (screen.height - h) / 2;
+    window.open(url, '_blank', 'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top + ',noopener');
+  }
+
+  function showCopied(btn) {
+    var iconDefault = btn.querySelector('.js-copy-icon-default');
+    var iconSuccess = btn.querySelector('.js-copy-icon-success');
+    var tip = btn.querySelector('.js-copy-tip');
+    btn.classList.add('is-copied');
+    if (iconDefault) iconDefault.style.display = 'none';
+    if (iconSuccess) iconSuccess.style.display = '';
+    if (tip) tip.textContent = '已複製';
+    setTimeout(function() {
+      btn.classList.remove('is-copied');
+      if (iconDefault) iconDefault.style.display = '';
+      if (iconSuccess) iconSuccess.style.display = 'none';
+      if (tip) tip.textContent = '複製連結';
+    }, 1800);
+  }
+
+  function copyText(text, btn) {
+    var done = function() { showCopied(btn); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(function() {
+        fallbackCopy(text, done);
+      });
+    } else {
+      fallbackCopy(text, done);
+    }
+  }
+
+  function fallbackCopy(text, done) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  function handleShareClick(btn) {
+    var platform = btn.getAttribute('data-platform');
+    var card = btn.closest('.share-strip');
+    var defaultPath = card ? card.getAttribute('data-share-default-path') : '/';
+    var shareUrl = buildShareUrl(defaultPath);
+    var encoded = encodeURIComponent(shareUrl);
+    var text = encodeURIComponent('ETF 觀察室 — 台股 ETF 排行 / 比較 / 配息');
+
+    recordClick(platform, shareUrl);
+
+    if (platform === 'fb') {
+      openPopup('https://www.facebook.com/sharer/sharer.php?u=' + encoded);
+    } else if (platform === 'line') {
+      openPopup('https://social-plugins.line.me/lineit/share?url=' + encoded);
+    } else if (platform === 'threads') {
+      openPopup('https://www.threads.net/intent/post?text=' + text + '&url=' + encoded);
+    } else if (platform === 'copy') {
+      copyText(shareUrl, btn);
+    }
+  }
+
+  // 30s 停留 → 標記有效引流(只在有 evw_ref_click cookie 時觸發)
+  function scheduleValidPing() {
+    var click = readCookie('evw_ref_click');
+    if (!click) return;
+    setTimeout(function() {
+      try {
+        fetch('/api/share/visit-valid', {
+          method: 'POST',
+          credentials: 'same-origin',
+        }).catch(function() {});
+      } catch (e) { /* fire-and-forget */ }
+    }, 30000);
+  }
+
+  function init() {
+    var btns = document.querySelectorAll('.js-share-btn');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].addEventListener('click', function(e) {
+        handleShareClick(e.currentTarget);
+      });
+    }
+    scheduleValidPing();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+{% endmacro %}
