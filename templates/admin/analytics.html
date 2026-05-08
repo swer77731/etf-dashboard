@@ -329,6 +329,86 @@
 </style>
 {% endif %}
 
+{# === 分享統計(2026-05-08)=== #}
+{% if share_stats is defined and share_stats %}
+<section class="mb-5">
+  <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
+    <span>分享統計</span>
+    <span class="text-xs text-muted font-normal">分享按鈕點擊 + 訪客引流</span>
+  </h2>
+
+  {# 今日各平台 4 卡 #}
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-3">
+    {% set p = share_stats.today_clicks_by_platform %}
+    {% for key, label in [('fb','Facebook'),('line','LINE'),('threads','Threads'),('copy','複製連結')] %}
+      <div class="card p-3 sm:p-4">
+        <div class="text-xs text-muted mb-1">{{ label }}</div>
+        <div class="num font-bold admin-share-num">{{ p[key] }}</div>
+        <div class="text-xs text-muted mt-1">今日點擊</div>
+      </div>
+    {% endfor %}
+  </div>
+
+  {# 引流 3 卡 #}
+  <div class="grid grid-cols-3 gap-2 sm:gap-3 mb-3">
+    <div class="card p-3 sm:p-4">
+      <div class="text-xs text-muted mb-1">今日總引流</div>
+      <div class="num font-bold admin-share-num">{{ share_stats.today_total_visits }}</div>
+      <div class="text-xs text-muted mt-1">含未滿 30 秒</div>
+    </div>
+    <div class="card p-3 sm:p-4">
+      <div class="text-xs text-muted mb-1">今日有效引流</div>
+      <div class="num font-bold admin-share-num" style="color: #10b981;">{{ share_stats.today_valid_visits }}</div>
+      <div class="text-xs text-muted mt-1">停留 ≥ 30 秒</div>
+    </div>
+    <div class="card p-3 sm:p-4">
+      <div class="text-xs text-muted mb-1">今日轉換率</div>
+      <div class="num font-bold admin-share-num">{{ '%.1f'|format(share_stats.valid_rate_today) }}%</div>
+      <div class="text-xs text-muted mt-1">有效引流 / 分享數</div>
+    </div>
+  </div>
+
+  {# Top 10 引流用戶 #}
+  <div class="card p-3 sm:p-4">
+    <h3 class="text-sm font-semibold mb-2">累計引流 Top 10 用戶</h3>
+    {% if share_stats.top_referrers and share_stats.top_referrers|length > 0 %}
+    <div class="overflow-x-auto -mx-3 sm:mx-0">
+      <table class="w-full text-sm min-w-[420px]">
+        <thead>
+          <tr class="text-xs text-muted uppercase tracking-wider border-b border-border">
+            <th class="text-left py-2 px-3 sm:px-2 admin-share-cell">推薦碼</th>
+            <th class="text-left py-2 px-3 sm:px-2 admin-share-cell">暱稱</th>
+            <th class="text-right py-2 px-3 sm:px-2 admin-share-cell whitespace-nowrap">引流總數</th>
+            <th class="text-right py-2 px-3 sm:px-2 admin-share-cell whitespace-nowrap">有效引流</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in share_stats.top_referrers %}
+          <tr class="border-b border-border last:border-b-0">
+            <td class="py-2 px-3 sm:px-2 font-mono text-fg/90 admin-share-cell">{{ r.referral_code }}</td>
+            <td class="py-2 px-3 sm:px-2 text-fg/85 admin-share-cell">{{ r.display_name }}</td>
+            <td class="py-2 px-3 sm:px-2 text-right num admin-share-cell">{{ r.total }}</td>
+            <td class="py-2 px-3 sm:px-2 text-right num admin-share-cell" style="color: #10b981;">{{ r.valid }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-muted text-sm py-4 text-center">尚無引流紀錄</div>
+    {% endif %}
+  </div>
+</section>
+
+<style>
+  .admin-share-num { font-size: 1.5rem; line-height: 1.15; }
+  @media (max-width: 640px) {
+    .admin-share-num { font-size: 1.25rem; }
+    .admin-share-cell { padding: 0.45rem 0.55rem !important; font-size: 12px; }
+  }
+</style>
+{% endif %}
+
 {# === 大字數字卡 — 今日綜合 === #}
 <section class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
   {% set ov = overview %}
