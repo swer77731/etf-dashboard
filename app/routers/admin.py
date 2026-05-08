@@ -280,8 +280,9 @@ async def analytics_page(request: Request, range_days: int = 7):
     member_stats = _member_stats()   # 會員註冊統計(2026-05-02 併入)
     pending_reports = _pending_error_reports_count()  # nav 入口顯示待處理筆數
     backup_summary = _backup_status_summary()         # 備份狀態卡入口用
-    from app.services import data_audit
+    from app.services import data_audit, share_service
     audit_summary = data_audit.get_latest()           # 資料健康管家(2026-05-06)
+    share_stats = share_service.get_admin_share_stats(top_n=10)  # 分享統計(2026-05-08)
 
     return templates.TemplateResponse(
         request, "admin/analytics.html",
@@ -302,6 +303,7 @@ async def analytics_page(request: Request, range_days: int = 7):
             pending_reports_count=pending_reports,
             backup_summary=backup_summary,
             audit_summary=audit_summary,
+            share_stats=share_stats,
             current_user=user,
         ),
     )

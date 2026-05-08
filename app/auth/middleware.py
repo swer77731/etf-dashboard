@@ -48,6 +48,8 @@ class CurrentUserMiddleware:
                             "email": user.email,
                             "display_name": user.display_name,
                             "avatar_url": user.avatar_url,
+                            "referral_code": user.referral_code,
+                            "ad_free_until": user.ad_free_until,
                         }
             except Exception:
                 logger.exception("[auth] load user failed user_id=%s", user_id)
