@@ -1,16 +1,23 @@
 {# ============================================================
    分享按鈕 partial — 極簡 icon strip(2026-05-08 redesign)
+                     + 行動裝置原生分享(2026-05-09 加)
    ------------------------------------------------------------
    設計
    ----
    - 不是 card,不是 CTA — 而是「工具列 / 元資訊條」
-   - 4 個 monochrome SVG icon(28-32px),全 muted 色,hover 才染主色
-   - 左上角極小 「SHARE / 分享」label(uppercase letter-spacing)
+   - **桌機**:4 個 monochrome SVG icon(FB / LINE / Threads / 複製)
+     全 muted 色,hover 才染主色 + 浮現 tooltip
+   - **行動裝置**(navigator.share 存在 + 行動 UA):
+     換成單顆「分享」按鈕,點擊叫系統原生分享選單
+     使用者可選 FB / LINE / IG / Messenger / 簡訊 / 複製等任何 App
+   - 左上角極小「分享」label(uppercase letter-spacing,行動模式隱藏避免重複)
    - 不用品牌色(避免 AI 感)、不用 emoji、不寫 VIP 提示
-   - Tooltip(只 desktop)hover 顯示平台名
    - 複製按鈕:點擊圖示變勾、tooltip 改「已複製」、1.5s 復原
-   - 手機:icon 拉到 36px,tooltip 隱藏(保留純 icon 視覺)
-   - 整體 padding 緊湊,不佔垂直空間
+
+   UTM 追蹤
+   --------
+   所有 share URL 自動帶 ?utm_source=X&utm_medium=share:
+   - FB / LINE / Threads / copy / native(行動原生)
 
    使用方式
    --------
@@ -72,6 +79,19 @@
       <span class="share-strip-tip js-copy-tip">複製連結</span>
     </button>
   </div>
+
+  {# 行動裝置原生分享按鈕 — JS 偵測到 navigator.share + 行動 UA 才顯示 #}
+  <button type="button" class="share-strip-mobile js-share-mobile-btn"
+          aria-label="叫出系統分享選單">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="2" stroke-linecap="round"
+         stroke-linejoin="round" aria-hidden="true">
+      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+      <polyline points="16 6 12 2 8 6"/>
+      <line x1="12" y1="2" x2="12" y2="15"/>
+    </svg>
+    <span>分享</span>
+  </button>
 </div>
 {% endmacro %}
 
@@ -173,6 +193,34 @@
     .share-strip-btn { width: 40px; height: 40px; }
     .share-strip-btn .share-strip-tip { display: none; }
   }
+
+  /* 行動裝置原生分享按鈕 — JS 偵測到 navigator.share + 行動 UA 才顯示 */
+  .share-strip-mobile {
+    display: none;   /* 預設隱藏,JS 加 data-mode="mobile" 才顯示 */
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.5rem 0.95rem;
+    margin-left: auto;
+    border-radius: 0.4rem;
+    background: rgb(var(--c-bg-soft) / 0.9);
+    border: 1px solid rgb(var(--c-border));
+    color: rgb(var(--c-fg));
+    font-size: 0.92rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+    -webkit-tap-highlight-color: transparent;
+    line-height: 1;
+  }
+  .share-strip-mobile:hover { border-color: rgb(var(--c-accent)); }
+  .share-strip-mobile:active { transform: scale(0.97); }
+  .share-strip-mobile svg { color: rgb(var(--c-muted)); }
+
+  /* 行動模式:隱藏桌機 4 顆 + 顯示原生按鈕 + 隱藏左側「分享」label
+     避免「分享 / 分享」重複 */
+  .share-strip[data-mode="mobile"] .share-strip-actions { display: none; }
+  .share-strip[data-mode="mobile"] .share-strip-mobile { display: inline-flex; }
+  .share-strip[data-mode="mobile"] .share-strip-label { display: none; }
 </style>
 
 <script>
@@ -189,15 +237,35 @@
     return '';
   }
 
-  function buildShareUrl(defaultPath) {
+  function buildShareUrl(defaultPath, utmSource) {
     var origin = location.origin;
     var path = location.pathname || (defaultPath || '/');
     var ref = readCookie('evw_my_ref');
     var url = origin + path;
+
+    var params = [];
     if (ref && /^[A-Z0-9]{6}$/.test(ref)) {
-      url += (url.indexOf('?') >= 0 ? '&' : '?') + 'ref=' + encodeURIComponent(ref);
+      params.push('ref=' + encodeURIComponent(ref));
+    }
+    if (utmSource) {
+      params.push('utm_source=' + encodeURIComponent(utmSource));
+      params.push('utm_medium=share');
+    }
+    if (params.length) {
+      url += (url.indexOf('?') >= 0 ? '&' : '?') + params.join('&');
     }
     return url;
+  }
+
+  // 行動裝置 + navigator.share 雙偵測;iPad 桌面 UA 用 maxTouchPoints 兜底
+  function detectMobileShare() {
+    if (typeof navigator.share !== 'function') return false;
+    var ua = navigator.userAgent || '';
+    if (/Android|iPhone|iPad|iPod|Mobile|BlackBerry|IEMobile|Opera Mini/i.test(ua)) {
+      return true;
+    }
+    // iPadOS 13+ 預設用 Macintosh UA,要靠 touch 支援判斷
+    return /Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1;
   }
 
   function recordClick(platform, pageUrl) {
@@ -260,7 +328,8 @@
     var platform = btn.getAttribute('data-platform');
     var card = btn.closest('.share-strip');
     var defaultPath = card ? card.getAttribute('data-share-default-path') : '/';
-    var shareUrl = buildShareUrl(defaultPath);
+    // platform 同時是 utm_source(fb / line / threads / copy)
+    var shareUrl = buildShareUrl(defaultPath, platform);
     var encoded = encodeURIComponent(shareUrl);
     var text = encodeURIComponent('ETF 觀察室 — 台股 ETF 排行 / 比較 / 配息');
 
@@ -275,6 +344,20 @@
     } else if (platform === 'copy') {
       copyText(shareUrl, btn);
     }
+  }
+
+  function handleNativeShare(card) {
+    var defaultPath = card ? card.getAttribute('data-share-default-path') : '/';
+    var shareUrl = buildShareUrl(defaultPath, 'native');
+    // 紀律:不 record 到後端 share_button_clicks(spec 不准動後端);
+    // 走 UTM 由 GA / referer log 接收
+    navigator.share({
+      title: document.title,
+      text: '看看這個 ETF 分析網站',
+      url: shareUrl
+    }).catch(function() {
+      /* user cancel / not supported / 任意失敗都吞掉 */
+    });
   }
 
   // 30s 停留 → 標記有效引流(只在有 evw_ref_click cookie 時觸發)
@@ -298,6 +381,24 @@
         handleShareClick(e.currentTarget);
       });
     }
+
+    // 行動裝置:標 data-mode="mobile" 切換 UI,綁原生 share 按鈕
+    var mobileShare = detectMobileShare();
+    var strips = document.querySelectorAll('.share-strip');
+    for (var j = 0; j < strips.length; j++) {
+      if (mobileShare) {
+        strips[j].setAttribute('data-mode', 'mobile');
+      }
+    }
+    if (mobileShare) {
+      var mobBtns = document.querySelectorAll('.js-share-mobile-btn');
+      for (var k = 0; k < mobBtns.length; k++) {
+        mobBtns[k].addEventListener('click', function(e) {
+          handleNativeShare(e.currentTarget.closest('.share-strip'));
+        });
+      }
+    }
+
     scheduleValidPing();
   }
 
