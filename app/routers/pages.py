@@ -71,7 +71,7 @@ def _show_error_report_for(path: str) -> bool:
     法律 / 教學 / 後台 / 註冊登入 / 雜訊頁(/news 等)預設 False。
     """
     if path in (
-        "/", "/holdings", "/compare", "/dca",
+        "/", "/compare", "/dca",
         "/monthly-income", "/dividend-calendar",
     ):
         return True
@@ -144,7 +144,7 @@ def _evict_expired_if_full():
 def _ttl_cached(key: tuple, build_fn, ttl: float | None = None):
     """Get-or-build with TTL(預設 60s),key 必須 hashable。
 
-    ttl 可覆寫(例:配息日曆 / API holdings 用 300s)。
+    ttl 可覆寫(例:配息日曆用 300s)。
     """
     now = _time.monotonic()
     entry = _ENDPOINT_CACHE.get(key)
@@ -647,60 +647,6 @@ async def monthly_income_preview_redirect():
     return RedirectResponse(url="/monthly-income", status_code=301)
 
 
-def _build_holdings_initial_codes(code_list: tuple[str, ...]) -> list[dict]:
-    """Heavy part of /holdings — ETF lookup for initial_codes(只在 ?codes= 帶值時跑)。"""
-    if not code_list:
-        return []
-    from app.models.etf import ETF
-    from app.database import session_scope
-    from sqlalchemy import select
-    with session_scope() as s:
-        etfs = s.scalars(select(ETF).where(ETF.code.in_(list(code_list)))).all()
-        etf_map = {e.code: e for e in etfs}
-    out = []
-    for c in code_list:
-        e = etf_map.get(c)
-        out.append({
-            "code": c,
-            "name": e.name if e else "",
-            "category": e.category if e else "",
-        })
-    return out
-
-
-_HOLDINGS_ALLOWED_DAYS = (1, 7, 30)
-
-
-@router.get("/holdings", response_class=HTMLResponse)
-async def holdings_page(
-    request: Request,
-    codes: str = "",
-    days: int = 7,
-) -> HTMLResponse:
-    """ETF 持股分析頁 — Alpine.js + AJAX,前端打 /api/etf/{code}/holdings。
-
-    URL ?codes=0050,0056 → 預先勾選那些 ETF。
-    URL ?days=1 / 7 / 30 → 持股變動 section 區間切換,預設 7。
-    上限 3 支(plan 鎖定)。TTL=60s memory cache(key=sorted codes + days)。
-    """
-    if days not in _HOLDINGS_ALLOWED_DAYS:
-        days = 7
-    code_list = tuple([c.strip().upper() for c in codes.split(",") if c.strip()][:3])
-    initial_codes = _ttl_cached(
-        ("holdings_init", tuple(sorted(code_list))),
-        lambda: _build_holdings_initial_codes(code_list),
-    )
-    return templates.TemplateResponse(
-        request, "holdings.html",
-        {
-            **_common_ctx(request),
-            "initial_codes": initial_codes,
-            "days": days,
-            "days_options": _HOLDINGS_ALLOWED_DAYS,
-        },
-    )
-
-
 def _build_etf_detail_payload(code: str):
     """Heavy compute for /etf/{code} — 6 期間報酬 + K 棒走勢 + 配息歷史 + 相關新聞 + 健康度。"""
     detail = etf_metrics.get_etf_detail(code)
@@ -736,84 +682,6 @@ async def etf_detail(request: Request, code: str) -> HTMLResponse:
     if response is None:
         raise HTTPException(status_code=404, detail=f"找不到 ETF: {code}")
     return response
-
-
-@router.get("/test_holdings", response_class=HTMLResponse)
-async def test_holdings(request: Request, code: str = "0050") -> HTMLResponse:
-    """Debug 頁 — 驗證 holdings + holdings_change 資料。
-
-    用法:/test_holdings?code=0050
-    """
-    from app.models.etf import ETF
-    from app.models.holdings import Holding
-    from app.models.holdings_change import HoldingsChange
-    from app.services.sync_status import get_sync_status
-    from app.database import session_scope
-    from sqlalchemy import select, func, desc
-
-    code = code.upper()
-    holdings_data: dict = {}
-    changes_data: dict = {}
-
-    with session_scope() as s:
-        etf = s.scalar(select(ETF).where(ETF.code == code))
-        if etf:
-            # 最新 batch holdings
-            latest_h = s.scalar(
-                select(func.max(Holding.updated_at)).where(Holding.etf_id == etf.id)
-            )
-            if latest_h:
-                rows = s.scalars(
-                    select(Holding).where(Holding.etf_id == etf.id)
-                    .where(Holding.updated_at == latest_h)
-                    .order_by(Holding.rank.asc())
-                ).all()
-                holdings_data = {
-                    "updated_at": latest_h.isoformat(),
-                    "rows": [{
-                        "rank": r.rank, "stock_code": r.stock_code,
-                        "stock_name": r.stock_name, "weight": r.weight,
-                        "sector": r.sector,
-                    } for r in rows],
-                }
-            # 最新 batch changes
-            latest_c = s.scalar(
-                select(func.max(HoldingsChange.updated_at)).where(HoldingsChange.etf_id == etf.id)
-            )
-            if latest_c:
-                cs = s.scalars(
-                    select(HoldingsChange).where(HoldingsChange.etf_id == etf.id)
-                    .where(HoldingsChange.updated_at == latest_c)
-                    .order_by(desc(HoldingsChange.shares_diff))
-                ).all()
-                changes_data = {
-                    "updated_at": latest_c.isoformat(),
-                    "latest_date": cs[0].latest_date.isoformat() if cs else None,
-                    "previous_date": cs[0].previous_date.isoformat() if cs else None,
-                    "buy": [{"stock_code": r.stock_code, "stock_name": r.stock_name,
-                             "shares_diff": r.shares_diff, "weight_latest": r.weight_latest}
-                            for r in cs if r.change_direction == "buy"],
-                    "sell": [{"stock_code": r.stock_code, "stock_name": r.stock_name,
-                              "shares_diff": r.shares_diff, "weight_latest": r.weight_latest}
-                             for r in cs if r.change_direction == "sell"],
-                    "new": [{"stock_code": r.stock_code, "stock_name": r.stock_name,
-                             "shares_diff": r.shares_diff, "weight_latest": r.weight_latest}
-                            for r in cs if r.change_direction == "new"],
-                }
-
-    sync_st = get_sync_status("holdings_cmoney")
-    return templates.TemplateResponse(
-        request, "test_holdings.html",
-        {
-            **_common_ctx(request),
-            "code": code,
-            "etf_found": etf is not None,
-            "etf_name": etf.name if etf else None,
-            "holdings": holdings_data,
-            "changes": changes_data,
-            "sync_status": sync_st,
-        },
-    )
 
 
 @router.get("/contact", response_class=HTMLResponse)
