@@ -344,7 +344,13 @@
     if (platform === 'fb') {
       openPopup('https://www.facebook.com/sharer/sharer.php?u=' + encoded);
     } else if (platform === 'line') {
-      openPopup('https://social-plugins.line.me/lineit/share?url=' + encoded);
+      // 手機:LINE deep link 直接開 App,跳過 web sharer 多一層
+      // 桌機:web sharer popup
+      if (detectMobileShare()) {
+        window.location.href = 'line://msg/text/?' + encoded;
+      } else {
+        openPopup('https://social-plugins.line.me/lineit/share?url=' + encoded);
+      }
     } else if (platform === 'threads') {
       openPopup('https://www.threads.net/intent/post?text=' + text + '&url=' + encoded);
     } else if (platform === 'copy') {
