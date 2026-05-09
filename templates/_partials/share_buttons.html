@@ -35,7 +35,21 @@
   <span class="share-strip-label" aria-hidden="true">分享</span>
   <div class="share-strip-actions">
 
-    {# Facebook #}
+    {# 行動裝置原生分享按鈕 — JS 偵測到 navigator.share + 行動 UA 才顯示
+       擺第一顆(行動模式下最左)。桌機 CSS 隱藏。 #}
+    <button type="button" class="share-strip-mobile js-share-mobile-btn"
+            aria-label="叫出系統分享選單">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round"
+           stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+        <polyline points="16 6 12 2 8 6"/>
+        <line x1="12" y1="2" x2="12" y2="15"/>
+      </svg>
+      <span>分享</span>
+    </button>
+
+    {# Facebook(行動模式 CSS 隱藏 — 手機點 FB 會跳 FB 首頁不是分享框)#}
     <button type="button" class="share-strip-btn js-share-btn"
             data-platform="fb" aria-label="分享到 Facebook">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -79,19 +93,6 @@
       <span class="share-strip-tip js-copy-tip">複製連結</span>
     </button>
   </div>
-
-  {# 行動裝置原生分享按鈕 — JS 偵測到 navigator.share + 行動 UA 才顯示 #}
-  <button type="button" class="share-strip-mobile js-share-mobile-btn"
-          aria-label="叫出系統分享選單">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-         stroke="currentColor" stroke-width="2" stroke-linecap="round"
-         stroke-linejoin="round" aria-hidden="true">
-      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
-      <polyline points="16 6 12 2 8 6"/>
-      <line x1="12" y1="2" x2="12" y2="15"/>
-    </svg>
-    <span>分享</span>
-  </button>
 </div>
 {% endmacro %}
 
@@ -194,32 +195,37 @@
     .share-strip-btn .share-strip-tip { display: none; }
   }
 
-  /* 行動裝置原生分享按鈕 — JS 偵測到 navigator.share + 行動 UA 才顯示 */
+  /* 行動裝置原生分享按鈕 — JS 偵測到 navigator.share + 行動 UA 才顯示
+     擺 .share-strip-actions 第一顆,桌機隱藏 */
   .share-strip-mobile {
     display: none;   /* 預設隱藏,JS 加 data-mode="mobile" 才顯示 */
     align-items: center;
-    gap: 0.45rem;
-    padding: 0.5rem 0.95rem;
-    margin-left: auto;
+    gap: 0.4rem;
+    padding: 0.5rem 0.7rem;
     border-radius: 0.4rem;
     background: rgb(var(--c-bg-soft) / 0.9);
     border: 1px solid rgb(var(--c-border));
     color: rgb(var(--c-fg));
-    font-size: 0.92rem;
+    font-size: 0.88rem;
     font-weight: 500;
     cursor: pointer;
     transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
     -webkit-tap-highlight-color: transparent;
     line-height: 1;
+    flex-shrink: 0;
   }
   .share-strip-mobile:hover { border-color: rgb(var(--c-accent)); }
   .share-strip-mobile:active { transform: scale(0.97); }
   .share-strip-mobile svg { color: rgb(var(--c-muted)); }
 
-  /* 行動模式:隱藏桌機 4 顆 + 顯示原生按鈕 + 隱藏左側「分享」label
-     避免「分享 / 分享」重複 */
-  .share-strip[data-mode="mobile"] .share-strip-actions { display: none; }
+  /* 行動模式(JS 偵測 navigator.share + 行動 UA 後加 data-mode="mobile"):
+     - 顯示 native share 按鈕
+     - 藏 FB(手機點下去跳 FB 首頁,沒用)
+     - 藏左側 SHARE label,避免跟 native button 「分享」字重複
+     - LINE / Threads / 複製 維持 icon 顯示
+  */
   .share-strip[data-mode="mobile"] .share-strip-mobile { display: inline-flex; }
+  .share-strip[data-mode="mobile"] .share-strip-btn[data-platform="fb"] { display: none; }
   .share-strip[data-mode="mobile"] .share-strip-label { display: none; }
 </style>
 
