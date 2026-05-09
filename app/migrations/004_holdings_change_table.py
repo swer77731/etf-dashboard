@@ -2,8 +2,9 @@
 
 Background
 ==========
-CMoney holdings API 一次回 10 天的持股 snapshot,可比對首尾算變動。
-holdings_change 表存「近 10 日 vs 最舊日」的個股增減。
+historical: 此表存近 10 個交易日 ETF 持股 snapshot 比對的個股增減
+(buy / sell / new)。2026-05-09 持股功能下架後保留 schema(資料已 truncate),
+未來若重建持股功能會復用此表結構。
 
 Scope
 =====

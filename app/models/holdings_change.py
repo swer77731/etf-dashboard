@@ -1,7 +1,7 @@
-"""ETF 持股變動 — 近 N 日 buy / sell / new(從 CMoney holdings 10-day window 計算)。
+"""ETF 持股變動 — 近 N 日 buy / sell / new(歷史 schema)。
 
-每次 sync 寫一批新 row(同 etf 同 stock 同 updated_at 不重複)。
-查最新變動 = 取該 etf_id 最新 updated_at 那批。
+2026-05-09 持股功能下架後保留 ORM,資料已 truncate。
+schema 留作未來合法資料源(發行商月報 / 投信公會)重建持股功能時復用。
 """
 from __future__ import annotations
 
