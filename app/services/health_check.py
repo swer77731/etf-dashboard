@@ -27,7 +27,6 @@ EXPECTED_SOURCES = (
     "etf_universe",
     "news_sync",
     "twse_dividend_announce",
-    "holdings_cmoney",
 )
 
 

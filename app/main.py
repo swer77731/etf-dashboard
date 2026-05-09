@@ -143,7 +143,7 @@ def _reset_finmind_quota_on_boot() -> None:
     news_15min cron 觸發後 finmind.request 走 quota gate sleep 60 分鐘 →
     一輪輪 sleep,新聞永遠不抓。清掉讓計數從 boot 重算。
 
-    不影響 universe/holdings/dividend cron 邏輯 — 它們的 quota gate 仍照常
+    不影響 universe/dividend cron 邏輯 — 它們的 quota gate 仍照常
     跑、record 仍照常寫,只是從 0 重新累積。
     """
     if settings.app_env != "production":

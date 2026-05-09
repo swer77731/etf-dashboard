@@ -3,7 +3,6 @@
 排程時間表(timezone Asia/Taipei):
 - 每 15 分鐘  : 新聞 sync(news_sync.sync_recent)
 - 每天 16:00 : K 棒 + 還原股價(kbar_sync.sync_all)
-- 每天 16:30 : CMoney 持股(holdings_sync.sync_etf_holdings_cmoney)
 - 每天 20:00 : TWSE 配息預告(dividend_announce_sync.sync_all)
 - 每天 23:00 : 健康度總檢查(health_check.daily_health_check)
 - 每週日 02:00: dividend 全量 sync(dividend_sync.sync_all)
@@ -41,7 +40,6 @@ from app.services import (
     dividend_sync,
     etf_universe,
     health_check,
-    holdings_sync,
     kbar_sync,
     news_sync,
     tg_notify,
@@ -57,7 +55,6 @@ _locks: dict[str, threading.Lock] = {
     "universe": threading.Lock(),
     "news": threading.Lock(),
     "announce": threading.Lock(),
-    "holdings": threading.Lock(),
     "health": threading.Lock(),
     "daily_report": threading.Lock(),
     "analytics_cleanup": threading.Lock(),
@@ -183,30 +180,6 @@ def announce_job() -> None:
         logger.exception("[announce_job] failed")
     finally:
         _release("announce")
-
-
-def holdings_job(_retry: bool = False) -> None:
-    if not _try_lock("holdings"):
-        return
-    try:
-        logger.info("[holdings_job] start (retry=%s)", _retry)
-        from sqlalchemy import select
-        from app.database import session_scope
-        from app.models.etf import ETF
-        with session_scope() as s:
-            active_codes = list(s.scalars(
-                select(ETF.code).where(ETF.is_active.is_(True))
-                .where(ETF.category != "index")
-            ).all())
-        stats = holdings_sync.sync_etf_holdings_cmoney(active_codes)
-        logger.info("[holdings_job] %s",
-                    {k: (len(v) if isinstance(v, list) else v) for k, v in stats.items()})
-        if not _retry and stats.get("missing_etfs"):
-            _schedule_retry("holdings", lambda: holdings_job(_retry=True))
-    except Exception:
-        logger.exception("[holdings_job] failed")
-    finally:
-        _release("holdings")
 
 
 def health_job() -> None:
@@ -422,13 +395,11 @@ def startup_sync_if_needed() -> None:
                 dividend_job()
                 announce_job()
                 news_job()
-                holdings_job()
             else:
                 logger.info("[startup_sync] DB has data — running incremental")
                 kbar_job()
                 announce_job()
                 news_job()
-                holdings_job()
         except Exception:
             logger.exception("[startup_sync] failed")
 
@@ -456,9 +427,6 @@ def start_scheduler() -> AsyncIOScheduler:
         # 每天 16:00 — K 棒 + 還原股價(收盤後)
         ("kbar_daily", kbar_job,
          CronTrigger(hour=16, minute=0, timezone=tz)),
-        # 每天 16:30 — CMoney 持股
-        ("holdings_daily", holdings_job,
-         CronTrigger(hour=16, minute=30, timezone=tz)),
         # 每天 20:00 — TWSE 配息預告
         ("announce_daily", announce_job,
          CronTrigger(hour=20, minute=0, timezone=tz)),
