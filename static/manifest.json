@@ -1,7 +1,7 @@
 {
   "name": "ETF 觀察室",
   "short_name": "ETF 觀察室",
-  "description": "台股 ETF 排行、配息、持股分析",
+  "description": "台股 ETF 排行、配息、績效比較",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
