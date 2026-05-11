@@ -44,17 +44,17 @@
     {% endif %}
 
     {% if upcoming.total > 0 %}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-5">
       {% for grp_key, grp_label in [
-          ('monthly',   group_labels['monthly']),
-          ('quarterly', group_labels['quarterly']),
-          ('long',      group_labels['long'])
+          ('monthly',     group_labels['monthly']),
+          ('quarterly',   group_labels['quarterly']),
+          ('semi-annual', group_labels['semi-annual']),
+          ('annual',      group_labels['annual'])
         ] %}
         {% set items = upcoming.groups[grp_key] %}
         <div class="div-board-col bg-bg-soft border border-border rounded-lg p-4 transition hover:border-accent/40">
           <div class="mb-3">
-            <div class="text-base font-semibold text-fg">{{ grp_label[0] }}</div>
-            <div class="text-xs text-muted mt-0.5">{{ grp_label[1] }}</div>
+            <div class="text-base font-semibold text-fg">{{ grp_label }}</div>
           </div>
 
           {% if items %}

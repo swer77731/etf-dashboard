@@ -49,14 +49,16 @@ FREQ_PER_YEAR = {
     "annual":      1,
 }
 
-# 三大顯示分組(首頁公布欄 UI 用)
-GROUP_MONTHLY    = "monthly"
-GROUP_QUARTERLY  = "quarterly"      # 季配 + 雙月配
-GROUP_LONG       = "long"           # 半年配 + 年配
+# 四組顯示分組(首頁公布欄 UI 用)— 跟 Frequency 同名直通
+GROUP_MONTHLY     = "monthly"
+GROUP_QUARTERLY   = "quarterly"
+GROUP_SEMI_ANNUAL = "semi-annual"
+GROUP_ANNUAL      = "annual"
 GROUP_LABELS = {
-    GROUP_MONTHLY:   ("月配(月月領)",   "適合想月月領薪水的客戶"),
-    GROUP_QUARTERLY: ("雙月配 / 季配",   "平衡型現金流"),
-    GROUP_LONG:      ("半年配 / 年配",   "大筆入袋"),
+    GROUP_MONTHLY:     "月配",
+    GROUP_QUARTERLY:   "季配",
+    GROUP_SEMI_ANNUAL: "半年配",
+    GROUP_ANNUAL:      "年配",
 }
 
 
@@ -79,14 +81,17 @@ def compute_annualized_yield(amount: float | None, frequency: Frequency | None,
 
 
 def detect_frequency(etf_id: int, lookback_months: int = 18) -> Frequency | None:
-    """看過去 N 個月的 ex_date 數量推測配息頻率。
+    """看過去 N 個月配息「相鄰 ex_date 間隔中位數」推測頻率(間隔法)。
 
-    rule of thumb(以 18 個月為窗):
-    - >= 14 次 → 月配
-    - 5 ~ 13 次 → 季配 / 雙月配(統一回 quarterly)
-    - 2 ~ 4 次 → 半年配
-    - 1 次 → 年配
-    - 0 次 → None(可能新 ETF 沒配息)
+    舊版用「次數」推會誤判:新上市季配 ETF 18 個月內只配 2-4 次 → 被歸半年配。
+    改用間隔中位數穩定得多 — 季配真實間隔 ~90 天、半年配 ~180 天 不會搞混。
+
+    判定門檻:
+    - 中位數 ≤  45 天 → monthly      (月配約 30 天)
+    - 中位數 ≤ 110 天 → quarterly    (季配約 90 天,雙月配約 60 天)
+    - 中位數 ≤ 220 天 → semi-annual  (半年配約 180 天)
+    - 中位數 >  220 天 → annual      (年配約 365 天)
+    - 配息 < 2 筆     → None         (無法算間隔)
     """
     cutoff = date.today() - timedelta(days=int(lookback_months * 30.5))
     with session_scope() as s:
@@ -96,28 +101,30 @@ def detect_frequency(etf_id: int, lookback_months: int = 18) -> Frequency | None
             .where(Dividend.ex_date >= cutoff)
             .where(Dividend.ex_date <= date.today())   # 只看已實現
             .where(Dividend.cash_dividend > 0)
+            .order_by(Dividend.ex_date.asc())
         ).all()
-    n = len(rows)
-    # 月配 ETF 在 18 個月應該配 18 次,留些容差
-    if n >= 14:
+    if len(rows) < 2:
+        return None
+    intervals = sorted((rows[i + 1] - rows[i]).days for i in range(len(rows) - 1))
+    mid = len(intervals) // 2
+    median_days = intervals[mid] if len(intervals) % 2 else (intervals[mid - 1] + intervals[mid]) / 2
+    if median_days <= 45:
         return "monthly"
-    if n >= 5:
+    if median_days <= 110:
         return "quarterly"
-    if n >= 2:
+    if median_days <= 220:
         return "semi-annual"
-    if n >= 1:
-        return "annual"
-    return None
+    return "annual"
 
 
 def freq_to_group(freq: Frequency | None) -> str | None:
-    """配息頻率對應到首頁三大分組。"""
-    if freq == "monthly":
-        return GROUP_MONTHLY
-    if freq == "quarterly":
-        return GROUP_QUARTERLY
-    if freq in ("semi-annual", "annual"):
-        return GROUP_LONG
+    """配息頻率對應到首頁四組(4 組直通,None 不歸組)。
+
+    None 表「過去 18 個月無 2 筆以上配息」— 通常是槓桿 / 反向 / 純成長型 ETF,
+    歸到任何「年配 / 半年配」組都是誤導 → caller 端跳過此 ETF 不顯示。
+    """
+    if freq in ("monthly", "quarterly", "semi-annual", "annual"):
+        return freq
     return None
 
 
@@ -183,7 +190,10 @@ def get_upcoming_dividends(days: int = 14, today: date | None = None,
     today = today or date.today()
     start = today - timedelta(days=past_days) if past_days > 0 else today
     end = today + timedelta(days=days)
-    groups: dict[str, list[dict]] = {GROUP_MONTHLY: [], GROUP_QUARTERLY: [], GROUP_LONG: []}
+    groups: dict[str, list[dict]] = {
+        GROUP_MONTHLY: [], GROUP_QUARTERLY: [],
+        GROUP_SEMI_ANNUAL: [], GROUP_ANNUAL: [],
+    }
 
     with session_scope() as s:
         rows = s.execute(
@@ -201,7 +211,11 @@ def get_upcoming_dividends(days: int = 14, today: date | None = None,
 
         for d, etf in rows:
             freq = detect_frequency(etf.id)
-            grp = freq_to_group(freq) or GROUP_LONG   # 推不出來 → 歸長間隔
+            grp = freq_to_group(freq)
+            if grp is None:
+                # freq=None(過去 18 個月無 2 筆配息)→ 通常是槓桿/反向/純成長
+                # 歸任何「年配/半年配」組都會誤導 user,直接 skip 不顯示
+                continue
             latest = _get_latest_close(s, etf.id)
             latest_close = latest[1] if latest else None
             latest_dt    = latest[0] if latest else None
