@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -257,3 +258,8 @@ app.include_router(api_router.router)
 app.include_router(auth_router.router)
 app.include_router(monthly_income_router.router)
 app.include_router(admin_router.router)
+
+
+@app.get("/ads.txt", response_class=PlainTextResponse)
+def ads_txt():
+    return "google.com, pub-7944099998961875, DIRECT, f08c47fec0942fa0"
