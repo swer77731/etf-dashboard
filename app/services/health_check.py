@@ -25,7 +25,6 @@ EXPECTED_SOURCES = (
     "kbar_sync",
     "dividend_sync",
     "etf_universe",
-    "news_sync",
     "twse_dividend_announce",
 )
 

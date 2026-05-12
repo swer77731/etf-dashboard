@@ -76,7 +76,6 @@ PATH_LABELS: list[tuple[str, str]] = [
     ("/dividend-calendar", "配息日曆"),
     ("/monthly-income", "配息計算器"),
     ("/compare", "績效比較"),
-    ("/news", "新聞"),
     ("/contact", "聯絡"),
     ("/changelog", "更新日誌"),
     ("/disclaimer", "免責聲明"),

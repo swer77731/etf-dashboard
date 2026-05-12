@@ -12,7 +12,7 @@ from datetime import date, datetime, timedelta
 from fastapi import HTTPException
 
 from app.config import PROJECT_ROOT, settings
-from app.services import dividend_metrics, etf_metrics, news_sync, performance, ranking
+from app.services import dividend_metrics, etf_metrics, performance, ranking
 from app.services.time_utils import humanize_relative, is_fresh_news, tw_time
 
 logger = logging.getLogger(__name__)
@@ -236,19 +236,11 @@ def _build_index_payload() -> dict:
         logger.exception("[index] upcoming_dividends failed")
         upcoming = None
 
-    # Phase 2A 新聞 5 則(主流類別,近 30 天才有可能有東西)
-    try:
-        latest_news = news_sync.list_recent_news(limit=5, days=30)
-    except Exception:
-        logger.exception("[index] latest_news failed")
-        latest_news = []
-
     return {
         "sections": sections,
         "market": market,
         "upcoming_dividends": upcoming,
         "upcoming_group_labels": dividend_metrics.GROUP_LABELS,
-        "latest_news": latest_news,
     }
 
 
@@ -348,102 +340,6 @@ async def compare(
             **_common_ctx(request),
             **payload,
         },
-    )
-
-
-# 紀律 #16 — news pagination:
-# 預設一頁 30 筆,user 點「載入更多」抓下一頁(無限滾不做,簡單可靠)。
-# 三 tab:今日(1 天)/ 近 7 天 / 近 30 天 — user 原意「今日」就是今天的快訊
-# (不是 7 天前後)。「全部」tab 拿掉(沒人滾完 900+ 筆)。
-_NEWS_DAYS_CHOICES = {"1": 1, "7": 7, "30": 30}
-_NEWS_DEFAULT_DAYS = "7"
-_NEWS_PAGE_SIZE = 30
-
-
-def _build_news_payload(etf: str | None, days: str, page: int) -> dict:
-    """Server-side pagination — items 只回 page N 那 30 筆,counts 給 tab 顯示。"""
-    days_int = _NEWS_DAYS_CHOICES.get(days, 7)
-    page = max(1, page)
-    offset = (page - 1) * _NEWS_PAGE_SIZE
-    items = news_sync.list_recent_news(
-        etf_code=etf, limit=_NEWS_PAGE_SIZE, offset=offset, days=days_int,
-    )
-    counts = {
-        "1":  news_sync.count_news(etf_code=etf, days=1),
-        "7":  news_sync.count_news(etf_code=etf, days=7),
-        "30": news_sync.count_news(etf_code=etf, days=30),
-    }
-    total = counts.get(days, len(items))
-    has_more = (offset + len(items)) < total
-    return {
-        "items": items,
-        "page": page,
-        "page_size": _NEWS_PAGE_SIZE,
-        "has_more": has_more,
-        "total": total,
-        "etf_filter": etf.upper() if etf else None,
-        "days_filter": days if days in _NEWS_DAYS_CHOICES else _NEWS_DEFAULT_DAYS,
-        "counts": counts,
-    }
-
-
-@router.get("/news", response_class=HTMLResponse)
-async def news(
-    request: Request,
-    etf: str | None = None,
-    days: str = "7",   # 7 / 30,預設近 7 天(快訊);舊 "all" 自動回退 30
-    page: int = 1,
-) -> HTMLResponse:
-    """新聞牆 — 100% 讀本地 news table。
-
-    TTL=60s rendered-HTML cache(key=etf+days+page+today_iso)。
-    page=1 為首頁,後續由 /news/_partial 抓 page=2,3,... 並由 JS append。
-    """
-    if days not in _NEWS_DAYS_CHOICES:
-        days = _NEWS_DEFAULT_DAYS
-    etf_key = etf.upper() if etf else ""
-    today_iso = date.today().isoformat()
-
-    def _build():
-        return {
-            **_common_ctx(request),
-            **_build_news_payload(etf, days, page),
-            "today_iso": today_iso,
-            "request": request,
-        }
-
-    return _render_cached(
-        ("news_html", etf_key, days, page, today_iso), "news.html", _build,
-    )
-
-
-@router.get("/news/_partial", response_class=HTMLResponse)
-async def news_partial(
-    request: Request,
-    etf: str | None = None,
-    days: str = "7",
-    page: int = 2,
-) -> HTMLResponse:
-    """「載入更多」endpoint — 回 30 筆 news rows HTML fragment。
-
-    JS 抓回來後 appendChild 到既有 .card-content 裡。
-    cache 同樣 60s TTL(key 包 page),熱門組合命中率高。
-    """
-    if days not in _NEWS_DAYS_CHOICES:
-        days = _NEWS_DEFAULT_DAYS
-    etf_key = etf.upper() if etf else ""
-    today_iso = date.today().isoformat()
-
-    def _build():
-        return {
-            **_build_news_payload(etf, days, page),
-            "today_iso": today_iso,
-        }
-
-    return _render_cached(
-        ("news_partial", etf_key, days, page, today_iso),
-        "_partials/news_rows.html",
-        _build,
     )
 
 
@@ -648,17 +544,15 @@ async def monthly_income_preview_redirect():
 
 
 def _build_etf_detail_payload(code: str):
-    """Heavy compute for /etf/{code} — 6 期間報酬 + K 棒走勢 + 配息歷史 + 相關新聞 + 健康度。"""
+    """Heavy compute for /etf/{code} — 6 期間報酬 + K 棒走勢 + 配息歷史 + 健康度。"""
     detail = etf_metrics.get_etf_detail(code)
     if not detail:
         return None
-    related_news = news_sync.list_recent_news(etf_code=code.upper(), limit=10)
     # ETF 健康度 — 受益人數 + 規模 兩張卡片
     from app.services import etf_health
     health = etf_health.build_ctx(code.upper())
     return {
         "etf": detail,
-        "related_news": related_news,
         **health,  # has_health_data / holders_card / aum_card
     }
 

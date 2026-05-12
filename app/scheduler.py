@@ -1,7 +1,6 @@
 """APScheduler — 排程拆分版(紀律 #20 監控)。
 
 排程時間表(timezone Asia/Taipei):
-- 每 15 分鐘  : 新聞 sync(news_sync.sync_recent)
 - 每天 16:00 : K 棒 + 還原股價(kbar_sync.sync_all)
 - 每天 20:00 : TWSE 配息預告(dividend_announce_sync.sync_all)
 - 每天 23:00 : 健康度總檢查(health_check.daily_health_check)
@@ -41,7 +40,6 @@ from app.services import (
     etf_universe,
     health_check,
     kbar_sync,
-    news_sync,
     tg_notify,
     yearly_returns_sync,
 )
@@ -53,7 +51,6 @@ _locks: dict[str, threading.Lock] = {
     "kbar": threading.Lock(),
     "dividend": threading.Lock(),
     "universe": threading.Lock(),
-    "news": threading.Lock(),
     "announce": threading.Lock(),
     "health": threading.Lock(),
     "daily_report": threading.Lock(),
@@ -151,21 +148,6 @@ def universe_job(_retry: bool = False) -> None:
         logger.exception("[universe_job] failed")
     finally:
         _release("universe")
-
-
-def news_job(_retry: bool = False) -> None:
-    if not _try_lock("news"):
-        return
-    try:
-        logger.info("[news_job] start (retry=%s)", _retry)
-        stats = news_sync.sync_recent()
-        logger.info("[news_job] %s", stats)
-        if not _retry and stats.get("missing"):
-            _schedule_retry("news", lambda: news_job(_retry=True))
-    except Exception:
-        logger.exception("[news_job] failed")
-    finally:
-        _release("news")
 
 
 def announce_job() -> None:
@@ -394,12 +376,10 @@ def startup_sync_if_needed() -> None:
                 kbar_job()
                 dividend_job()
                 announce_job()
-                news_job()
             else:
                 logger.info("[startup_sync] DB has data — running incremental")
                 kbar_job()
                 announce_job()
-                news_job()
         except Exception:
             logger.exception("[startup_sync] failed")
 
@@ -421,9 +401,6 @@ def start_scheduler() -> AsyncIOScheduler:
 
     # 排程時間表(可調)
     jobs = [
-        # 每 15 分鐘 — 新聞
-        ("news_15min", news_job,
-         CronTrigger(minute="*/15", timezone=tz)),
         # 每天 16:00 — K 棒 + 還原股價(收盤後)
         ("kbar_daily", kbar_job,
          CronTrigger(hour=16, minute=0, timezone=tz)),

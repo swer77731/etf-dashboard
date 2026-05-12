@@ -4,7 +4,6 @@
 
 {% from "_partials/ranking_card.html" import ranking_card %}
 {% from "_partials/dividend_board.html" import div_board %}
-{% from "_partials/news_preview.html" import news_preview %}
 
 {% set CATEGORY_DESC = {
   "market":   "買到台股市值最大的公司",
@@ -124,9 +123,6 @@
     {% endfor %}
   </div>
 </section>
-
-{# === 最新新聞 5 則 === #}
-{{ news_preview(latest_news, today_iso) }}
 
 {# === 全頁底部統一商業免責 === #}
 <section class="text-xs text-muted text-center mt-12 mb-6 max-w-2xl mx-auto leading-relaxed px-4">
