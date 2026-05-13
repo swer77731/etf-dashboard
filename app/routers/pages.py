@@ -633,6 +633,45 @@ async def install_guide(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "install.html", _common_ctx(request))
 
 
+@router.get("/sitemap.xml", include_in_schema=False)
+async def sitemap():
+    """SEO sitemap — 公開頁面 + 所有 active ETF 詳情頁。
+
+    AdSense / Googlebot 用此檔發現網站全部可索引頁面。
+    """
+    from fastapi.responses import Response
+    base = "https://etf-watch.com"
+    static_pages = [
+        "", "/compare", "/dca", "/monthly-income", "/dividend-calendar",
+        "/market-temp", "/ranking/top",
+        "/disclaimer", "/privacy", "/terms", "/account-delete",
+        "/contact", "/changelog", "/install",
+    ]
+    from sqlalchemy import select
+    from app.database import session_scope
+    from app.models.etf import ETF
+    with session_scope() as session:
+        etf_codes = list(session.scalars(
+            select(ETF.code).where(ETF.code != "TAIEX", ETF.is_active == True)  # noqa: E712
+        ))
+
+    today_iso = date.today().isoformat()
+    urls = []
+    for path in static_pages:
+        urls.append(f'<url><loc>{base}{path}</loc><lastmod>{today_iso}</lastmod></url>')
+    for code in etf_codes:
+        urls.append(f'<url><loc>{base}/etf/{code}</loc><lastmod>{today_iso}</lastmod></url>')
+
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        + "\n".join(urls)
+        + "\n</urlset>"
+    )
+    from fastapi.responses import Response as _Resp
+    return _Resp(content=xml, media_type="application/xml")
+
+
 # === PWA 路由(根路徑提供 sw + manifest)===
 # Service Worker 必須從根路徑提供才能控制整個 origin(Service-Worker-Allowed: /)
 # manifest.json 額外從根提供一份,讓 SW pre-cache 清單裡的 /manifest.json 命中
