@@ -1,0 +1,26 @@
+{# Paywall overlay — 在 .paywall-overlay-container 內 absolute 蓋住模糊內容
+   使用方式:
+     <div class="paywall-overlay-container">
+       <div class="paywall-blur">[原內容]</div>
+       {% with pw_title="...", pw_desc="..." %}
+         {% include "_partials/paywall_overlay.html" %}
+       {% endwith %}
+     </div>
+#}
+<div class="paywall-cta" role="region" aria-label="進階版限定內容">
+  <div class="paywall-cta-content">
+    <div class="paywall-cta-badge">進階版</div>
+    <h3 class="paywall-cta-title">{{ pw_title or "進階版專屬功能" }}</h3>
+    <p class="paywall-cta-desc">{{ pw_desc or "解鎖完整數據與分析" }}</p>
+    <div class="paywall-cta-actions">
+      {% if current_user %}
+      <button type="button" class="paywall-btn-primary" onclick="window.openShareModal && window.openShareModal()">
+        分享拿 2 天試用
+      </button>
+      {% else %}
+      <a href="/auth/google/login" class="paywall-btn-primary">登入後分享拿試用</a>
+      {% endif %}
+      <a href="/premium" class="paywall-btn-secondary">了解進階版</a>
+    </div>
+  </div>
+</div>

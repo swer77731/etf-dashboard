@@ -133,6 +133,12 @@
     <div id="gauge" class="gauge-box"></div>
   </div>
 
+  {# 2. 三大法人 + 進階指標 — 非 sponsor 整個區塊 blur #}
+  {% if not is_sponsor %}
+  <div class="paywall-overlay-container mt-7" style="min-height: 600px;">
+    <div class="paywall-blur">
+  {% endif %}
+
   {# 2. 三大法人 3 卡 #}
   <div class="section-title">三大法人籌碼</div>
   <div class="chip-grid">
@@ -360,6 +366,14 @@
       <div id="sblBar" class="opt-bar"></div>
     </div>
   </div>
+
+  {% if not is_sponsor %}
+    </div>{# /.paywall-blur #}
+    {% with pw_title="進階訊號專屬贊助會員", pw_desc="三大法人 / 漲跌家數 / 融資融券 / 借券 完整資料" %}
+      {% include "_partials/paywall_overlay.html" %}
+    {% endwith %}
+  </div>{# /.paywall-overlay-container #}
+  {% endif %}
 </div>
 
 <script id="mt-data" type="application/json">

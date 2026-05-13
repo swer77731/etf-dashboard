@@ -14,7 +14,7 @@
   {%- endif -%}
 {%- endmacro %}
 
-{% macro ranking_table(data, show_category=False) %}
+{% macro ranking_table(data, show_category=False, paywall=False) %}
   {% if data is none or data.row_count == 0 %}
     <div class="text-base text-muted py-10 text-center">
       資料更新中,請稍候。
@@ -37,7 +37,8 @@
         </thead>
         <tbody>
           {% for r in data.rows %}
-          <tr class="border-b border-border/40 hover:bg-bg/40">
+          {% set _locked = paywall and (loop.index > 3) %}
+          <tr class="border-b border-border/40 hover:bg-bg/40 {% if _locked %}paywall-blur{% endif %}">
             <td class="col-primary py-3 px-4 sm:px-3 text-muted text-base" data-label="名次">
               <span class="hidden sm:inline">{{ loop.index }}</span>
               <span class="sm:hidden">

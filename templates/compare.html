@@ -181,9 +181,37 @@
     <span class="hero-text">績效比較</span>
   </h1>
   <p class="text-base text-muted">
-    自選最多 6 支 ETF + 自訂期間,看誰真的賺最多、波動多大。
+    自選最多 {{ '6' if is_sponsor else '2' }} 支 ETF + 自訂期間{% if not is_sponsor %}(免費版上限 30 天){% endif %},看誰真的賺最多、波動多大。
   </p>
 </section>
+
+{% if not is_sponsor and (paywall_applied.codes or paywall_applied.period) %}
+<section class="mb-6 px-5 py-4 rounded-xl border border-amber-500/30 bg-amber-500/8">
+  <div class="flex items-start gap-3 flex-wrap">
+    <span class="paywall-cta-badge" style="flex-shrink: 0;">進階版</span>
+    <div class="flex-1 min-w-[200px]">
+      <div class="text-sm font-medium text-amber-200 mb-1">
+        {% if paywall_applied.codes and paywall_applied.period %}
+          已自動截為 2 檔 ETF + 30 天期間
+        {% elif paywall_applied.codes %}
+          已自動截為 2 檔 ETF(免費版上限)
+        {% elif paywall_applied.period %}
+          已自動截為 30 天期間(免費版上限)
+        {% endif %}
+      </div>
+      <p class="text-xs text-muted">贊助開通解鎖最多 6 檔 + 任意期間比較</p>
+    </div>
+    <div class="inline-flex gap-2 flex-wrap">
+      {% if current_user %}
+      <button type="button" class="paywall-btn-primary" onclick="window.openShareModal && window.openShareModal()">分享拿 2 天試用</button>
+      {% else %}
+      <a href="/auth/google/login" class="paywall-btn-primary">登入後分享拿試用</a>
+      {% endif %}
+      <a href="/premium" class="paywall-btn-secondary">了解進階版</a>
+    </div>
+  </div>
+</section>
+{% endif %}
 
 {# === 表單 === #}
 <section class="relative section-card rounded-xl p-5 sm:p-7 mb-7"

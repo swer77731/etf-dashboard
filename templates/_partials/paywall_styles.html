@@ -1,0 +1,85 @@
+{# Paywall 共用 CSS — base.html 引入 #}
+<style>
+  .paywall-overlay-container { position: relative; overflow: hidden; border-radius: inherit; }
+  .paywall-blur {
+    filter: blur(8px);
+    pointer-events: none;
+    user-select: none;
+  }
+  .paywall-cta {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(10, 14, 26, 0.62);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    z-index: 10;
+    border-radius: inherit;
+    padding: 1.2rem;
+  }
+  .paywall-cta-content {
+    text-align: center;
+    color: rgb(var(--c-fg));
+    max-width: 420px;
+  }
+  .paywall-cta-badge {
+    display: inline-block;
+    padding: 3px 12px;
+    border-radius: 9999px;
+    background: rgb(245 158 11 / 0.2);
+    color: rgb(252 211 77);
+    border: 1px solid rgb(251 191 36 / 0.4);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+  }
+  .paywall-cta-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: rgb(var(--c-fg));
+  }
+  .paywall-cta-desc {
+    font-size: 0.92rem;
+    color: rgb(var(--c-muted));
+    margin-bottom: 14px;
+    line-height: 1.5;
+  }
+  .paywall-cta-actions {
+    display: inline-flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .paywall-btn-primary,
+  .paywall-btn-secondary {
+    display: inline-flex; align-items: center;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    border: 1px solid transparent;
+  }
+  .paywall-btn-primary {
+    background: rgb(245 158 11);
+    color: rgb(17 24 39);
+  }
+  .paywall-btn-primary:hover { background: rgb(251 191 36); }
+  .paywall-btn-secondary {
+    background: transparent;
+    color: rgb(var(--c-fg));
+    border-color: rgb(var(--c-border));
+  }
+  .paywall-btn-secondary:hover {
+    background: rgb(var(--c-card));
+    border-color: rgb(var(--c-accent) / 0.5);
+  }
+  @media (max-width: 480px) {
+    .paywall-cta-title { font-size: 1rem; }
+    .paywall-cta-desc { font-size: 0.85rem; }
+    .paywall-btn-primary, .paywall-btn-secondary { padding: 7px 12px; font-size: 13px; }
+  }
+</style>

@@ -197,8 +197,19 @@
   <div class="card-watermark">ETF Watch</div>
 </section>
 
-{# === 2.5 ETF 健康度(受益人數 + 規模)=== #}
-{% include "_partials/etf_health.html" %}
+{# === 2.5 ETF 健康度(受益人數 + 規模)— 非 sponsor 鎖 === #}
+{% if is_sponsor %}
+  {% include "_partials/etf_health.html" %}
+{% else %}
+<section class="paywall-overlay-container section-card rounded-xl mb-7" style="min-height: 220px;">
+  <div class="paywall-blur p-5 sm:p-7">
+    {% include "_partials/etf_health.html" %}
+  </div>
+  {% with pw_title="受益人數 + ETF 規模", pw_desc="解鎖完整健康度資料" %}
+    {% include "_partials/paywall_overlay.html" %}
+  {% endwith %}
+</section>
+{% endif %}
 
 {# === 3. 走勢圖(近 1 年 / 資料未滿 1 年顯示「自上市以來」)=== #}
 <section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7">
@@ -342,7 +353,19 @@
 </section>
 {% endif %}
 
-{# === 4. 配息歷史(5 年細項 + 年度小計)=== #}
+{# === 4. 配息歷史(5 年細項 + 年度小計)— 非 sponsor 鎖 === #}
+{% if not is_sponsor %}
+<div class="paywall-overlay-container section-card rounded-xl mb-7" style="min-height: 320px;">
+  <div class="paywall-blur p-5 sm:p-7 pb-12">
+    <h2 class="text-xl sm:text-2xl font-semibold mb-4">配息歷史(近 5 年)</h2>
+    <div class="text-base text-muted">近 1 年配息 N 次,合計每股 X.XXXX 元</div>
+    <div class="mt-6 h-48 bg-card/50 rounded"></div>
+  </div>
+  {% with pw_title="配息歷史(近 5 年)", pw_desc="解鎖完整年度小計 + 每筆配息日期 + 殖利率" %}
+    {% include "_partials/paywall_overlay.html" %}
+  {% endwith %}
+</div>
+{% else %}
 <section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7 pb-12">
   <div class="card-watermark-center" aria-hidden="true">ETF Watch</div>
 
@@ -433,6 +456,7 @@
 
   <div class="card-watermark">ETF Watch</div>
 </section>
+{% endif %}
 
 {# === 6. 即將推出 === #}
 <section class="relative overflow-hidden section-card rounded-xl p-5 sm:p-7 mb-7 pb-12 opacity-70">

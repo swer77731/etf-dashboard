@@ -89,11 +89,20 @@ def _common_ctx(request: Request | None = None) -> dict:
     show_error_report:依 request.url.path 判斷,白名單 8 頁顯示浮動回報按鈕。
     """
     from app.auth.oauth import is_google_oauth_enabled
+    from app.services.paywall import is_sponsor as _is_sponsor, get_trial_status
     current_user = None
     show_error_report = False
+    sponsor_flag = False
+    trial_status: dict = {"status": "guest", "until": None}
     if request is not None:
         current_user = getattr(request.state, "user", None)
         show_error_report = _show_error_report_for(request.url.path)
+        if current_user:
+            try:
+                sponsor_flag = _is_sponsor(current_user)
+                trial_status = get_trial_status(current_user)
+            except Exception:
+                pass
     return {
         "app_name": settings.app_name,
         "app_env": settings.app_env,
@@ -103,6 +112,8 @@ def _common_ctx(request: Request | None = None) -> dict:
         "current_user": current_user,
         "google_oauth_enabled": is_google_oauth_enabled(),
         "show_error_report": show_error_report,
+        "is_sponsor": sponsor_flag,
+        "trial_status": trial_status,
         **_detect_brand_assets(),
     }
 
@@ -332,14 +343,28 @@ async def compare(
 
     # 上限 6 支(避免圖表太擠);保留輸入順序但 cache key 用排序版避免 0050,0056 / 0056,0050 命中分裂
     code_list = [c.strip().upper() for c in codes.split(",") if c.strip()][:6]
+
+    # paywall server-side enforcement(非 sponsor 截到 2 檔 + 30 天)
+    common = _common_ctx(request)
+    paywall_applied = {"codes": False, "period": False}
+    if not common.get("is_sponsor"):
+        if len(code_list) > 2:
+            code_list = code_list[:2]
+            paywall_applied["codes"] = True
+        max_period = timedelta(days=30)
+        if (end_date - start_date) > max_period:
+            start_date = end_date - max_period
+            paywall_applied["period"] = True
+
     cache_key = ("compare", tuple(sorted(code_list)), start_date.isoformat(), end_date.isoformat())
     payload = _ttl_cached(cache_key, lambda: _build_compare_payload(tuple(code_list), start_date, end_date))
 
     return templates.TemplateResponse(
         request, "compare.html",
         {
-            **_common_ctx(request),
+            **common,
             **payload,
+            "paywall_applied": paywall_applied,
         },
     )
 

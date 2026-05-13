@@ -60,7 +60,24 @@
     </div>
     {% endif %}
 
-    {{ ranking_table(data, show_category=(kind == "top")) }}
+    {{ ranking_table(data, show_category=(kind == "top"), paywall=(not is_sponsor)) }}
+
+    {% if not is_sponsor and data and data.row_count and data.row_count > 3 %}
+    <div class="mt-6 px-5 py-5 rounded-xl border border-amber-500/30 bg-amber-500/8 text-center">
+      <div class="text-sm font-medium text-amber-200 mb-1">
+        還有 {{ data.row_count - 3 }} 檔 ETF 可以看
+      </div>
+      <p class="text-xs text-muted mb-3">贊助開通解鎖完整排行</p>
+      <div class="inline-flex gap-2 flex-wrap justify-center">
+        {% if current_user %}
+        <button type="button" class="paywall-btn-primary" onclick="window.openShareModal && window.openShareModal()">分享拿 2 天試用</button>
+        {% else %}
+        <a href="/auth/google/login" class="paywall-btn-primary">登入後分享拿試用</a>
+        {% endif %}
+        <a href="/premium" class="paywall-btn-secondary">了解進階版</a>
+      </div>
+    </div>
+    {% endif %}
   </div>
 
   <div class="card-watermark">ETF Watch</div>
