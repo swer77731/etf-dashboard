@@ -355,11 +355,19 @@ async def learn_article(request: Request, slug: str):
         if article.status != "published" and not _is_admin(request):
             raise HTTPException(404, "文章未發布")
 
-        # access_level
+        # access_level — login / sponsor 都用 paywall 蓋(不再強制 redirect)
+        # admin 直接放行
         user = getattr(request.state, "user", None)
-        if article.access_level == "login" and not user and not _is_admin(request):
-            return RedirectResponse(url=f"/auth/google/login?next=/learn/{slug}", status_code=302)
-        is_sponsor_block = (article.access_level == "sponsor")
+        is_admin_flag = _is_admin(request)
+        needs_paywall = False
+        if not is_admin_flag:
+            if article.access_level == "login" and not user:
+                needs_paywall = True
+            elif article.access_level == "sponsor":
+                from app.services.paywall import is_sponsor as _is_sponsor
+                if not _is_sponsor(user):
+                    needs_paywall = True
+        is_sponsor_block = needs_paywall  # 留舊變數名給 template 相容(下方一併改)
 
         # 找同分類前/後/延伸閱讀
         same_cat_q = select(LearnArticle).where(
@@ -401,5 +409,6 @@ async def learn_article(request: Request, slug: str):
             **_common(request),
             "article": article_view,
             "related": related_views,
+            "needs_paywall": needs_paywall,
         },
     )
