@@ -855,6 +855,50 @@ def trigger_yearly_returns_backfill(request: Request):
     }
 
 
+@router.get("/market_temp/status")
+def market_temp_status(request: Request):
+    """5 table row count + latest date + sync_status 摘要,給 diagnostic 用。"""
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
+    from sqlalchemy import func, select
+    from app.database import session_scope
+    from app.models.market_temperature import (
+        MarginMaintenance, MarketBreadth, MarginShortTotal,
+        SecuritiesLendingDaily, InstitutionalDaily,
+    )
+    from app.models.sync_status import SyncStatus
+    out = {}
+    with session_scope() as session:
+        for name, cls in [
+            ("margin_maintenance", MarginMaintenance),
+            ("market_breadth", MarketBreadth),
+            ("margin_short_total", MarginShortTotal),
+            ("securities_lending_daily", SecuritiesLendingDaily),
+            ("institutional_daily", InstitutionalDaily),
+        ]:
+            cnt = session.scalar(select(func.count()).select_from(cls)) or 0
+            latest = session.scalar(select(func.max(cls.date)))
+            out[name] = {"rows": cnt, "latest": latest.isoformat() if latest else None}
+        # sync_status mt_* sources
+        sources = ("mt_breadth", "mt_institutional", "mt_lending",
+                   "mt_margin_short", "mt_maintenance")
+        statuses = {}
+        for src in sources:
+            row = session.scalar(select(SyncStatus).where(SyncStatus.source == src))
+            if row:
+                statuses[src] = {
+                    "last_success": row.last_success_at.isoformat() if row.last_success_at else None,
+                    "last_attempt": row.last_attempt_at.isoformat() if row.last_attempt_at else None,
+                    "last_error": (row.last_error or "")[:200],
+                    "missing_count": row.missing_count or 0,
+                }
+            else:
+                statuses[src] = None
+        out["sync_status"] = statuses
+    return out
+
+
 @router.get("/market_temp/backfill")
 def trigger_market_temp_backfill(request: Request, days: int = 30):
     """手動 backfill 市場溫度計 5 sync 過去 N 天(default 30)。

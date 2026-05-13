@@ -407,11 +407,26 @@ window.addEventListener('load', function() {
       },
       tooltip: {
         trigger: 'axis',
-        axisPointer: { type: 'cross', crossStyle: { color: '#4b5563' } },
-        backgroundColor: 'rgba(10, 14, 26, 0.94)',
+        axisPointer: { type: 'line', lineStyle: { color: '#4b5563', width: 1 } },
+        backgroundColor: 'rgba(10, 14, 26, 0.96)',
         borderColor: '#374151',
+        borderWidth: 1,
         textStyle: { color: '#e5e7eb', fontSize: 12 },
-        padding: [8, 12],
+        padding: [10, 14],
+        extraCssText: 'box-shadow: 0 4px 18px rgba(0,0,0,0.45); border-radius: 8px; max-width: 240px;',
+        formatter: function(params) {
+          if (!params || !params.length) return '';
+          var date = params[0].axisValueLabel || params[0].axisValue || '';
+          var lines = ['<div style="color:#9ca3af;font-size:11px;margin-bottom:4px;">' + date + '</div>'];
+          params.forEach(function(p) {
+            var v = p.value;
+            var vs = (typeof v === 'number')
+              ? (Math.abs(v) >= 1000 ? v.toLocaleString() : v.toFixed(2))
+              : v;
+            lines.push(p.marker + ' ' + p.seriesName + ' <b style="color:#e5e7eb">' + vs + '</b>');
+          });
+          return lines.join('<br/>');
+        },
       },
       xAxis: {
         type: 'category', data: D.dates,
