@@ -83,6 +83,7 @@ def build_payload(days: int = 30) -> dict[str, Any]:
                 .where(
                     InstitutionalDaily.institution == "foreign",
                     InstitutionalDaily.spot_net_yi.is_not(None),
+                    InstitutionalDaily.spot_net_yi != 0,  # 0 = 週末/假日空 row(防禦)
                 )
                 .order_by(InstitutionalDaily.date.desc())
                 .limit(days)

@@ -72,6 +72,10 @@ def _twse_stock_codes() -> set[str]:
 def sync_breadth(target: date_type | None = None) -> dict:
     """每日 1 row:date / up / down / flat。"""
     d = target or _today_tw()
+    # 鐵律:週末/假日 DB 不該有 row(view 端 X 軸跟著歪)
+    if d.weekday() >= 5:
+        logger.debug("[market_temp.breadth] %s weekday skip", d)
+        return {"date": d.isoformat(), "rows": 0, "missing": [], "error": None, "skipped": "weekend"}
     yyyymmdd = d.strftime("%Y%m%d")
 
     rows_written = 0
@@ -148,6 +152,9 @@ def sync_institutional(target: date_type | None = None) -> dict:
     - TaiwanOptionInstitutionalInvestors(TXO 選擇權)
     """
     d = target or _today_tw()
+    if d.weekday() >= 5:
+        logger.debug("[market_temp.institutional] %s weekday skip", d)
+        return {"date": d.isoformat(), "rows": 0, "missing": [], "error": None, "skipped": "weekend"}
     rows_written = 0
     missing: list[str] = []
     err_msg: str | None = None
@@ -267,6 +274,9 @@ def sync_institutional(target: date_type | None = None) -> dict:
 def sync_lending(target: date_type | None = None) -> dict:
     """每日 1 row:volume / deal_count / avg_fee_rate。"""
     d = target or _today_tw()
+    if d.weekday() >= 5:
+        logger.debug("[market_temp.lending] %s weekday skip", d)
+        return {"date": d.isoformat(), "rows": 0, "missing": [], "error": None, "skipped": "weekend"}
     rows_written = 0
     missing: list[str] = []
     err_msg: str | None = None
@@ -325,6 +335,9 @@ def sync_margin_short_and_maintenance(target: date_type | None = None) -> dict:
     紀律 #14 — 不重抓兩次。
     """
     d = target or _today_tw()
+    if d.weekday() >= 5:
+        logger.debug("[market_temp.margin_short] %s weekday skip", d)
+        return {"date": d.isoformat(), "rows": 0, "missing": [], "error": None, "skipped": "weekend"}
     rows_written = 0
     missing: list[str] = []
     err_msg: str | None = None
