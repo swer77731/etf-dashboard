@@ -431,6 +431,94 @@ def analytics_cleanup_job() -> None:
 # Startup bootstrap — server 啟動時若 DB 空就跑全量
 # ─────────────────────────────────────────────────────────────
 
+def mt_auto_backfill_if_needed() -> None:
+    """容器啟動時檢查市場溫度計 5 table latest date,缺漏 > 3 天 → 自動 backfill。
+
+    紀律 #20:抓不到不寫(sync 內 raise + record_sync_attempt),DB 不會留假資料。
+    紀律 #22:每天 23:30 audit + 5 個 cron(14:35/16:05/17:35/18:05)
+              保持新鮮度;這個 startup hook 是「重啟後即時補洞」safety net。
+
+    daemon thread 跑,不阻塞 lifespan。
+    """
+    def _run():
+        try:
+            from datetime import date as date_type, timedelta
+            from sqlalchemy import func, select
+            from app.database import session_scope
+            from app.models.market_temperature import (
+                MarginMaintenance, MarketBreadth, MarginShortTotal,
+                SecuritiesLendingDaily, InstitutionalDaily,
+            )
+
+            today = date_type.today()
+            stale_threshold = today - timedelta(days=3)
+            need_backfill = False
+            earliest_latest = today
+
+            with session_scope() as session:
+                for cls in (MarginMaintenance, MarketBreadth, MarginShortTotal,
+                            SecuritiesLendingDaily, InstitutionalDaily):
+                    latest = session.scalar(select(func.max(cls.date)))
+                    if latest is None or latest < stale_threshold:
+                        need_backfill = True
+                        if latest:
+                            if latest < earliest_latest:
+                                earliest_latest = latest
+                        else:
+                            # 完全沒資料 → 預設補 30 天
+                            earliest_latest = today - timedelta(days=30)
+                            break
+
+            if not need_backfill:
+                logger.info("[mt-auto-backfill] all 5 tables fresh (latest >= %s), skip",
+                            stale_threshold)
+                return
+
+            # 從最早缺的下一天起補,safety margin 多回推 1 天
+            start = earliest_latest - timedelta(days=1)
+            end = today
+            total = (end - start).days + 1
+            logger.info(
+                "[mt-auto-backfill] backfilling %s ~ %s (%d days)",
+                start, end, total,
+            )
+
+            from app.services import market_temp_sync
+            d = start
+            done = 0
+            err = 0
+            while d <= end:
+                try:
+                    r1 = market_temp_sync.sync_breadth(d)
+                    r2 = market_temp_sync.sync_institutional(d)
+                    r3 = market_temp_sync.sync_lending(d)
+                    r4 = market_temp_sync.sync_margin_short_and_maintenance(d)
+                    for tag, r in [("breadth", r1), ("inst", r2),
+                                   ("lend", r3), ("ms", r4)]:
+                        if r.get("error"):
+                            err += 1
+                            logger.warning(
+                                "[mt-auto-backfill] %s/%s err: %s",
+                                d, tag, r["error"][:120],
+                            )
+                except Exception as e:
+                    err += 1
+                    logger.warning("[mt-auto-backfill] %s raise: %s", d, str(e)[:120])
+                done += 1
+                d += timedelta(days=1)
+
+            logger.info(
+                "[mt-auto-backfill] done — days=%d, errors=%d",
+                done, err,
+            )
+        except Exception:
+            logger.exception("[mt-auto-backfill] crashed")
+
+    t = threading.Thread(target=_run, daemon=True, name="mt-auto-backfill")
+    t.start()
+    logger.info("[mt-auto-backfill] started in background")
+
+
 def startup_sync_if_needed() -> None:
     """啟動時跑一次:空 DB → 全 backfill;有資料 → 增量同步。
 

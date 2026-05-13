@@ -24,7 +24,12 @@ from app.routers import api as api_router
 from app.routers import auth as auth_router
 from app.routers import monthly_income as monthly_income_router
 from app.routers import pages as pages_router
-from app.scheduler import shutdown_scheduler, start_scheduler, startup_sync_if_needed
+from app.scheduler import (
+    mt_auto_backfill_if_needed,
+    shutdown_scheduler,
+    start_scheduler,
+    startup_sync_if_needed,
+)
 
 
 class CachedStaticFiles(StaticFiles):
@@ -183,6 +188,7 @@ async def lifespan(app: FastAPI):
     _reset_finmind_quota_on_boot()
     start_scheduler()
     startup_sync_if_needed()  # 背景跑,不卡 web 啟動
+    mt_auto_backfill_if_needed()  # 市場溫度計缺漏 > 3 天 → 背景自動補
     set_app_ready(True)
     logger.info("Startup complete — listening on %s:%s", settings.host, settings.port)
     try:
