@@ -51,10 +51,11 @@
   }
   .tab-pill:hover { color: rgb(var(--c-fg)); border-color: rgb(var(--c-accent) / 0.4); }
   .tab-pill.active {
-    background: rgb(var(--c-accent) / 0.15);
-    border-color: rgb(var(--c-accent) / 0.5);
-    color: rgb(var(--c-accent));
+    background: rgb(var(--c-accent));
+    border-color: rgb(var(--c-accent));
+    color: rgb(var(--c-bg));
   }
+  .tab-pill.active .tab-count { opacity: 0.75; }
   .tab-count { opacity: 0.6; font-size: 11px; }
 
   @keyframes new-pulse {
