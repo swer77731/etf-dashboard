@@ -58,6 +58,15 @@
   .tab-pill.active .tab-count { opacity: 0.75; }
   .tab-count { opacity: 0.6; font-size: 11px; }
 
+  .pinned-badge {
+    display: inline-flex; align-items: center;
+    padding: 2px 8px; font-size: 10px; font-weight: 600;
+    letter-spacing: 0.5px; border-radius: 9999px;
+    background-color: rgb(234 179 8 / 0.2);
+    color: rgb(253 224 71);
+    border: 1px solid rgb(250 204 21 / 0.4);
+  }
+
   @keyframes new-pulse {
     0%, 100% { opacity: 0.85; }
     50%      { opacity: 1; }
@@ -112,8 +121,9 @@
   <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
     {% for a in articles %}
     <a href="/learn/{{ a.slug }}" class="learn-card block">
-      <div class="flex items-center gap-2 mb-3">
+      <div class="flex items-center gap-2 mb-3 flex-wrap">
         <span class="cat-chip cat-chip-{{ a.category.color }}">{{ a.category.name }}</span>
+        {% if a.is_pinned %}<span class="pinned-badge">置頂</span>{% endif %}
         <span class="text-xs {{ a.access_color_class }}">{{ a.access_label }}</span>
       </div>
       <h3 class="text-lg font-semibold mb-2 line-clamp-2 leading-snug">

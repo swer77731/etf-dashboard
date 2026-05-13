@@ -13,6 +13,7 @@ from typing import Optional
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     DateTime,
     ForeignKey,
     Index,
@@ -67,6 +68,7 @@ class LearnArticle(Base):
     # 'draft' | 'published'
     author: Mapped[str] = mapped_column(String(40), nullable=False, default="ETF 觀察室編輯部")
     view_count: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    is_pinned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False

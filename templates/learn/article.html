@@ -89,23 +89,36 @@
   }
 
   .admin-float {
-    position: fixed; right: 16px; bottom: 60px;
+    position: fixed; left: 24px; bottom: 24px;
     display: flex; flex-direction: column; gap: 8px;
-    z-index: 45;
-  }
-  .admin-float button, .admin-float a {
-    background: rgb(17 24 39 / 0.9);
-    border: 1px solid rgb(var(--c-border));
-    color: rgb(var(--c-fg));
-    padding: 7px 14px;
-    border-radius: 6px;
-    font-size: 13px;
+    z-index: 60;  /* 比錯誤回報 z-30/40 高 */
     opacity: 0.85;
     transition: opacity 0.15s;
-    cursor: pointer;
   }
-  .admin-float button:hover, .admin-float a:hover { opacity: 1; }
+  .admin-float:hover { opacity: 1; }
+  .admin-float button, .admin-float a {
+    display: inline-block;
+    padding: 8px 16px;
+    background: rgb(31 41 55 / 0.9);
+    border: 1px solid rgb(75 85 99);
+    color: rgb(229 231 235);
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .admin-float a:hover {
+    background: rgb(245 158 11 / 0.2);
+    border-color: rgb(245 158 11);
+  }
   .admin-float .delete-btn { color: rgb(248 113 113); }
+  .admin-float .delete-btn:hover {
+    background: rgb(239 68 68 / 0.2);
+    border-color: rgb(239 68 68);
+  }
+  @media (max-width: 640px) {
+    .admin-float { bottom: 80px; }  /* 手機避開底部 cookie banner */
+  }
 
   .related-card {
     background: rgb(var(--c-card));

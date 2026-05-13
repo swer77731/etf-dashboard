@@ -91,7 +91,7 @@ async def learn_list(request: Request, category: str | None = None, page: int = 
             )
             if cur_cat:
                 q = q.where(LearnArticle.category_id == cur_cat.id)
-        q = q.order_by(desc(LearnArticle.published_at))
+        q = q.order_by(desc(LearnArticle.is_pinned), desc(LearnArticle.published_at))
         total_filtered = session.scalar(
             select(func.count()).select_from(q.subquery())
         ) or 0
@@ -114,6 +114,7 @@ async def learn_list(request: Request, category: str | None = None, page: int = 
                 "access_label": a.access_label,
                 "access_color_class": a.access_color_class,
                 "is_new": a.is_new,
+                "is_pinned": a.is_pinned,
                 "reading_minutes": a.reading_minutes,
                 "published_at": a.published_at,
             }
@@ -174,6 +175,7 @@ async def learn_save(
     content_md: str = Form(""),
     article_id: Optional[int] = Form(None),
     publish: str = Form(""),  # "1" 表示 publish
+    is_pinned: str = Form(""),  # "1" 表示置頂
 ):
     """儲存(建立 or 更新)— admin only。"""
     redirect = _require_admin(request)
@@ -190,11 +192,27 @@ async def learn_save(
     if not slug or not validate_slug(slug):
         slug = title_to_slug(title)
 
+    want_pinned = (is_pinned == "1")
+
     with session_scope() as session:
         # 驗 category
         cat = session.scalar(select(LearnCategory).where(LearnCategory.id == category_id))
         if not cat:
             raise HTTPException(400, "category 不存在")
+
+        # 置頂上限檢查(5 篇,排除自己)
+        if want_pinned:
+            q = select(func.count()).select_from(LearnArticle).where(
+                LearnArticle.is_pinned == True,  # noqa: E712
+                LearnArticle.deleted_at.is_(None),
+            )
+            if article_id:
+                q = q.where(LearnArticle.id != article_id)
+            pinned_count = session.scalar(q) or 0
+            if pinned_count >= 5:
+                # 不存,redirect 回 edit 帶 error query
+                back_url = f"/learn/edit/{article_id}" if article_id else "/learn/new"
+                return RedirectResponse(url=f"{back_url}?error=pinned_limit", status_code=303)
 
         if article_id:
             article = session.scalar(select(LearnArticle).where(LearnArticle.id == article_id))
@@ -208,6 +226,7 @@ async def learn_save(
             article.access_level = access_level
             article.content_md = content_md
             article.content_html = render_markdown(content_md)
+            article.is_pinned = want_pinned
             if publish == "1" and article.status != "published":
                 article.status = "published"
                 article.published_at = datetime.now()
@@ -222,6 +241,7 @@ async def learn_save(
                 category_id=category_id,
                 access_level=access_level,
                 status="published" if publish == "1" else "draft",
+                is_pinned=want_pinned,
             )
             if publish == "1":
                 article.published_at = datetime.now()
@@ -258,6 +278,7 @@ async def learn_edit(request: Request, article_id: int):
             "access_level": article.access_level,
             "content_md": article.content_md,
             "status": article.status,
+            "is_pinned": article.is_pinned,
         }
     return templates.TemplateResponse(
         request, "learn/editor.html",

@@ -151,8 +151,20 @@
         <label><input type="radio" name="access_level" value="login" {% if article and article.access_level == 'login' %}checked{% endif %}><span>登入後可看</span></label>
         <label title="即將推出"><input type="radio" name="access_level" value="sponsor" {% if article and article.access_level == 'sponsor' %}checked{% endif %}><span>贊助會員(即將推出)</span></label>
       </div>
+      <label class="flex items-center gap-2 mt-3 cursor-pointer" style="font-size: 14px;">
+        <input type="checkbox" name="is_pinned" value="1"
+               style="accent-color: rgb(245 158 11);"
+               {% if article and article.is_pinned %}checked{% endif %}>
+        <span>置頂這篇文章(列表頁優先顯示,最多 5 篇)</span>
+      </label>
     </div>
   </div>
+
+  {% if request.query_params.get('error') == 'pinned_limit' %}
+  <div style="background: rgb(239 68 68 / 0.1); border: 1px solid rgb(239 68 68 / 0.4); color: rgb(252 165 165); padding: 12px 16px; border-radius: 8px; margin: 16px 0; font-size: 14px;">
+    最多只能置頂 5 篇文章。請先取消其他置頂後再儲存。
+  </div>
+  {% endif %}
 
   <div class="md-toolbar">
     <button type="button" onclick="insertMd('## ')">H2 大標</button>
