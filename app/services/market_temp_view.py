@@ -74,21 +74,34 @@ def build_payload(days: int = 30) -> dict[str, Any]:
             data_age_days = 999
             stale_date = None
 
-        # ──────── 2. dates_full (chart 用,從 TAIEX) ────────
-        taiex = session.scalar(select(ETF).where(ETF.code == "TAIEX"))
-        taiex_kbars = []
-        if taiex:
-            taiex_kbars = list(
-                session.scalars(
-                    select(DailyKBar)
-                    .where(DailyKBar.etf_id == taiex.id, DailyKBar.date >= start)
-                    .order_by(DailyKBar.date)
-                )
+        # ──────── 2. dates_full ─ 用「institutional 真實 row date」確保 chart 不前段空白 ────────
+        # 先查 institutional_daily foreign 的 row date(最完整 sync,寬表 row 數最多)
+        inst_date_rows = list(
+            session.scalars(
+                select(InstitutionalDaily.date)
+                .where(InstitutionalDaily.institution == "foreign",
+                       InstitutionalDaily.date >= start)
+                .order_by(InstitutionalDaily.date)
             )
-        taiex_kbars = taiex_kbars[-days:] if len(taiex_kbars) > days else taiex_kbars
-        dates_full = [k.date for k in taiex_kbars]
+        )
+        dates_full = inst_date_rows[-days:] if inst_date_rows else []
         dates_short = [_fmt_short(d) for d in dates_full]
-        taiex_arr = [round(float(k.close), 2) for k in taiex_kbars]
+
+        # TAIEX 對齊 dates_full(缺日填 None,line connectNulls 跳過)
+        taiex_arr: list = []
+        if dates_full:
+            taiex = session.scalar(select(ETF).where(ETF.code == "TAIEX"))
+            taiex_by_date: dict = {}
+            if taiex:
+                taiex_kbars = list(
+                    session.scalars(
+                        select(DailyKBar)
+                        .where(DailyKBar.etf_id == taiex.id,
+                               DailyKBar.date >= dates_full[0])
+                    )
+                )
+                taiex_by_date = {k.date: round(float(k.close), 2) for k in taiex_kbars}
+            taiex_arr = [taiex_by_date.get(d) for d in dates_full]
 
         # ──────── 3. 三大法人 — 抓最近 N 天(各 table 自己的 date) ────────
         inst_rows = list(
