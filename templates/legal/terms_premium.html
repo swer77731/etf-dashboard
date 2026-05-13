@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}服務條款 — {{ brand_full }}{% endblock %}
+
+{% block head %}
+{% include "_partials/legal_styles.html" %}
+<style>
+  .legal-clause { margin-top: 1.8rem; }
+  .legal-clause h2 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: rgb(var(--c-fg));
+    margin-bottom: 0.65rem;
+    border-left: 3px solid rgb(var(--c-accent));
+    padding-left: 10px;
+  }
+  .legal-clause p { line-height: 1.85; margin-bottom: 0.5rem; color: rgb(var(--c-fg) / 0.92); }
+  .legal-intro {
+    background: rgb(var(--c-accent) / 0.06);
+    border: 1px solid rgb(var(--c-accent) / 0.25);
+    border-radius: 8px;
+    padding: 14px 18px;
+    color: rgb(var(--c-fg) / 0.95);
+    line-height: 1.85;
+  }
+  .legal-refs { margin-top: 2.2rem; padding-top: 1rem; border-top: 1px solid rgb(var(--c-border)); }
+  .legal-refs a { color: rgb(var(--c-accent)); text-decoration: underline; text-underline-offset: 3px; word-break: break-all; }
+  .legal-refs a:hover { color: rgb(252 211 77); }
+  .legal-updated { margin-top: 2.2rem; padding-top: 1rem; border-top: 1px solid rgb(var(--c-border)); font-size: 0.85rem; color: rgb(var(--c-muted)); }
+</style>
+{% endblock %}
+
+{% block content %}
+<article class="legal-page">
+  <div class="text-xs text-muted tracking-widest mb-2">
+    <a href="/" class="hover:text-accent">首頁</a>
+    <span class="mx-1">/</span>
+    <span>服務條款</span>
+  </div>
+
+  <h1 class="hero-text">ETF Watch 系統服務條款與免責聲明</h1>
+
+  <div class="bg-card border border-border rounded-xl p-6 sm:p-8 mt-5">
+
+    <div class="legal-intro">
+      歡迎使用 ETF Watch 數據分析系統。在您進行贊助並解鎖進階功能前,
+      請務必詳細閱讀並同意以下條款。
+    </div>
+
+    <section class="legal-clause">
+      <h2>1. 系統定位與資訊性質</h2>
+      <p>本網站為個人獨立開發之量化數據與歷史回測軟體工具。網站內提供之所有 ETF 價格、淨值、籌碼、殖利率及策略回測數據,皆為系統經由公開資訊客觀統計與程式運算之結果。本網站絕不提供任何主觀之市場預測、買賣點位指示或投資建議,亦不具備證券投資顧問之性質。</p>
+    </section>
+
+    <section class="legal-clause">
+      <h2>2. 贊助費用說明</h2>
+      <p>本網站收取之費用,純屬「進階軟體功能之使用授權」與「系統伺服器維護贊助」,並非提供投資建議之顧問費用。您所支付的費用僅代表您取得操作本網站特定數據庫與圖表工具之權限。</p>
+    </section>
+
+    <section class="legal-clause">
+      <h2>3. 投資風險與盈虧自負</h2>
+      <p>金融市場瞬息萬變,歷史數據與回測績效(包含任何策略模型)絕對無法保證未來之獲利。使用者在進行任何真實資金交易前,應具備獨立判斷能力,並自行承擔所有投資風險。使用者因參考本網站數據而產生之任何直接或間接財務虧損,本網站與系統開發者概不負責。</p>
+    </section>
+
+    <section class="legal-clause">
+      <h2>4. 系統穩定度與數據正確性</h2>
+      <p>本站由個人開發者營運,開發者將盡力維持網站運作與資料爬蟲之準確性,但不保證系統能 100% 隨時穩定連線,亦不保證第三方來源數據之絕對無誤或無延遲。如遇伺服器停機、資料源變更或系統升級導致服務暫斷,屬正常軟體營運狀況。</p>
+    </section>
+
+    <section class="legal-clause">
+      <h2>5. 退款與解約權利拋棄</h2>
+      <p>本網站提供之進階數據權限與軟體工具,屬《通訊交易解除權合理例外情事適用準則》第 2 條第 5 款所規定之「一經提供即為完成之線上服務」。本服務一經付款開通即刻生效,不適用消費者保護法第 19 條之七天鑑賞期規定,開通後恕不接受任何理由之退款。但如系統因本網站責任原因致無法提供服務超過 24 小時,本網站將依未使用期間比例退還費用。</p>
+    </section>
+
+    <section class="legal-clause">
+      <h2>6. 申辦資格限制</h2>
+      <p>使用者承諾為年滿 18 歲且具完全行為能力之人。若您為限制行為能力人,應於法定代理人同意後方得使用本服務。</p>
+    </section>
+
+    <section class="legal-clause">
+      <h2>7. 法律準據與管轄</h2>
+      <p>本條款之解釋與適用,以及與本條款有關之爭議,以中華民國法律為準據法,並合意以台灣台北地方法院(或您戶籍地之地方法院)為第一審管轄法院。</p>
+    </section>
+
+    <section class="legal-refs">
+      <h2 class="text-sm font-semibold text-muted mb-3">法條來源</h2>
+      <ul class="space-y-2 text-sm">
+        <li>投顧法:<a href="https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=G0400072" target="_blank" rel="noopener">https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=G0400072</a></li>
+        <li>消保法:<a href="https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=J0170001" target="_blank" rel="noopener">https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=J0170001</a></li>
+        <li>通訊交易例外準則:<a href="https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=J0170028" target="_blank" rel="noopener">https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=J0170028</a></li>
+      </ul>
+    </section>
+
+    <div class="legal-updated">最後更新日期:2026-05-13</div>
+
+  </div>
+</article>
+{% endblock %}

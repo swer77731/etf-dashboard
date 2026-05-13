@@ -613,7 +613,8 @@ async def disclaimer(request: Request) -> HTMLResponse:
 
 @router.get("/terms", response_class=HTMLResponse)
 async def terms(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(request, "legal/terms.html", _common_ctx(request))
+    # 改用 premium 服務條款(7 條,含贊助/退款/管轄)— 取代既有 terms.html
+    return templates.TemplateResponse(request, "legal/terms_premium.html", _common_ctx(request))
 
 
 @router.get("/privacy", response_class=HTMLResponse)
