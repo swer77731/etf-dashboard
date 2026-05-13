@@ -16,7 +16,7 @@
   }
   .editor-input {
     width: 100%;
-    background: transparent;
+    background: rgb(var(--c-card));
     border: 1px solid rgb(var(--c-border));
     border-radius: 8px;
     padding: 10px 12px;
@@ -24,6 +24,20 @@
     font-size: 14px;
   }
   .editor-input:focus { outline: none; border-color: rgb(var(--c-accent)); }
+  /* select dropdown options theme-aware(避免亮色 theme 變白) */
+  .editor-input option {
+    background-color: rgb(var(--c-card));
+    color: rgb(var(--c-fg));
+  }
+  select.editor-input {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20' stroke='%239ca3af' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 16px;
+    padding-right: 36px;
+  }
   .editor-title-input {
     background: transparent; border: none; width: 100%;
     color: rgb(var(--c-fg)); font-size: 30px; font-weight: 700;
