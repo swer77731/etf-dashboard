@@ -22,6 +22,18 @@
   {%- endif -%}
 {%- endmacro %}
 
+{# 「萬張」格式:v / 10000,保留 1 位小數,signed=True 帶 + 號 #}
+{% macro fmt_wan(v, signed=False) -%}
+  {%- if v is none -%}—
+  {%- else -%}
+    {%- set w = v / 10000 -%}
+    {%- if signed and w > 0 -%}+{{ "{:,.1f}".format(w) }}
+    {%- elif w < 0 -%}{{ "{:,.1f}".format(w) }}
+    {%- else -%}{{ "{:,.1f}".format(w) }}
+    {%- endif -%}
+  {%- endif -%}
+{%- endmacro %}
+
 {% macro cls(v) -%}
   {%- if v is none -%}v-neutral
   {%- elif v > 0 -%}v-up
@@ -280,11 +292,11 @@
       <div id="breadthBar" class="opt-bar"></div>
     </div>
 
-    {# 卡 E 融資融券 #}
+    {# 卡 E 融資融券(萬張單位) #}
     <div class="mt-card">
       <div class="chip-title">
         <span class="name">融資融券</span>
-        <span class="unit">全市場,張</span>
+        <span class="unit">全市場,萬張</span>
       </div>
       <table class="period-table">
         <thead>
@@ -293,21 +305,21 @@
         <tbody>
           <tr>
             <td class="th-name">融資</td>
-            <td class="v-neutral">{{ fmt_int(margin_short_summary['long_1d']) }}</td>
-            <td class="{{ cls(margin_short_summary['long_7d_delta']) }}">{{ fmt_signed_int(margin_short_summary['long_7d_delta']) }}</td>
-            <td class="{{ cls(margin_short_summary['long_30d_delta']) }}">{{ fmt_signed_int(margin_short_summary['long_30d_delta']) }}</td>
+            <td class="v-neutral">{{ fmt_wan(margin_short_summary['long_1d']) }}</td>
+            <td class="{{ cls(margin_short_summary['long_7d_delta']) }}">{{ fmt_wan(margin_short_summary['long_7d_delta'], signed=True) }}</td>
+            <td class="{{ cls(margin_short_summary['long_30d_delta']) }}">{{ fmt_wan(margin_short_summary['long_30d_delta'], signed=True) }}</td>
           </tr>
           <tr>
             <td class="th-name">融券</td>
-            <td class="v-neutral">{{ fmt_int(margin_short_summary['short_1d']) }}</td>
-            <td class="{{ cls(margin_short_summary['short_7d_delta']) }}">{{ fmt_signed_int(margin_short_summary['short_7d_delta']) }}</td>
-            <td class="{{ cls(margin_short_summary['short_30d_delta']) }}">{{ fmt_signed_int(margin_short_summary['short_30d_delta']) }}</td>
+            <td class="v-neutral">{{ fmt_wan(margin_short_summary['short_1d']) }}</td>
+            <td class="{{ cls(margin_short_summary['short_7d_delta']) }}">{{ fmt_wan(margin_short_summary['short_7d_delta'], signed=True) }}</td>
+            <td class="{{ cls(margin_short_summary['short_30d_delta']) }}">{{ fmt_wan(margin_short_summary['short_30d_delta'], signed=True) }}</td>
           </tr>
           <tr class="row-total">
             <td class="th-name">加總</td>
-            <td class="v-neutral">{{ fmt_int(margin_short_summary['total_1d']) }}</td>
-            <td class="{{ cls(margin_short_summary['total_7d']) }}">{{ fmt_signed_int(margin_short_summary['total_7d']) }}</td>
-            <td class="{{ cls(margin_short_summary['total_30d']) }}">{{ fmt_signed_int(margin_short_summary['total_30d']) }}</td>
+            <td class="v-neutral">{{ fmt_wan(margin_short_summary['total_1d']) }}</td>
+            <td class="{{ cls(margin_short_summary['total_7d']) }}">{{ fmt_wan(margin_short_summary['total_7d'], signed=True) }}</td>
+            <td class="{{ cls(margin_short_summary['total_30d']) }}">{{ fmt_wan(margin_short_summary['total_30d'], signed=True) }}</td>
           </tr>
         </tbody>
       </table>

@@ -254,10 +254,10 @@ def build_payload(days: int = 30) -> dict[str, Any]:
         margin_short_summary["total_1d"] = _ms_total("long_1d", "short_1d")
         margin_short_summary["total_7d"] = _ms_total("long_7d_delta", "short_7d_delta")
         margin_short_summary["total_30d"] = _ms_total("long_30d_delta", "short_30d_delta")
-        # chart 對齊 dates_full
+        # chart 對齊 dates_full(缺日填 None,ECharts 自動跳過不畫斷崖)
         ms_by = {r.date: r for r in ms_rows}
-        long_arr = [int(ms_by[d].margin_balance) if d in ms_by else 0 for d in dates_full]
-        short_arr = [int(ms_by[d].short_balance) if d in ms_by else 0 for d in dates_full]
+        long_arr = [int(ms_by[d].margin_balance) if d in ms_by else None for d in dates_full]
+        short_arr = [int(ms_by[d].short_balance) if d in ms_by else None for d in dates_full]
 
         # ──────── 6. 借券(獨立 summary + chart) ────────
         sbl_rows = list(
