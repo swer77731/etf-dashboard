@@ -21,4 +21,9 @@ from app.models.market_temperature import (  # noqa: F401
     InstitutionalDaily,
 )
 from app.models.learn import LearnCategory, LearnArticle  # noqa: F401
-from app.models.billing import CheckoutAgreement, UserPlan  # noqa: F401
+from app.models.billing import (  # noqa: F401
+    CheckoutAgreement,
+    UserPlan,
+    Referral,
+    AdminAction,
+)

@@ -41,7 +41,10 @@ class CheckoutAgreement(Base):
 
 
 class UserPlan(Base):
-    """使用者目前方案(預設 free,贊助後變 premium 並含 premium_until)。"""
+    """使用者目前方案(free / trial / premium)。
+
+    解鎖判斷:premium_until OR trial_until 任一 > now → 解鎖。
+    """
     __tablename__ = "user_plans"
     __table_args__ = (
         Index("idx_user_plans_premium_until", "premium_until"),
@@ -52,5 +55,52 @@ class UserPlan(Base):
     )
     current_plan: Mapped[str] = mapped_column(String(16), nullable=False, default="free")
     premium_until: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    trial_until: Mapped[Optional[datetime]] = mapped_column(DateTime)
     total_paid: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     last_payment_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    last_share_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    total_share_count: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    pending_notification: Mapped[bool] = mapped_column(
+        nullable=False, default=False, server_default="0"
+    )
+
+
+class Referral(Base):
+    """訪客點 ref 連結記錄(referrer 試用獎勵的稽核源)。"""
+    __tablename__ = "referrals"
+    __table_args__ = (
+        Index("idx_referrals_referrer", "referrer_user_id"),
+        Index("idx_referrals_token", "ref_token"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    referrer_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    ref_token: Mapped[str] = mapped_column(String(32), nullable=False)
+    visitor_ip: Mapped[Optional[str]] = mapped_column(String(64))
+    visitor_user_agent: Mapped[Optional[str]] = mapped_column(String(512))
+    clicked_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    reward_granted: Mapped[bool] = mapped_column(
+        nullable=False, default=False, server_default="0"
+    )
+    granted_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+
+class AdminAction(Base):
+    """admin 手動開通 / 撤銷權限的稽核 log。"""
+    __tablename__ = "admin_actions"
+    __table_args__ = (
+        Index("idx_admin_actions_target", "target_user_id"),
+        Index("idx_admin_actions_time", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    admin_email: Mapped[str] = mapped_column(String(120), nullable=False)
+    action_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    # 'grant_trial' / 'grant_premium' / 'revoke'
+    target_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    target_user_email: Mapped[Optional[str]] = mapped_column(String(120))
+    days_granted: Mapped[Optional[int]] = mapped_column()
+    reason: Mapped[Optional[str]] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
