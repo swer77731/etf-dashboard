@@ -272,7 +272,21 @@ async def index(request: Request) -> HTMLResponse:
     """首頁 — Phase 2A 瘦身版:hero / 市場概況 / 配息公布欄 / 6 類別卡 2x3 / 新聞 5 則。
 
     TTL=60s memory cache(紀律 #16):heavy 部分 cache,brand / today_iso 即時。
+    紀律 paywall:若帶 ?ref=xxx → 找 referrer 並給 2 天試用(24h 冷卻)。
     """
+    # ref 觸發
+    ref = request.query_params.get("ref", "").strip()
+    if ref and len(ref) == 12 and all(c in "0123456789abcdef" for c in ref):
+        try:
+            from app.services.paywall import find_referrer_by_token, grant_trial_check
+            referrer_id = find_referrer_by_token(ref)
+            if referrer_id:
+                visitor_ip = request.client.host if request.client else None
+                visitor_ua = request.headers.get("user-agent", "")
+                grant_trial_check(referrer_id, ref, visitor_ip, visitor_ua)
+        except Exception:
+            pass  # 失敗不影響首頁
+
     payload = _get_index_payload()
     return templates.TemplateResponse(
         request, "index.html",

@@ -1,0 +1,140 @@
+{# Share modal — 全站可用(base.html include),paywall_overlay 按鈕觸發 #}
+<div id="share-modal" class="sm-overlay" hidden aria-modal="true" role="dialog">
+  <div class="sm-content">
+    <button type="button" class="sm-close" onclick="window.closeShareModal()" aria-label="關閉">×</button>
+    <h3 class="sm-title">分享 ETF 觀察室,拿 2 天試用</h3>
+    <div id="sm-status" class="sm-status">
+      <p>累積成功推薦:<strong id="sm-total">—</strong> 次</p>
+      <p>目前試用到期:<strong id="sm-until">—</strong></p>
+      <p id="sm-next" class="sm-muted" hidden></p>
+    </div>
+    <div class="sm-link-row">
+      <input type="text" id="sm-ref-url" readonly>
+      <button type="button" onclick="window.copyShareLink()" class="paywall-btn-secondary">複製</button>
+    </div>
+    <div class="sm-buttons">
+      <button type="button" onclick="window.shareToLine()" class="sm-share-btn">分享到 LINE</button>
+      <button type="button" onclick="window.shareToFacebook()" class="sm-share-btn">分享到 FB</button>
+      <button type="button" onclick="window.shareToThreads()" class="sm-share-btn">分享到 Threads</button>
+    </div>
+    <p class="sm-hint">每 24 小時最多累積 1 次試用獎勵 — 有人從你的連結進站,你就能拿到 +2 天試用。</p>
+  </div>
+</div>
+
+<style>
+  .sm-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+  }
+  .sm-overlay[hidden] { display: none; }
+  .sm-content {
+    background: rgb(var(--c-card));
+    border: 1px solid rgb(var(--c-border));
+    border-radius: 14px;
+    padding: 22px 24px;
+    width: 100%; max-width: 460px;
+    color: rgb(var(--c-fg));
+    position: relative;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+  }
+  .sm-close {
+    position: absolute; top: 10px; right: 14px;
+    background: transparent; border: none; cursor: pointer;
+    color: rgb(var(--c-muted)); font-size: 22px;
+  }
+  .sm-close:hover { color: rgb(var(--c-fg)); }
+  .sm-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 14px; }
+  .sm-status { font-size: 13px; line-height: 1.85; color: rgb(var(--c-muted)); margin-bottom: 16px; }
+  .sm-status strong { color: rgb(var(--c-fg)); font-weight: 600; }
+  .sm-muted { color: rgb(var(--c-muted)); font-size: 12px; }
+  .sm-link-row { display: flex; gap: 6px; margin-bottom: 14px; }
+  .sm-link-row input {
+    flex: 1; background: rgb(var(--c-bg));
+    border: 1px solid rgb(var(--c-border));
+    border-radius: 6px; padding: 7px 10px;
+    color: rgb(var(--c-fg)); font-size: 13px;
+    font-family: ui-monospace, monospace;
+  }
+  .sm-buttons { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .sm-share-btn {
+    flex: 1; min-width: 110px;
+    background: rgb(var(--c-bg));
+    border: 1px solid rgb(var(--c-border));
+    color: rgb(var(--c-fg));
+    padding: 7px 10px; border-radius: 6px;
+    font-size: 13px; cursor: pointer;
+  }
+  .sm-share-btn:hover { border-color: rgb(var(--c-accent) / 0.5); }
+  .sm-hint { font-size: 11px; color: rgb(var(--c-muted)); line-height: 1.6; margin-top: 4px; }
+</style>
+
+<script>
+(function() {
+  const modal = document.getElementById('share-modal');
+  if (!modal) return;
+
+  async function fetchLink() {
+    const r = await fetch('/api/share/my-link', {credentials: 'same-origin'});
+    if (r.status === 401) {
+      window.location.href = '/auth/google/login?next=' + encodeURIComponent(window.location.pathname);
+      return null;
+    }
+    if (!r.ok) return null;
+    return await r.json();
+  }
+
+  window.openShareModal = async function() {
+    modal.hidden = false;
+    document.getElementById('sm-ref-url').value = '載入中...';
+    const data = await fetchLink();
+    if (!data) return;
+    document.getElementById('sm-ref-url').value = data.ref_url;
+    document.getElementById('sm-total').textContent = data.total_share_count || 0;
+    document.getElementById('sm-until').textContent = data.trial_until
+      ? new Date(data.trial_until).toLocaleString('zh-TW', {dateStyle: 'short', timeStyle: 'short'})
+      : '尚未開通';
+    const nxt = document.getElementById('sm-next');
+    if (!data.can_share_now && data.next_available_at) {
+      nxt.hidden = false;
+      const nd = new Date(data.next_available_at);
+      nxt.textContent = '下次可累積試用:' + nd.toLocaleString('zh-TW', {dateStyle: 'short', timeStyle: 'short'});
+    } else {
+      nxt.hidden = true;
+    }
+  };
+
+  window.closeShareModal = function() { modal.hidden = true; };
+
+  modal.addEventListener('click', e => { if (e.target === modal) window.closeShareModal(); });
+
+  window.copyShareLink = function() {
+    const input = document.getElementById('sm-ref-url');
+    input.select();
+    try { document.execCommand('copy'); } catch(e) {}
+    if (navigator.clipboard) navigator.clipboard.writeText(input.value);
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = '已複製';
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  };
+
+  function _refUrl() { return document.getElementById('sm-ref-url').value; }
+  const SHARE_TEXT = '推薦 ETF 觀察室 — 台灣最完整的 ETF 數據工具';
+
+  window.shareToLine = function() {
+    const url = encodeURIComponent(_refUrl());
+    const text = encodeURIComponent(SHARE_TEXT);
+    window.open(`https://social-plugins.line.me/lineit/share?url=${url}&text=${text}`, '_blank');
+  };
+  window.shareToFacebook = function() {
+    const url = encodeURIComponent(_refUrl());
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, '_blank');
+  };
+  window.shareToThreads = function() {
+    const text = encodeURIComponent(SHARE_TEXT + ' ' + _refUrl());
+    window.open(`https://www.threads.net/intent/post?text=${text}`, '_blank');
+  };
+})();
+</script>

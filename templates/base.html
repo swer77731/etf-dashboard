@@ -1162,5 +1162,37 @@
     {% if show_error_report %}
       {% include "_partials/error_report.html" %}
     {% endif %}
+
+    {# === 分享 modal — 全站可用,paywall CTA 按鈕觸發 === #}
+    {% if current_user %}
+      {% include "_partials/share_modal.html" %}
+    {% endif %}
+
+    {# === 試用開通 toast(referrer 下次登入顯示)=== #}
+    {% if current_user and trial_status and trial_status.status == 'trial' %}
+    <script>
+    (function() {
+      // 簡易檢查 pending(現在的實作:trial 狀態剛開通才顯示一次,用 sessionStorage 防重複)
+      const KEY = 'mt_trial_notified';
+      fetch('/api/share/my-link', {credentials: 'same-origin'}).then(r => r.ok && r.json()).then(d => {
+        if (!d || !d.trial_until) return;
+        const seen = sessionStorage.getItem(KEY);
+        if (seen === d.trial_until) return;
+        // 顯示 toast(簡易)
+        const t = document.createElement('div');
+        t.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);' +
+          'background:rgb(34,197,94);color:white;padding:12px 20px;border-radius:8px;' +
+          'box-shadow:0 8px 24px rgba(0,0,0,0.4);z-index:200;font-size:14px;';
+        const until = new Date(d.trial_until).toLocaleString('zh-TW', {dateStyle:'short', timeStyle:'short'});
+        t.textContent = '+2 天試用已開通,使用到 ' + until;
+        document.body.appendChild(t);
+        setTimeout(() => t.remove(), 5000);
+        sessionStorage.setItem(KEY, d.trial_until);
+        // 清 server 端 pending flag
+        fetch('/api/share/clear-notification', {method:'POST', credentials:'same-origin'}).catch(()=>{});
+      }).catch(()=>{});
+    })();
+    </script>
+    {% endif %}
 </body>
 </html>

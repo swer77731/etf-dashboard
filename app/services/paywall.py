@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Optional
 
 from sqlalchemy import select
@@ -92,6 +92,67 @@ def get_or_create_ref_token(user_id: int) -> str:
     """
     raw = f"{user_id}:{settings.session_secret_key}".encode("utf-8")
     return hashlib.sha256(raw).hexdigest()[:12]
+
+
+def grant_trial_check(referrer_user_id: int, ref_token: str,
+                      visitor_ip: str | None, visitor_ua: str | None) -> dict:
+    """訪客點 ref 連結時,給 referrer 加 2 天試用(24h 冷卻)。
+
+    Returns:
+        {granted: bool, reason: str, trial_until: iso or None}
+    """
+    now = datetime.now()
+    with session_scope() as session:
+        plan = session.scalar(select(UserPlan).where(UserPlan.user_id == referrer_user_id))
+        if plan is None:
+            plan = UserPlan(user_id=referrer_user_id, current_plan="free")
+            session.add(plan)
+            session.flush()
+
+        # 24h 冷卻檢查
+        if plan.last_share_at and (now - plan.last_share_at) < timedelta(hours=24):
+            # 寫 referrals row 但 reward_granted=False
+            from app.models.billing import Referral
+            session.add(Referral(
+                referrer_user_id=referrer_user_id,
+                ref_token=ref_token[:32],
+                visitor_ip=(visitor_ip or "")[:64],
+                visitor_user_agent=(visitor_ua or "")[:512],
+                clicked_at=now,
+                reward_granted=False,
+                granted_at=None,
+            ))
+            return {"granted": False, "reason": "24h cooldown", "trial_until": None}
+
+        # 給 2 天試用(疊加在既有 trial_until 之後)
+        base = plan.trial_until if (plan.trial_until and plan.trial_until > now) else now
+        plan.trial_until = base + timedelta(days=2)
+        plan.last_share_at = now
+        plan.total_share_count = (plan.total_share_count or 0) + 1
+        plan.pending_notification = True
+
+        # 記錄 referrals
+        from app.models.billing import Referral
+        session.add(Referral(
+            referrer_user_id=referrer_user_id,
+            ref_token=ref_token[:32],
+            visitor_ip=(visitor_ip or "")[:64],
+            visitor_user_agent=(visitor_ua or "")[:512],
+            clicked_at=now,
+            reward_granted=True,
+            granted_at=now,
+        ))
+        trial_iso = plan.trial_until.isoformat()
+    logger.info("[paywall.grant_trial] +2d for user %d → %s", referrer_user_id, trial_iso)
+    return {"granted": True, "reason": "ok", "trial_until": trial_iso}
+
+
+def clear_pending_notification(user_id: int) -> None:
+    """user 看到 toast 後 client 呼叫,清掉 flag。"""
+    with session_scope() as session:
+        plan = session.scalar(select(UserPlan).where(UserPlan.user_id == user_id))
+        if plan and plan.pending_notification:
+            plan.pending_notification = False
 
 
 def find_referrer_by_token(token: str) -> Optional[int]:

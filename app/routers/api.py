@@ -456,6 +456,51 @@ async def share_button_click(
     return {"ok": rid is not None, "id": rid}
 
 
+@router.get("/share/my-link")
+async def share_my_link(request: Request) -> dict:
+    """登入用戶取得個人專屬 ref_url + 試用狀態。"""
+    user = getattr(request.state, "user", None)
+    if not user:
+        raise HTTPException(401, "請先登入")
+    from datetime import datetime, timedelta
+    from app.services.paywall import get_or_create_ref_token, get_user_plan, ensure_user_plan
+    uid = user.get("id") or user.get("user_id")
+    if not uid:
+        raise HTTPException(400, "invalid user")
+    plan = get_user_plan(uid) or ensure_user_plan(uid)
+    token = get_or_create_ref_token(uid)
+    base_url = "https://etf-watch.com"
+    next_available = None
+    can_now = True
+    if plan.last_share_at:
+        nxt = plan.last_share_at + timedelta(hours=24)
+        if nxt > datetime.now():
+            next_available = nxt.isoformat()
+            can_now = False
+    return {
+        "ref_url": f"{base_url}/?ref={token}",
+        "share_text": "推薦 ETF 觀察室 — 台灣最完整的 ETF 數據工具",
+        "trial_until": plan.trial_until.isoformat() if plan.trial_until else None,
+        "premium_until": plan.premium_until.isoformat() if plan.premium_until else None,
+        "total_share_count": plan.total_share_count or 0,
+        "next_available_at": next_available,
+        "can_share_now": can_now,
+    }
+
+
+@router.post("/share/clear-notification")
+async def share_clear_notification(request: Request) -> dict:
+    """User 看到 toast 後呼叫,清 pending_notification。"""
+    user = getattr(request.state, "user", None)
+    if not user:
+        raise HTTPException(401)
+    from app.services.paywall import clear_pending_notification
+    uid = user.get("id") or user.get("user_id")
+    if uid:
+        clear_pending_notification(uid)
+    return {"ok": True}
+
+
 @router.post("/share/visit-valid")
 async def share_visit_valid(request: Request) -> dict:
     """訪客在頁面停留 > 30s → JS 呼叫 → mark share_clicks.is_valid=1。

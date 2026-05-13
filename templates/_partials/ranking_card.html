@@ -23,7 +23,7 @@
   "leverage_neg": "leverage_neg",
 } %}
 
-{% macro ranking_card(sec, descriptions) %}
+{% macro ranking_card(sec, descriptions, paywall=False) %}
 {% set is_leverage = (sec.kind in ("leverage_pos", "leverage_neg")) %}
 {# kind=category 用 sec.category;kind=top_movers 用 "top";其他直接 sec.kind #}
 {% set link_kind = sec.category if sec.kind == "category" else _RANKING_URL_KIND.get(sec.kind, sec.kind) %}
@@ -60,7 +60,8 @@
     {% else %}
       <ul class="flex-1 divide-y divide-border/40 num">
         {% for r in sec.data.rows[:5] %}
-        <li class="py-2.5 flex items-center gap-3">
+        {% set _locked = paywall and loop.index > 3 %}
+        <li class="py-2.5 flex items-center gap-3 {% if _locked %}paywall-blur{% endif %}">
           <span class="w-5 text-center text-sm text-muted">{{ loop.index }}</span>
           <div class="flex-1 min-w-0">
             <a href="/etf/{{ r.code }}" class="block">

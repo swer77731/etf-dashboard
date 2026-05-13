@@ -130,7 +130,7 @@
 <section class="mb-7">
   <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
     {% for sec in sections %}
-      {{ ranking_card(sec, CATEGORY_DESC) }}
+      {{ ranking_card(sec, CATEGORY_DESC, paywall=(not is_sponsor)) }}
     {% endfor %}
   </div>
 </section>
