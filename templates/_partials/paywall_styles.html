@@ -79,8 +79,14 @@
   }
   @media (max-width: 480px) {
     .paywall-cta-title { font-size: 1rem; }
-    .paywall-cta-desc { font-size: 0.85rem; }
-    .paywall-btn-primary, .paywall-btn-secondary { padding: 7px 12px; font-size: 13px; }
+    .paywall-cta-desc { font-size: 0.9rem; }
+    /* 手機按鈕不縮反加大 — 紀律 #19「大一點點」+ HIG 觸控 ≥ 44px */
+    .paywall-btn-primary, .paywall-btn-secondary {
+      padding: 12px 18px;
+      font-size: 14px;
+      min-height: 44px;
+      line-height: 1.2;
+    }
   }
 
   /* 用戶狀態 badge(sidebar / mobile menu)*/
