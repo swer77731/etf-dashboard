@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}進階版 — {{ brand_full }}{% endblock %}
+
+{% block head %}
+<style>
+  .premium-page { max-width: 880px; margin: 0 auto; padding: 32px 16px 56px; }
+  .premium-hero {
+    text-align: center; margin-bottom: 44px;
+  }
+  .premium-hero h1 {
+    font-size: 2.2rem; font-weight: 700; margin-bottom: 8px;
+    color: rgb(var(--c-fg));
+    letter-spacing: 0.02em;
+  }
+  .premium-hero .premium-price {
+    font-size: 1.5rem; font-weight: 700;
+    color: rgb(252 211 77);
+    margin: 12px 0 6px;
+  }
+  .premium-hero .premium-status {
+    display: inline-block;
+    padding: 4px 12px; border-radius: 9999px;
+    background: rgb(245 158 11 / 0.15);
+    color: rgb(252 211 77);
+    border: 1px solid rgb(251 191 36 / 0.4);
+    font-size: 12px; letter-spacing: 0.05em;
+  }
+
+  .premium-features {
+    background: rgb(var(--c-card));
+    border: 1px solid rgb(var(--c-border));
+    border-radius: 14px;
+    padding: 28px 32px;
+    margin-bottom: 32px;
+  }
+  .premium-features h2 {
+    font-size: 1.3rem; font-weight: 600; margin-bottom: 18px;
+    border-left: 3px solid rgb(var(--c-accent));
+    padding-left: 12px;
+  }
+  .premium-features ul { list-style: none; padding: 0; }
+  .premium-features li {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 10px 0;
+    border-bottom: 1px solid rgb(var(--c-border) / 0.4);
+    font-size: 15px;
+    color: rgb(var(--c-fg));
+    line-height: 1.6;
+  }
+  .premium-features li:last-child { border-bottom: none; }
+  .premium-features li::before {
+    content: ""; flex-shrink: 0;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: rgb(245 158 11);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%2317191e'%3E%3Cpath fill-rule='evenodd' d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z' clip-rule='evenodd'/%3E%3C/svg%3E");
+    background-size: 14px; background-position: center; background-repeat: no-repeat;
+    margin-top: 2px;
+  }
+
+  .premium-cta {
+    text-align: center;
+    padding: 32px 24px;
+    background: linear-gradient(135deg, rgb(245 158 11 / 0.1), rgb(251 191 36 / 0.05));
+    border: 1px solid rgb(251 191 36 / 0.3);
+    border-radius: 14px;
+    margin-bottom: 24px;
+  }
+  .premium-cta-title {
+    font-size: 1.1rem; font-weight: 600; margin-bottom: 16px;
+  }
+  .premium-btn-large {
+    display: inline-block;
+    padding: 12px 28px;
+    background: rgb(245 158 11);
+    color: rgb(17 24 39);
+    border-radius: 10px;
+    font-size: 15px; font-weight: 600;
+    text-decoration: none; cursor: pointer; border: none;
+  }
+  .premium-btn-large:hover { background: rgb(251 191 36); }
+  .premium-cta-hint {
+    margin-top: 14px;
+    font-size: 12px; color: rgb(var(--c-muted));
+  }
+
+  .premium-terms-note {
+    text-align: center;
+    font-size: 13px;
+    color: rgb(var(--c-muted));
+    margin-top: 12px;
+  }
+  .premium-terms-note a { color: rgb(var(--c-accent)); text-decoration: underline; }
+
+  @media (max-width: 480px) {
+    .premium-hero h1 { font-size: 1.7rem; }
+    .premium-features { padding: 20px 22px; }
+    .premium-features li { font-size: 14px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<article class="premium-page">
+  <header class="premium-hero">
+    <h1>ETF 觀察室 進階版</h1>
+    <div class="premium-price">NT$ 2,999 / 30 天</div>
+    <div class="premium-status">即將開放贊助</div>
+  </header>
+
+  <section class="premium-features">
+    <h2>解鎖功能</h2>
+    <ul>
+      <li>全市場完整排行(254+ 檔 ETF / 7 個分類)</li>
+      <li>績效比較工具:最多 6 檔 ETF + 自訂期間</li>
+      <li>ETF 詳情完整版:配息歷史 / 受益人數 / 規模</li>
+      <li>市場溫度計進階:三大法人 / 漲跌家數 / 融資融券 / 借券</li>
+      <li>定期定額進階分析(規劃中):蒙地卡羅 / 最大回撤 / 稅務試算</li>
+      <li>月領試算進階版(規劃中):通膨情境 / 稅務 / 多 ETF 配置</li>
+      <li>學習專區深度文章(贊助會員專屬)</li>
+    </ul>
+  </section>
+
+  <section class="premium-cta">
+    <div class="premium-cta-title">先體驗 2 天,看看適不適合</div>
+    {% if current_user %}
+    <button type="button" class="premium-btn-large" onclick="window.openShareModal && window.openShareModal()">
+      分享網站,立刻拿 2 天試用
+    </button>
+    {% else %}
+    <a href="/auth/google/login?next=/premium" class="premium-btn-large">登入後分享拿試用</a>
+    {% endif %}
+    <div class="premium-cta-hint">PayUni 審核中,贊助功能即將開放</div>
+  </section>
+
+  <p class="premium-terms-note">
+    使用前請閱讀 <a href="/terms">服務條款</a>
+  </p>
+</article>
+{% endblock %}

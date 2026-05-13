@@ -673,6 +673,12 @@ async def install_guide(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "install.html", _common_ctx(request))
 
 
+@router.get("/premium", response_class=HTMLResponse)
+async def premium(request: Request) -> HTMLResponse:
+    """進階版介紹頁(PayUni 審核中,只放分享拿試用按鈕)。"""
+    return templates.TemplateResponse(request, "premium.html", _common_ctx(request))
+
+
 @router.get("/sitemap.xml", include_in_schema=False)
 async def sitemap():
     """SEO sitemap — 公開頁面 + 所有 active ETF 詳情頁。
@@ -683,7 +689,7 @@ async def sitemap():
     base = "https://etf-watch.com"
     static_pages = [
         "", "/compare", "/dca", "/monthly-income", "/dividend-calendar",
-        "/market-temp", "/ranking/top", "/learn",
+        "/market-temp", "/ranking/top", "/learn", "/premium",
         "/disclaimer", "/privacy", "/terms", "/account-delete",
         "/contact", "/changelog", "/install",
     ]

@@ -51,8 +51,26 @@ def ensure_user_plan(user_id: int) -> UserPlan:
         return plan
 
 
+def _is_admin_email(user: Any) -> bool:
+    """判斷 user.email 是否在 ADMIN_EMAILS 白名單。"""
+    if not user:
+        return False
+    email = user.get("email") if isinstance(user, dict) else getattr(user, "email", None)
+    if not email:
+        return False
+    raw = (settings.admin_email or "").lower()
+    if not raw:
+        return False
+    return email.lower() in {e.strip() for e in raw.split(",") if e.strip()}
+
+
 def is_sponsor(user: Any) -> bool:
-    """判斷是否解鎖進階(付費 OR 試用中)。"""
+    """判斷是否解鎖進階(admin / 付費 / 試用中)。"""
+    if not user:
+        return False
+    # admin 直接視為 sponsor(看完整內容)
+    if _is_admin_email(user):
+        return True
     uid = _user_id_from(user)
     if not uid:
         return False
@@ -69,8 +87,12 @@ def is_sponsor(user: Any) -> bool:
 
 def get_trial_status(user: Any) -> dict:
     """UI 顯示用:{status, until}。
-    status: guest / free / trial / premium
+    status: guest / free / trial / premium / admin
     """
+    if not user:
+        return {"status": "guest", "until": None}
+    if _is_admin_email(user):
+        return {"status": "premium", "until": None, "admin": True}
     uid = _user_id_from(user)
     if not uid:
         return {"status": "guest", "until": None}
