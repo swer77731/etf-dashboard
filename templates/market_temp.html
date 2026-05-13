@@ -4,8 +4,9 @@
 
 {% macro fmt_signed(v, dp=1) -%}
   {%- if v is none -%}—
-  {%- elif v >= 0 -%}+{{ "{:,.{}f}".format(v, dp) }}
-  {%- else -%}{{ "{:,.{}f}".format(v, dp) }}
+  {%- elif v > 0 -%}+{{ "{:,.{}f}".format(v, dp) }}
+  {%- elif v < 0 -%}{{ "{:,.{}f}".format(v, dp) }}
+  {%- else -%}{{ "{:,.{}f}".format(0, dp) }}
   {%- endif -%}
 {%- endmacro %}
 
@@ -15,8 +16,9 @@
 
 {% macro fmt_signed_int(v) -%}
   {%- if v is none -%}—
-  {%- elif v >= 0 -%}+{{ "{:,}".format(v|int) }}
-  {%- else -%}{{ "{:,}".format(v|int) }}
+  {%- elif v > 0 -%}+{{ "{:,}".format(v|int) }}
+  {%- elif v < 0 -%}{{ "{:,}".format(v|int) }}
+  {%- else -%}0
   {%- endif -%}
 {%- endmacro %}
 
