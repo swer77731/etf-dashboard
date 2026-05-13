@@ -74,12 +74,14 @@ def build_payload(days: int = 30) -> dict[str, Any]:
             data_age_days = 999
             stale_date = None
 
-        # ──────── 2. dates_full ─ 用「institutional 真實 row date」確保 chart 不前段空白 ────────
-        # 先查 institutional_daily foreign 的 row date(最完整 sync,寬表 row 數最多)
+        # ──────── 2. dates_full ─ 用「institutional 真實有資料的 row」 ────────
+        # 鐵律 #1 後:institutional row 可能存在但欄位 NULL(抓不到不寫 0)。
+        # X 軸該縮到「spot_net_yi 真的有值」的 row dates,避免前段 bar 空白。
         inst_date_rows = list(
             session.scalars(
                 select(InstitutionalDaily.date)
                 .where(InstitutionalDaily.institution == "foreign",
+                       InstitutionalDaily.spot_net_yi.is_not(None),
                        InstitutionalDaily.date >= start)
                 .order_by(InstitutionalDaily.date)
             )
