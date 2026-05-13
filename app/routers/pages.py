@@ -73,6 +73,7 @@ def _show_error_report_for(path: str) -> bool:
     if path in (
         "/", "/compare", "/dca",
         "/monthly-income", "/dividend-calendar",
+        "/market-temp",
     ):
         return True
     if path.startswith("/etf/") or path.startswith("/ranking/"):
@@ -390,6 +391,23 @@ def _build_dividend_calendar_payload(year: int, month: int) -> dict:
         "events_by_day": events_by_day,
         "total_events": len(events),
     }
+
+
+@router.get("/market-temp", response_class=HTMLResponse)
+async def market_temperature(request: Request) -> HTMLResponse:
+    """市場溫度計 — 融資維持率 gauge + 三大法人 + 漲跌家數 / 融資融券 / 借券。
+
+    純讀本地 DB(資料主權鐵律),5 個 sync 服務在各自釋出時間 cron 更新。
+    """
+    from app.services import market_temp_view
+    payload = market_temp_view.build_payload(days=30)
+    return templates.TemplateResponse(
+        request, "market_temp.html",
+        {
+            **_common_ctx(request),
+            **payload,
+        },
+    )
 
 
 @router.get("/dividend-calendar", response_class=HTMLResponse)
