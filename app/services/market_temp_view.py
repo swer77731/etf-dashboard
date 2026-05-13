@@ -74,19 +74,32 @@ def build_payload(days: int = 30) -> dict[str, Any]:
             data_age_days = 999
             stale_date = None
 
-        # ──────── 2. dates_full ─ 用「institutional 真實有資料的 row」 ────────
-        # 鐵律 #1 後:institutional row 可能存在但欄位 NULL(抓不到不寫 0)。
-        # X 軸該縮到「spot_net_yi 真的有值」的 row dates,避免前段 bar 空白。
+        # ──────── 2. dates_full ─ 滾動 N 個交易日設計 ────────
+        # DB row 本身只有交易日(FinMind 不回假日 / 週末),不用手動 skip。
+        # 從 institutional foreign 抓最近 N 個「spot_net_yi 真值」的 row date。
         inst_date_rows = list(
             session.scalars(
                 select(InstitutionalDaily.date)
-                .where(InstitutionalDaily.institution == "foreign",
-                       InstitutionalDaily.spot_net_yi.is_not(None),
-                       InstitutionalDaily.date >= start)
-                .order_by(InstitutionalDaily.date)
+                .where(
+                    InstitutionalDaily.institution == "foreign",
+                    InstitutionalDaily.spot_net_yi.is_not(None),
+                )
+                .order_by(InstitutionalDaily.date.desc())
+                .limit(days)
             )
         )
-        dates_full = inst_date_rows[-days:] if inst_date_rows else []
+        dates_full = sorted(inst_date_rows)  # desc 抓完反序回時間正序
+
+        # === Sanity check:跨度警示(連假 / 跨年連續休市時放鬆) ===
+        if dates_full and len(dates_full) >= 2:
+            span_days = (dates_full[-1] - dates_full[0]).days
+            expected_max = days * 1.6  # 30 交易日 ~ 42-48 自然日,1.6x 餘裕
+            if span_days > expected_max:
+                import logging as _lg
+                _lg.getLogger(__name__).warning(
+                    "[market-temp] X 軸跨度異常:%d 個交易日跨 %d 自然日(預期 < %d)",
+                    len(dates_full), span_days, int(expected_max),
+                )
         dates_short = [_fmt_short(d) for d in dates_full]
 
         # TAIEX 對齊 dates_full(缺日填 None,line connectNulls 跳過)
