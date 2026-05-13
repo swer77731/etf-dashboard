@@ -73,10 +73,10 @@ def _show_error_report_for(path: str) -> bool:
     if path in (
         "/", "/compare", "/dca",
         "/monthly-income", "/dividend-calendar",
-        "/market-temp",
+        "/market-temp", "/learn",
     ):
         return True
-    if path.startswith("/etf/") or path.startswith("/ranking/"):
+    if path.startswith("/etf/") or path.startswith("/ranking/") or path.startswith("/learn/"):
         return True
     return False
 
@@ -643,16 +643,25 @@ async def sitemap():
     base = "https://etf-watch.com"
     static_pages = [
         "", "/compare", "/dca", "/monthly-income", "/dividend-calendar",
-        "/market-temp", "/ranking/top",
+        "/market-temp", "/ranking/top", "/learn",
         "/disclaimer", "/privacy", "/terms", "/account-delete",
         "/contact", "/changelog", "/install",
     ]
     from sqlalchemy import select
     from app.database import session_scope
     from app.models.etf import ETF
+    from app.models.learn import LearnArticle
     with session_scope() as session:
         etf_codes = list(session.scalars(
             select(ETF.code).where(ETF.code != "TAIEX", ETF.is_active == True)  # noqa: E712
+        ))
+        # 加 public + published 文章
+        learn_articles = list(session.scalars(
+            select(LearnArticle.slug).where(
+                LearnArticle.status == "published",
+                LearnArticle.access_level == "public",
+                LearnArticle.deleted_at.is_(None),
+            )
         ))
 
     today_iso = date.today().isoformat()
@@ -661,6 +670,8 @@ async def sitemap():
         urls.append(f'<url><loc>{base}{path}</loc><lastmod>{today_iso}</lastmod></url>')
     for code in etf_codes:
         urls.append(f'<url><loc>{base}/etf/{code}</loc><lastmod>{today_iso}</lastmod></url>')
+    for slug in learn_articles:
+        urls.append(f'<url><loc>{base}/learn/{slug}</loc><lastmod>{today_iso}</lastmod></url>')
 
     xml = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'

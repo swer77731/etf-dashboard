@@ -20,3 +20,4 @@ from app.models.market_temperature import (  # noqa: F401
     SecuritiesLendingDaily,
     InstitutionalDaily,
 )
+from app.models.learn import LearnCategory, LearnArticle  # noqa: F401

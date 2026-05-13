@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+
+{% block title %}{% if mode == 'edit' %}編輯文章{% else %}新增文章{% endif %} — {{ brand_full }}{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+<style>
+  .editor-shell { max-width: 880px; margin: 0 auto; padding: 24px 16px; }
+  .editor-bar {
+    position: sticky; top: 0; z-index: 30;
+    background: rgb(var(--c-bg));
+    padding: 12px 0;
+    border-bottom: 1px solid rgb(var(--c-border));
+    margin-bottom: 24px;
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .editor-input {
+    width: 100%;
+    background: transparent;
+    border: 1px solid rgb(var(--c-border));
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: rgb(var(--c-fg));
+    font-size: 14px;
+  }
+  .editor-input:focus { outline: none; border-color: rgb(var(--c-accent)); }
+  .editor-title-input {
+    background: transparent; border: none; width: 100%;
+    color: rgb(var(--c-fg)); font-size: 30px; font-weight: 700;
+    padding: 8px 0;
+  }
+  .editor-title-input:focus { outline: none; }
+  .editor-summary {
+    background: transparent;
+    border: 1px solid rgb(var(--c-border)); border-radius: 8px;
+    padding: 10px 12px; width: 100%; color: rgb(var(--c-fg));
+    font-size: 14px; resize: vertical; min-height: 60px;
+  }
+  .editor-content {
+    background: rgb(var(--c-card));
+    border: 1px solid rgb(var(--c-border)); border-radius: 8px;
+    padding: 16px; width: 100%;
+    color: rgb(var(--c-fg)); font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 13px; line-height: 1.7; resize: vertical; min-height: 360px;
+  }
+
+  .md-toolbar { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 10px; }
+  .md-toolbar button {
+    background: rgb(var(--c-card)); border: 1px solid rgb(var(--c-border));
+    border-radius: 6px; padding: 5px 11px; font-size: 12px;
+    color: rgb(var(--c-muted)); cursor: pointer;
+  }
+  .md-toolbar button:hover { color: rgb(var(--c-fg)); border-color: rgb(var(--c-accent) / 0.5); }
+
+  .form-row { margin: 18px 0; }
+  .form-label { font-size: 12px; color: rgb(var(--c-muted)); margin-bottom: 6px; display: block; }
+  .access-radio { display: flex; gap: 14px; flex-wrap: wrap; }
+  .access-radio label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; }
+  .access-radio input[type="radio"] { accent-color: rgb(var(--c-accent)); }
+  .access-radio input[disabled] + span { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-primary {
+    background: rgb(245 158 11); color: rgb(17 24 39);
+    padding: 8px 16px; border-radius: 8px; font-size: 14px;
+    font-weight: 500; cursor: pointer; border: none;
+  }
+  .btn-primary:hover { background: rgb(251 191 36); }
+  .btn-secondary {
+    background: transparent; color: rgb(var(--c-fg));
+    border: 1px solid rgb(var(--c-border));
+    padding: 8px 14px; border-radius: 8px; font-size: 14px;
+    cursor: pointer;
+  }
+  .btn-secondary:hover { background: rgb(var(--c-card)); }
+
+  .preview-pane {
+    margin-top: 24px;
+    background: rgb(var(--c-card));
+    border: 1px solid rgb(var(--c-border));
+    border-radius: 10px;
+    padding: 20px 24px;
+    color: rgb(var(--c-fg));
+    line-height: 1.85; font-size: 15px;
+  }
+  .preview-pane h2 { font-size: 1.4rem; font-weight: 600; margin: 1.3rem 0 0.6rem; }
+  .preview-pane h3 { font-size: 1.1rem; font-weight: 600; margin: 1rem 0 0.5rem; }
+  .preview-pane p { margin: 0.8rem 0; }
+  .preview-pane a { color: rgb(252 211 77); text-decoration: underline; }
+  .preview-pane code { background: rgb(31 41 55); padding: 2px 6px; border-radius: 4px; color: rgb(252 211 77); font-size: 0.9em; }
+  .preview-pane pre { background: rgb(17 24 39); padding: 14px; border-radius: 6px; overflow-x: auto; }
+  .preview-pane pre code { background: transparent; padding: 0; color: rgb(229 231 235); }
+  .preview-pane blockquote { border-left: 3px solid rgb(252 211 77); padding-left: 12px; margin: 1rem 0; color: rgb(var(--c-muted)); }
+  .preview-pane table { border-collapse: collapse; width: 100%; }
+  .preview-pane th, .preview-pane td { border: 1px solid rgb(var(--c-border)); padding: 6px 10px; font-size: 14px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<form method="post" action="/learn/save" id="editor-form" class="editor-shell">
+  <div class="editor-bar">
+    <a href="/learn" class="btn-secondary">← 返回列表</a>
+    <button type="button" class="btn-secondary" onclick="togglePreview()">預覽</button>
+    <span class="flex-1"></span>
+    <button type="submit" name="publish" value="" class="btn-secondary">儲存草稿</button>
+    <button type="submit" name="publish" value="1" class="btn-primary">儲存並發布</button>
+  </div>
+
+  {% if article %}<input type="hidden" name="article_id" value="{{ article.id }}">{% endif %}
+
+  <input type="text" name="title" class="editor-title-input" placeholder="輸入文章標題..."
+         value="{{ article.title if article else '' }}" required maxlength="120">
+
+  <div class="form-row">
+    <label class="form-label">Slug(URL,自動產生可手動覆寫)</label>
+    <input type="text" name="slug" class="editor-input" pattern="[a-z0-9\-]*" maxlength="120"
+           value="{{ article.slug if article else '' }}" placeholder="例:etf-basics-intro">
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">摘要(列表頁顯示)</label>
+    <textarea name="summary" class="editor-summary" maxlength="240" placeholder="2-3 句說明這篇文章內容">{{ article.summary if article else '' }}</textarea>
+  </div>
+
+  <div class="form-row grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div>
+      <label class="form-label">分類</label>
+      <select name="category_id" class="editor-input" required>
+        {% for c in cats %}
+        <option value="{{ c.id }}" {% if article and article.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="form-label">存取等級</label>
+      <div class="access-radio mt-2">
+        <label><input type="radio" name="access_level" value="public" {% if not article or article.access_level == 'public' %}checked{% endif %}><span>公開</span></label>
+        <label><input type="radio" name="access_level" value="login" {% if article and article.access_level == 'login' %}checked{% endif %}><span>登入後可看</span></label>
+        <label title="即將推出"><input type="radio" name="access_level" value="sponsor" {% if article and article.access_level == 'sponsor' %}checked{% endif %}><span>贊助會員(即將推出)</span></label>
+      </div>
+    </div>
+  </div>
+
+  <div class="md-toolbar">
+    <button type="button" onclick="insertMd('## ')">H2 大標</button>
+    <button type="button" onclick="insertMd('### ')">H3 小標</button>
+    <button type="button" onclick="wrapMd('**', '**')">B 粗體</button>
+    <button type="button" onclick="wrapMd('*', '*')">I 斜體</button>
+    <button type="button" onclick="insertMd('- ')">清單</button>
+    <button type="button" onclick="insertMd('1. ')">編號</button>
+    <button type="button" onclick="insertMd('> ')">引用</button>
+    <button type="button" onclick="wrapMd('[', '](https://)')">連結</button>
+    <button type="button" onclick="insertMd('| 欄 1 | 欄 2 |\n|---|---|\n| 值 1 | 值 2 |\n')">表格</button>
+    <button type="button" onclick="wrapMd('```\n', '\n```')">程式碼</button>
+  </div>
+
+  <textarea name="content_md" id="md-content" class="editor-content"
+            placeholder="用 Markdown 寫作..." maxlength="102400">{{ article.content_md if article else '' }}</textarea>
+
+  <div id="preview-pane" class="preview-pane" style="display:none;">
+    <h3 class="text-muted text-sm mb-3">預覽</h3>
+    <div id="preview-body"></div>
+  </div>
+</form>
+
+<script>
+const ta = document.getElementById('md-content');
+
+function insertMd(prefix) {
+  const start = ta.selectionStart;
+  const end = ta.selectionEnd;
+  ta.value = ta.value.substring(0, start) + prefix + ta.value.substring(end);
+  ta.selectionStart = ta.selectionEnd = start + prefix.length;
+  ta.focus();
+}
+
+function wrapMd(left, right) {
+  const start = ta.selectionStart;
+  const end = ta.selectionEnd;
+  const sel = ta.value.substring(start, end);
+  ta.value = ta.value.substring(0, start) + left + sel + right + ta.value.substring(end);
+  ta.selectionStart = start + left.length;
+  ta.selectionEnd = end + left.length;
+  ta.focus();
+}
+
+function togglePreview() {
+  const pane = document.getElementById('preview-pane');
+  if (pane.style.display === 'none') {
+    document.getElementById('preview-body').innerHTML = marked.parse(ta.value || '');
+    pane.style.display = 'block';
+    pane.scrollIntoView({behavior: 'smooth'});
+  } else {
+    pane.style.display = 'none';
+  }
+}
+
+// 離開前 confirm 未儲存
+let dirty = false;
+ta.addEventListener('input', () => { dirty = true; });
+document.querySelectorAll('.editor-title-input,.editor-summary,.editor-input').forEach(el => {
+  el.addEventListener('input', () => { dirty = true; });
+});
+window.addEventListener('beforeunload', e => {
+  if (dirty) { e.preventDefault(); e.returnValue = ''; }
+});
+document.getElementById('editor-form').addEventListener('submit', () => { dirty = false; });
+
+// localStorage 30s autosave
+const LS_KEY = 'learn_editor_draft_{{ article.id if article else "new" }}';
+setInterval(() => {
+  if (!ta.value) return;
+  localStorage.setItem(LS_KEY, JSON.stringify({
+    title: document.querySelector('input[name=title]').value,
+    summary: document.querySelector('textarea[name=summary]').value,
+    content_md: ta.value,
+    ts: Date.now(),
+  }));
+}, 30000);
+</script>
+{% endblock %}

@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}{{ article.title }} — {{ brand_full }}{% endblock %}
+
+{% block head %}
+<meta name="description" content="{{ article.summary }}">
+<meta property="og:title" content="{{ article.title }}">
+<meta property="og:description" content="{{ article.summary }}">
+<meta property="og:type" content="article">
+
+<style>
+  .breadcrumb { font-size: 12px; color: rgb(var(--c-muted)); letter-spacing: 0.04em; }
+  .breadcrumb a { color: rgb(var(--c-muted)); }
+  .breadcrumb a:hover { color: rgb(var(--c-fg)); }
+  .cat-chip {
+    display: inline-flex; align-items: center;
+    padding: 2px 10px; border-radius: 9999px;
+    font-size: 11px; font-weight: 500; letter-spacing: 0.04em;
+    border: 1px solid;
+  }
+  .cat-chip-green  { background-color: rgb(34 197 94 / 0.18);  color: rgb(134 239 172); border-color: rgb(74 222 128 / 0.3); }
+  .cat-chip-blue   { background-color: rgb(59 130 246 / 0.18); color: rgb(147 197 253); border-color: rgb(96 165 250 / 0.3); }
+  .cat-chip-amber  { background-color: rgb(245 158 11 / 0.18); color: rgb(252 211 77);  border-color: rgb(251 191 36 / 0.3); }
+  .cat-chip-purple { background-color: rgb(168 85 247 / 0.18); color: rgb(216 180 254); border-color: rgb(192 132 252 / 0.3); }
+
+  @keyframes new-pulse { 0%,100% { opacity: 0.85; } 50% { opacity: 1; } }
+  .new-badge {
+    display: inline-flex; align-items: center;
+    padding: 3px 10px; font-size: 11px; font-weight: 600;
+    letter-spacing: 0.5px; border-radius: 9999px;
+    background-color: rgb(236 72 153 / 0.2);
+    color: rgb(249 168 212);
+    border: 1px solid rgb(244 114 182 / 0.4);
+    animation: new-pulse 2s ease-in-out infinite;
+    vertical-align: middle;
+    margin-left: 12px;
+  }
+
+  /* prose-like inline */
+  .article-body { color: rgb(var(--c-fg)); line-height: 1.85; font-size: 16px; }
+  .article-body h2 { font-size: 1.6rem; font-weight: 600; margin-top: 2.2rem; margin-bottom: 0.9rem; }
+  .article-body h3 { font-size: 1.25rem; font-weight: 600; margin-top: 1.6rem; margin-bottom: 0.6rem; }
+  .article-body p { margin: 1rem 0; }
+  .article-body a { color: rgb(252 211 77); text-decoration: underline; text-underline-offset: 3px; }
+  .article-body a:hover { color: rgb(253 224 71); }
+  .article-body strong { font-weight: 600; color: rgb(255 255 255 / 0.95); }
+  .article-body code:not(.codehilite code) {
+    background: rgb(31 41 55); padding: 2px 6px; border-radius: 4px;
+    font-size: 0.9em; color: rgb(252 211 77);
+  }
+  .article-body pre.codehilite {
+    background: rgb(17 24 39); padding: 16px 18px; border-radius: 8px;
+    overflow-x: auto; margin: 1.2rem 0; font-size: 13px;
+    border: 1px solid rgb(var(--c-border));
+  }
+  .article-body pre.codehilite code { background: transparent; color: rgb(229 231 235); padding: 0; }
+  .article-body blockquote {
+    border-left: 3px solid rgb(252 211 77);
+    padding: 8px 16px;
+    margin: 1.2rem 0;
+    background: rgb(252 211 77 / 0.05);
+    color: rgb(var(--c-muted));
+  }
+  .article-body ul, .article-body ol { padding-left: 1.5rem; margin: 1rem 0; }
+  .article-body ul li { list-style: disc; margin: 0.4rem 0; }
+  .article-body ol li { list-style: decimal; margin: 0.4rem 0; }
+  .article-body table {
+    border-collapse: collapse; width: 100%; margin: 1.2rem 0;
+    font-size: 14px;
+  }
+  .article-body th, .article-body td {
+    border: 1px solid rgb(var(--c-border)); padding: 8px 12px;
+  }
+  .article-body th { background: rgb(var(--c-border) / 0.4); }
+  .article-body tr:nth-child(even) { background: rgb(255 255 255 / 0.02); }
+
+  .disclaimer-callout {
+    background: rgb(239 68 68 / 0.08);
+    border-left: 3px solid rgb(239 68 68);
+    border-radius: 6px;
+    padding: 14px 18px;
+    margin-top: 2.5rem;
+    color: rgb(254 226 226);
+    font-size: 14px;
+    line-height: 1.7;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .admin-float {
+    position: fixed; right: 16px; bottom: 60px;
+    display: flex; flex-direction: column; gap: 8px;
+    z-index: 45;
+  }
+  .admin-float button, .admin-float a {
+    background: rgb(17 24 39 / 0.9);
+    border: 1px solid rgb(var(--c-border));
+    color: rgb(var(--c-fg));
+    padding: 7px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    opacity: 0.85;
+    transition: opacity 0.15s;
+    cursor: pointer;
+  }
+  .admin-float button:hover, .admin-float a:hover { opacity: 1; }
+  .admin-float .delete-btn { color: rgb(248 113 113); }
+
+  .related-card {
+    background: rgb(var(--c-card));
+    border: 1px solid rgb(var(--c-border));
+    border-radius: 10px;
+    padding: 14px 16px;
+    transition: border-color 0.15s;
+  }
+  .related-card:hover { border-color: rgb(var(--c-accent) / 0.4); }
+</style>
+{% endblock %}
+
+{% block content %}
+<article class="max-w-[760px] mx-auto py-8 px-4">
+  <nav class="breadcrumb mb-4">
+    <a href="/">首頁</a> / <a href="/learn">學習</a> /
+    <a href="/learn?category={{ article.category.slug }}">{{ article.category.name }}</a> /
+    <span>{{ article.title }}</span>
+  </nav>
+
+  <header class="mb-7 pb-6 border-b border-border">
+    <div class="flex items-center gap-2 mb-3 flex-wrap">
+      <span class="cat-chip cat-chip-{{ article.category.color }}">{{ article.category.name }}</span>
+      <span class="text-xs {{ article.access_color_class }}">{{ article.access_label }}</span>
+    </div>
+    <h1 class="text-3xl sm:text-4xl font-bold leading-tight mb-3">
+      {{ article.title }}{% if article.is_new %}<span class="new-badge">NEW</span>{% endif %}
+    </h1>
+    <div class="text-xs text-muted flex items-center gap-2 flex-wrap">
+      <span>{{ article.author }}</span>
+      <span>·</span>
+      <span>{{ article.published_at.strftime('%Y-%m-%d') if article.published_at else '草稿' }}</span>
+      <span>·</span>
+      <span>閱讀 {{ article.reading_minutes }} 分鐘</span>
+    </div>
+  </header>
+
+  {% if article.is_sponsor_block and not is_admin %}
+  {# sponsor 級別佔位 #}
+  <div class="text-center py-16">
+    <p class="text-xl font-semibold mb-3">贊助會員專屬內容</p>
+    <p class="text-sm text-muted">即將推出</p>
+  </div>
+  {% else %}
+  <div class="article-body">{{ article.content_html|safe }}</div>
+
+  <div class="disclaimer-callout">
+    <svg class="w-5 h-5 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+    <div>
+      本文為 ETF 相關金融知識整理,不構成投資建議。
+      投資有風險,請依個人狀況審慎評估。
+    </div>
+  </div>
+  {% endif %}
+
+  {% if related %}
+  <section class="mt-10">
+    <h2 class="text-lg font-semibold mb-4 text-muted">延伸閱讀</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {% for r in related %}
+      <a href="/learn/{{ r.slug }}" class="related-card block">
+        <p class="text-sm font-medium leading-snug">{{ r.title }}{% if r.is_new %}<span class="new-badge">NEW</span>{% endif %}</p>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+</article>
+
+{% if is_admin %}
+<div class="admin-float">
+  <a href="/learn/edit/{{ article.id }}">編輯</a>
+  <form action="/learn/delete/{{ article.id }}" method="post" onsubmit="return confirm('確定刪除?');">
+    <button type="submit" class="delete-btn w-full">刪除</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

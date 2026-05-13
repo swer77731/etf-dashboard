@@ -22,6 +22,7 @@ from app.database import init_db
 from app.routers import admin as admin_router
 from app.routers import api as api_router
 from app.routers import auth as auth_router
+from app.routers import learn as learn_router
 from app.routers import monthly_income as monthly_income_router
 from app.routers import pages as pages_router
 from app.scheduler import (
@@ -264,6 +265,7 @@ app.include_router(api_router.router)
 app.include_router(auth_router.router)
 app.include_router(monthly_income_router.router)
 app.include_router(admin_router.router)
+app.include_router(learn_router.router)
 
 
 @app.get("/ads.txt", response_class=PlainTextResponse)
