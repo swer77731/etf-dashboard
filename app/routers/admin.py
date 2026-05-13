@@ -857,7 +857,7 @@ def trigger_yearly_returns_backfill(request: Request):
 
 @router.get("/market_temp/status")
 def market_temp_status(request: Request):
-    """5 table row count + latest date + sync_status 摘要,給 diagnostic 用。"""
+    """5 table row count + latest 10 day list + NULL detection + sync_status。"""
     redirect = _require_admin(request)
     if redirect is not None:
         return redirect
@@ -879,7 +879,32 @@ def market_temp_status(request: Request):
         ]:
             cnt = session.scalar(select(func.count()).select_from(cls)) or 0
             latest = session.scalar(select(func.max(cls.date)))
-            out[name] = {"rows": cnt, "latest": latest.isoformat() if latest else None}
+            recent = list(session.scalars(
+                select(cls.date).order_by(cls.date.desc()).limit(10)
+            ))
+            out[name] = {
+                "rows": cnt,
+                "latest": latest.isoformat() if latest else None,
+                "recent_10_days": [d.isoformat() for d in recent],
+            }
+        # institutional_daily — 額外看最新 row 各欄位 NULL 狀態
+        latest_inst = session.scalar(
+            select(InstitutionalDaily)
+            .where(InstitutionalDaily.institution == "foreign")
+            .order_by(InstitutionalDaily.date.desc())
+            .limit(1)
+        )
+        if latest_inst:
+            out["institutional_daily"]["latest_foreign_row"] = {
+                "date": latest_inst.date.isoformat(),
+                "spot_net_yi": latest_inst.spot_net_yi,
+                "fut_long_vol": latest_inst.fut_long_vol,
+                "fut_short_vol": latest_inst.fut_short_vol,
+                "opt_buy_call_yi": latest_inst.opt_buy_call_yi,
+                "opt_sell_call_yi": latest_inst.opt_sell_call_yi,
+                "opt_buy_put_yi": latest_inst.opt_buy_put_yi,
+                "opt_sell_put_yi": latest_inst.opt_sell_put_yi,
+            }
         # sync_status mt_* sources
         sources = ("mt_breadth", "mt_institutional", "mt_lending",
                    "mt_margin_short", "mt_maintenance")

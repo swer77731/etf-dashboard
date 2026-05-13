@@ -153,39 +153,40 @@ def sync_institutional(target: date_type | None = None) -> dict:
     err_msg: str | None = None
 
     try:
-        # 現貨
+        # 現貨 — 鐵律:empty → None,不寫 0
         spot = finmind.request("TaiwanStockTotalInstitutionalInvestors",
                                start_date=d.isoformat(), end_date=d.isoformat())
-        spot_net: dict[str, float] = defaultdict(float)
+        spot_net: dict[str, float] = {}  # 只填有抓到的(無 default 0)
         for r in spot:
             n = r.get("name") or ""
             net_yi = (float(r["buy"]) - float(r["sell"])) / 1e8
             if "Foreign" in n:
-                spot_net["foreign"] += net_yi
+                spot_net["foreign"] = spot_net.get("foreign", 0.0) + net_yi
             elif "Trust" in n or "Investment_Trust" in n:
-                spot_net["trust"] += net_yi
+                spot_net["trust"] = spot_net.get("trust", 0.0) + net_yi
             elif "Dealer" in n:
-                spot_net["dealer"] += net_yi
+                spot_net["dealer"] = spot_net.get("dealer", 0.0) + net_yi
+        spot_has_data = bool(spot)  # FinMind 該 day 有任何 row
 
-        # 期貨 TX
+        # 期貨 TX — 鐵律同上
         fut = finmind.request("TaiwanFuturesInstitutionalInvestors",
                               start_date=d.isoformat(), end_date=d.isoformat())
-        fut_oi: dict[str, dict[str, int]] = defaultdict(lambda: {"long": 0, "short": 0})
+        fut_oi: dict[str, dict[str, int]] = {}
         for r in fut:
             if r.get("futures_id") != "TX":
                 continue
             who = _INST_MAP.get(r.get("institutional_investors"))
             if not who:
                 continue
-            fut_oi[who]["long"] = int(r.get("long_open_interest_balance_volume") or 0)
-            fut_oi[who]["short"] = int(r.get("short_open_interest_balance_volume") or 0)
+            fut_oi[who] = {
+                "long": int(r.get("long_open_interest_balance_volume") or 0),
+                "short": int(r.get("short_open_interest_balance_volume") or 0),
+            }
 
-        # 選擇權 TXO(全 3 法人都收,但只外資存 4 項細部)
+        # 選擇權 TXO
         opt = finmind.request("TaiwanOptionInstitutionalInvestors",
                               start_date=d.isoformat(), end_date=d.isoformat())
-        opt_amt: dict[str, dict[str, float]] = defaultdict(
-            lambda: {"buy_call": 0.0, "sell_call": 0.0, "buy_put": 0.0, "sell_put": 0.0}
-        )
+        opt_amt: dict[str, dict[str, float]] = {}
         for r in opt:
             if r.get("option_id") != "TXO":
                 continue
@@ -193,37 +194,57 @@ def sync_institutional(target: date_type | None = None) -> dict:
             if not who:
                 continue
             cp = r.get("call_put")
-            long_amt = float(r.get("long_open_interest_balance_amount") or 0) / 1e5  # 億元
+            long_amt = float(r.get("long_open_interest_balance_amount") or 0) / 1e5
             short_amt = float(r.get("short_open_interest_balance_amount") or 0) / 1e5
+            slot = opt_amt.setdefault(who, {"buy_call": 0.0, "sell_call": 0.0, "buy_put": 0.0, "sell_put": 0.0})
             if cp == "買權":
-                opt_amt[who]["buy_call"] += long_amt
-                opt_amt[who]["sell_call"] += short_amt
+                slot["buy_call"] += long_amt
+                slot["sell_call"] += short_amt
             elif cp == "賣權":
-                opt_amt[who]["buy_put"] += long_amt
-                opt_amt[who]["sell_put"] += short_amt
+                slot["buy_put"] += long_amt
+                slot["sell_put"] += short_amt
 
-        # UPSERT 3 row(foreign/trust/dealer)
+        # 鐵律 #1:3 個 dataset 全 empty → 完全不寫(raise → missing_items)
+        if not spot_has_data and not fut_oi and not opt_amt:
+            raise RuntimeError("FinMind 3 個 institutional dataset 全 empty")
+
+        # UPSERT 3 row(foreign/trust/dealer)— 抓不到的欄位寫 None,不寫 0
         with session_scope() as session:
             for who in ("foreign", "trust", "dealer"):
+                spot_val = round(spot_net[who], 2) if who in spot_net else None
+                fut_long = fut_oi[who]["long"] if who in fut_oi else None
+                fut_short = fut_oi[who]["short"] if who in fut_oi else None
+                opt_slot = opt_amt.get(who)
                 values = {
                     "date": d,
                     "institution": who,
-                    "spot_net_yi": round(spot_net.get(who, 0.0), 2),
-                    "fut_long_vol": fut_oi[who]["long"],
-                    "fut_short_vol": fut_oi[who]["short"],
-                    "opt_buy_call_yi": round(opt_amt[who]["buy_call"], 2),
-                    "opt_sell_call_yi": round(opt_amt[who]["sell_call"], 2),
-                    "opt_buy_put_yi": round(opt_amt[who]["buy_put"], 2),
-                    "opt_sell_put_yi": round(opt_amt[who]["sell_put"], 2),
+                    "spot_net_yi": spot_val,
+                    "fut_long_vol": fut_long,
+                    "fut_short_vol": fut_short,
+                    "opt_buy_call_yi": round(opt_slot["buy_call"], 2) if opt_slot else None,
+                    "opt_sell_call_yi": round(opt_slot["sell_call"], 2) if opt_slot else None,
+                    "opt_buy_put_yi": round(opt_slot["buy_put"], 2) if opt_slot else None,
+                    "opt_sell_put_yi": round(opt_slot["sell_put"], 2) if opt_slot else None,
+                }
+                # 鐵律 #2:UPSERT 時若新值 None,保留舊值(COALESCE)避免覆蓋已有真值
+                from sqlalchemy import func as _f
+                update_cols = {
+                    k: _f.coalesce(getattr(sqlite_upsert(InstitutionalDaily).excluded, k),
+                                    getattr(InstitutionalDaily, k))
+                    for k in values
+                    if k not in ("date", "institution")
                 }
                 stmt = sqlite_upsert(InstitutionalDaily).values(**values).on_conflict_do_update(
                     index_elements=["date", "institution"],
-                    set_={k: v for k, v in values.items() if k not in ("date", "institution")},
+                    set_=update_cols,
                 )
                 session.execute(stmt)
                 rows_written += 1
 
-        logger.info("[market_temp.institutional] %s: 寫入 %d row(3 法人)", d, rows_written)
+        logger.info(
+            "[market_temp.institutional] %s: 寫入 %d row(spot=%s/fut=%s/opt=%s)",
+            d, rows_written, len(spot_net), len(fut_oi), len(opt_amt),
+        )
 
     except Exception as e:
         err_msg = _redact(str(e))[:300]

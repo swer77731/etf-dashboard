@@ -58,6 +58,22 @@ def build_payload(days: int = 30) -> dict[str, Any]:
         gauge_value = round(latest_mm.ratio_pct, 2) if latest_mm else None
         gauge_date = latest_mm.date.isoformat() if latest_mm else None
 
+        # ──────── 0. data freshness — 5 個 table 取最早 latest(最 stale) ────────
+        from sqlalchemy import func as _func
+        table_latests = []
+        for cls in (MarginMaintenance, MarketBreadth, MarginShortTotal,
+                    SecuritiesLendingDaily, InstitutionalDaily):
+            ld = session.scalar(select(_func.max(cls.date)))
+            table_latests.append(ld)
+        non_null = [d for d in table_latests if d is not None]
+        oldest_latest = min(non_null) if non_null else None
+        if oldest_latest:
+            data_age_days = (today - oldest_latest).days
+            stale_date = oldest_latest.isoformat()
+        else:
+            data_age_days = 999
+            stale_date = None
+
         # ──────── 2. dates_full (chart 用,從 TAIEX) ────────
         taiex = session.scalar(select(ETF).where(ETF.code == "TAIEX"))
         taiex_kbars = []
@@ -272,6 +288,8 @@ def build_payload(days: int = 30) -> dict[str, Any]:
     return {
         "gauge_value": gauge_value,
         "gauge_date": gauge_date,
+        "data_age_days": data_age_days,
+        "stale_date": stale_date,
         "dates_short": dates_short,
         "taiex": taiex_arr,
         "spot_foreign": spot_foreign,

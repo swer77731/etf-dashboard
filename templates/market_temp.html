@@ -90,13 +90,30 @@
 
   .opt-bar { width: 100%; height: 320px; margin-top: 14px; border-top: 1px solid rgb(var(--c-border)); padding-top: 8px; }
   @media (max-width: 767px) { .opt-bar { height: 300px; } }
+  /* 資料停滯紅色警示 */
+  .subtitle-stale {
+    color: #f87171;
+    background: rgba(248, 113, 113, 0.08);
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(248, 113, 113, 0.3);
+    display: inline-block;
+    font-size: 0.92rem;
+    font-weight: 500;
+  }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="max-w-[1280px] mx-auto py-6 px-4">
   <h1 class="text-center text-xl sm:text-2xl font-semibold mb-1">市場溫度計</h1>
-  <div class="text-center text-muted text-sm mb-6">資料截至 {{ gauge_date or '—' }}</div>
+  <div class="text-center mb-6">
+    {% if data_age_days is not none and data_age_days > 5 %}
+      <span class="subtitle-stale">⚠ 資料停滯於 {{ stale_date or '—' }}({{ data_age_days }} 天前),最新尚未收錄</span>
+    {% else %}
+      <span class="text-muted text-sm">資料截至 {{ stale_date or gauge_date or '—' }}</span>
+    {% endif %}
+  </div>
 
   {# 1. gauge #}
   <div class="mt-card gauge-card">
@@ -400,15 +417,16 @@ window.addEventListener('load', function() {
 
   function commonAxis(leftUnit) {
     return {
-      grid: { left: 56, right: 62, top: 30, bottom: 62 },
+      grid: { left: 50, right: 56, top: 38, bottom: 64 },
       legend: {
-        show: true, bottom: 6, left: 'center',
+        show: true, bottom: 10, left: 'center',
         textStyle: { color: '#cbd5e1', fontSize: 12 },
         itemWidth: 14, itemHeight: 8, itemGap: 14,
         icon: 'roundRect',
       },
       tooltip: {
         trigger: 'axis',
+        confine: true,
         axisPointer: { type: 'line', lineStyle: { color: '#4b5563', width: 1 } },
         backgroundColor: 'rgba(10, 14, 26, 0.96)',
         borderColor: '#374151',
@@ -433,19 +451,23 @@ window.addEventListener('load', function() {
       xAxis: {
         type: 'category', data: D.dates,
         axisLine: { lineStyle: { color: '#374151' } },
-        axisLabel: { color: '#9ca3af', fontSize: 11, interval: 2 },
+        axisLabel: { color: '#9ca3af', fontSize: 10, interval: 'auto', margin: 10 },
         axisTick: { show: false },
         boundaryGap: true,
       },
       yAxis: [
         { type: 'value', name: leftUnit, scale: true,
-          nameTextStyle: { color: '#9ca3af', fontSize: 11, padding: [0,0,8,-20] },
+          nameLocation: 'end',
+          nameTextStyle: { color: '#9ca3af', fontSize: 10, padding: [0,0,2,0] },
+          nameGap: 6,
           axisLine: { show: false },
           splitLine: { lineStyle: { color: '#1f2937' } },
-          axisLabel: { color: '#9ca3af', fontSize: 11 },
+          axisLabel: { color: '#9ca3af', fontSize: 11, margin: 8 },
         },
         { type: 'value', name: '加權', scale: true,
-          nameTextStyle: { color: '#9ca3af', fontSize: 11, padding: [0,-20,8,0] },
+          nameLocation: 'end',
+          nameTextStyle: { color: '#9ca3af', fontSize: 10, padding: [0,0,2,0] },
+          nameGap: 6,
           axisLine: { show: false }, splitLine: { show: false },
           axisLabel: { color: '#9ca3af', fontSize: 11 },
         },
