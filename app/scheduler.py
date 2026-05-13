@@ -61,6 +61,10 @@ _locks: dict[str, threading.Lock] = {
     "aum": threading.Lock(),
     "backup": threading.Lock(),
     "data_audit": threading.Lock(),
+    "mt_breadth": threading.Lock(),
+    "mt_institutional": threading.Lock(),
+    "mt_lending": threading.Lock(),
+    "mt_margin_short": threading.Lock(),
 }
 
 # 5 分鐘後 retry 用 — APScheduler 有 max_instances=1 + coalesce 防併發
@@ -337,6 +341,78 @@ def data_audit_job() -> None:
         _release("data_audit")
 
 
+# ─────────────────────────────────────────────────────────────
+# 市場溫度計 5 個 sync(各自 release time)
+# ─────────────────────────────────────────────────────────────
+
+def mt_breadth_job(_retry: bool = False) -> None:
+    """每天 14:35 — 漲跌家數(TWSE MI_INDEX,收盤 14:30 後即釋出)。"""
+    if not _try_lock("mt_breadth"):
+        return
+    try:
+        logger.info("[mt_breadth_job] start (retry=%s)", _retry)
+        from app.services import market_temp_sync
+        r = market_temp_sync.sync_breadth()
+        logger.info("[mt_breadth_job] %s", r)
+        if not _retry and r.get("error"):
+            _schedule_retry("mt_breadth", lambda: mt_breadth_job(_retry=True))
+    except Exception:
+        logger.exception("[mt_breadth_job] failed")
+    finally:
+        _release("mt_breadth")
+
+
+def mt_institutional_job(_retry: bool = False) -> None:
+    """每天 16:05 — 三大法人現貨 + 期貨 + 選擇權(現貨 ~16:00 釋出)。"""
+    if not _try_lock("mt_institutional"):
+        return
+    try:
+        logger.info("[mt_institutional_job] start (retry=%s)", _retry)
+        from app.services import market_temp_sync
+        r = market_temp_sync.sync_institutional()
+        logger.info("[mt_institutional_job] %s", r)
+        if not _retry and r.get("error"):
+            _schedule_retry("mt_institutional", lambda: mt_institutional_job(_retry=True))
+    except Exception:
+        logger.exception("[mt_institutional_job] failed")
+    finally:
+        _release("mt_institutional")
+
+
+def mt_lending_job(_retry: bool = False) -> None:
+    """每天 17:35 — 借券當日交易(~17:30 釋出)。"""
+    if not _try_lock("mt_lending"):
+        return
+    try:
+        logger.info("[mt_lending_job] start (retry=%s)", _retry)
+        from app.services import market_temp_sync
+        r = market_temp_sync.sync_lending()
+        logger.info("[mt_lending_job] %s", r)
+        if not _retry and r.get("error"):
+            _schedule_retry("mt_lending", lambda: mt_lending_job(_retry=True))
+    except Exception:
+        logger.exception("[mt_lending_job] failed")
+    finally:
+        _release("mt_lending")
+
+
+def mt_margin_short_job(_retry: bool = False) -> None:
+    """每天 18:05 — 融資融券 + 維持率(融資融券 ~18:00 釋出,最晚)。"""
+    if not _try_lock("mt_margin_short"):
+        return
+    try:
+        logger.info("[mt_margin_short_job] start (retry=%s)", _retry)
+        from app.services import market_temp_sync
+        r = market_temp_sync.sync_margin_short_and_maintenance()
+        logger.info("[mt_margin_short_job] %s", r)
+        if not _retry and r.get("error"):
+            _schedule_retry("mt_margin_short", lambda: mt_margin_short_job(_retry=True))
+    except Exception:
+        logger.exception("[mt_margin_short_job] failed")
+    finally:
+        _release("mt_margin_short")
+
+
 def analytics_cleanup_job() -> None:
     """每天 03:00 (Taipei) 刪 90 天前的 analytics / search / compare / online_snapshots。"""
     if not _try_lock("analytics_cleanup"):
@@ -449,6 +525,15 @@ def start_scheduler() -> AsyncIOScheduler:
         # 23:00 已被 health_daily 占,挪 30 分鐘避開
         ("data_audit_daily", data_audit_job,
          CronTrigger(hour=23, minute=30, timezone=tz)),
+        # ── 市場溫度計 5 sync(各自釋出時間) ──
+        ("mt_breadth_daily", mt_breadth_job,
+         CronTrigger(hour=14, minute=35, timezone=tz)),
+        ("mt_institutional_daily", mt_institutional_job,
+         CronTrigger(hour=16, minute=5, timezone=tz)),
+        ("mt_lending_daily", mt_lending_job,
+         CronTrigger(hour=17, minute=35, timezone=tz)),
+        ("mt_margin_short_daily", mt_margin_short_job,
+         CronTrigger(hour=18, minute=5, timezone=tz)),
     ]
 
     for job_id, fn, trig in jobs:

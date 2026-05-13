@@ -855,6 +855,25 @@ def trigger_yearly_returns_backfill(request: Request):
     }
 
 
+@router.get("/market_temp/backfill")
+def trigger_market_temp_backfill(request: Request, days: int = 30):
+    """手動 backfill 市場溫度計 5 sync 過去 N 天(default 30)。
+
+    用於:Zeabur 第一次部署、cron 漏跑、資料修正。
+    跑 ~3-5 分鐘(N=30 → ~120 req,quota 50% gate 內)。
+    """
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
+    from datetime import date as date_type, timedelta
+    from app.services import market_temp_sync
+    end = date_type.today()
+    start = end - timedelta(days=max(1, min(days, 90)))
+    logger.info("[admin] market_temp backfill %s ~ %s", start, end)
+    result = market_temp_sync.backfill_range(start, end)
+    return {"range": [start.isoformat(), end.isoformat()], **result}
+
+
 # Bot 歷史紀錄清理 — 刪 analytics_log 中 UA 命中黑名單的 row
 @router.get("/bot-cleanup", response_class=HTMLResponse)
 async def bot_cleanup(request: Request):
