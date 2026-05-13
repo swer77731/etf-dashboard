@@ -776,6 +776,11 @@
   </p>
 </section>
 
+{% if not is_sponsor %}
+<div class="paywall-overlay-container mb-7" style="min-height: 480px;">
+<div class="paywall-blur">
+{% endif %}
+
 <section class="relative section-card rounded-xl p-5 sm:p-7 mb-7"
          x-data="monthlyIncomePicker()" x-init="init()">
 
@@ -1125,6 +1130,14 @@
     </div>
   </template>
 </section>
+
+{% if not is_sponsor %}
+</div>{# /.paywall-blur #}
+{% with pw_title="配息計算器", pw_desc="解鎖完整月配試算 + 多 ETF 配置 + 通膨情境" %}
+  {% include "_partials/paywall_overlay.html" %}
+{% endwith %}
+</div>{# /.paywall-overlay-container #}
+{% endif %}
 
 {# === 防線 3:頁尾完整免責聲明 === #}
 <section class="mi-full-disclaimer">

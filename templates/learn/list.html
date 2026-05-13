@@ -130,7 +130,11 @@
         {{ a.title }}{% if a.is_new %}<span class="new-badge">NEW</span>{% endif %}
       </h3>
       {% if a.summary %}
-      <p class="text-sm text-muted line-clamp-2 mb-3 leading-relaxed">{{ a.summary }}</p>
+        {% if is_sponsor or a.access_level == 'public' %}
+        <p class="text-sm text-muted line-clamp-2 mb-3 leading-relaxed">{{ a.summary }}</p>
+        {% else %}
+        <p class="text-sm text-muted line-clamp-2 mb-3 leading-relaxed paywall-blur" aria-hidden="true">{{ a.summary }}</p>
+        {% endif %}
       {% endif %}
       <div class="text-xs text-muted/80 flex items-center gap-2">
         <span>{{ a.published_at.strftime('%Y-%m-%d') if a.published_at else '草稿' }}</span>

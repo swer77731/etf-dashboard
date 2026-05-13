@@ -156,11 +156,13 @@
     </div>
   </header>
 
-  {% if article.is_sponsor_block and not is_admin %}
-  {# sponsor 級別佔位 #}
-  <div class="text-center py-16">
-    <p class="text-xl font-semibold mb-3">贊助會員專屬內容</p>
-    <p class="text-sm text-muted">即將推出</p>
+  {% if article.access_level == 'sponsor' and not is_sponsor and not is_admin %}
+  {# sponsor 級別 — 顯示前 300 字 + paywall blur + CTA(取代之前佔位)#}
+  <div class="paywall-overlay-container" style="min-height: 480px;">
+    <div class="paywall-blur article-body">{{ article.content_html|safe }}</div>
+    {% with pw_title="贊助會員專屬內容", pw_desc="這篇深度文章只給贊助 / 試用會員看" %}
+      {% include "_partials/paywall_overlay.html" %}
+    {% endwith %}
   </div>
   {% else %}
   <div class="article-body">{{ article.content_html|safe }}</div>
