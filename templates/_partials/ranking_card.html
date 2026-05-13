@@ -81,6 +81,22 @@
         {% endfor %}
       </ul>
 
+      {% if paywall %}
+      <div class="text-xs text-center mt-3 pt-3 border-t border-border/30">
+        {% if current_user %}
+        <button type="button" onclick="window.openShareModal && window.openShareModal()"
+                class="text-amber-400 hover:text-amber-300 underline-offset-2 hover:underline">
+          還有 {{ sec.data.rows|length - 3 }} 檔・分享拿 2 天試用
+        </button>
+        {% else %}
+        <a href="/auth/google/login"
+           class="text-amber-400 hover:text-amber-300 underline-offset-2 hover:underline">
+          還有 {{ sec.data.rows|length - 3 }} 檔・登入分享拿 2 天
+        </a>
+        {% endif %}
+      </div>
+      {% endif %}
+
       <div class="mt-3 pt-3 border-t border-border/40 flex items-center justify-between gap-3 flex-wrap">
         {% if sec.data.period_start %}
         <span class="text-xs text-muted num">{{ sec.data.period_start }} ~ {{ sec.data.today }}</span>
