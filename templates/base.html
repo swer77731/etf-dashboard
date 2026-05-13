@@ -834,9 +834,9 @@
             {% if trial_status and trial_status.status != 'guest' %}
             <div class="mt-2 px-1">
               {% if trial_status.status == 'premium' %}
-                <a href="/premium" class="status-badge status-badge-premium" title="贊助會員">進階版</a>
+                <span class="status-badge status-badge-premium" title="贊助會員">進階版</span>
               {% elif trial_status.status == 'trial' %}
-                <a href="/premium" class="status-badge status-badge-trial" title="試用中">試用中</a>
+                <span class="status-badge status-badge-trial" title="試用中">試用中</span>
               {% else %}
                 <button type="button" onclick="window.openShareModal && window.openShareModal()"
                         class="status-badge status-badge-free">分享拿試用</button>

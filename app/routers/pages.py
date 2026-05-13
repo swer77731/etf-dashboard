@@ -689,7 +689,7 @@ async def sitemap():
     base = "https://etf-watch.com"
     static_pages = [
         "", "/compare", "/dca", "/monthly-income", "/dividend-calendar",
-        "/market-temp", "/ranking/top", "/learn", "/premium",
+        "/market-temp", "/ranking/top", "/learn",
         "/disclaimer", "/privacy", "/terms", "/account-delete",
         "/contact", "/changelog", "/install",
     ]
