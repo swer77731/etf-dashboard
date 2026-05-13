@@ -855,6 +855,203 @@ def trigger_yearly_returns_backfill(request: Request):
     }
 
 
+@router.get("/users", response_class=HTMLResponse)
+def admin_users(
+    request: Request,
+    q: str = "",
+    plan: str = "all",
+    page: int = 1,
+):
+    """Admin 用戶管理 — 列表 + 搜尋 + 開通入口。"""
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
+    from sqlalchemy import or_, desc as sa_desc
+    from app.database import session_scope
+    from app.models.user import User as _U
+    from app.models.billing import UserPlan as _UP
+
+    page = max(1, page)
+    per_page = 50
+    now = datetime.now()
+
+    with session_scope() as session:
+        stmt = select(_U)
+        if q:
+            stmt = stmt.where(or_(_U.email.ilike(f"%{q}%"),
+                                  _U.display_name.ilike(f"%{q}%")))
+        stmt = stmt.order_by(sa_desc(_U.last_login_at))
+        total = session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+        users = list(session.scalars(stmt.offset((page-1)*per_page).limit(per_page)))
+
+        # 一次撈 user_plans
+        uids = [u.id for u in users]
+        plans = {p.user_id: p for p in session.scalars(
+            select(_UP).where(_UP.user_id.in_(uids))
+        )} if uids else {}
+
+        rows = []
+        for u in users:
+            pl = plans.get(u.id)
+            if pl and pl.premium_until and pl.premium_until > now:
+                cur_plan = "premium"
+                until = pl.premium_until
+            elif pl and pl.trial_until and pl.trial_until > now:
+                cur_plan = "trial"
+                until = pl.trial_until
+            else:
+                cur_plan = "free"
+                until = None
+            # 篩選
+            if plan != "all" and cur_plan != plan:
+                continue
+            rows.append({
+                "id": u.id, "email": u.email,
+                "display_name": u.display_name or "",
+                "created_at": u.created_at, "last_login_at": u.last_login_at,
+                "current_plan": cur_plan,
+                "trial_until": pl.trial_until if pl else None,
+                "premium_until": pl.premium_until if pl else None,
+                "share_count": (pl.total_share_count if pl else 0) or 0,
+            })
+
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    return templates.TemplateResponse(
+        request, "admin/users.html",
+        {**_admin_ctx(request), "rows": rows, "q": q, "plan_filter": plan,
+         "page": page, "total_pages": total_pages, "total": total},
+    )
+
+
+@router.post("/users/{user_id}/grant")
+def admin_users_grant(
+    request: Request,
+    user_id: int,
+    type: str = Form(...),  # 'trial' or 'premium'
+    days: int = Form(...),
+    reason: str = Form(""),
+):
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
+    if type not in ("trial", "premium"):
+        raise HTTPException(400, "type 必須是 trial 或 premium")
+    if days < 1 or days > 365:
+        raise HTTPException(400, "days 必須 1-365")
+
+    from app.database import session_scope
+    from app.models.user import User as _U
+    from app.models.billing import UserPlan as _UP, AdminAction
+
+    is_admin_, admin_user = _is_site_admin(request)
+    now = datetime.now()
+    with session_scope() as session:
+        u = session.scalar(select(_U).where(_U.id == user_id))
+        if not u:
+            raise HTTPException(404, "user not found")
+        pl = session.scalar(select(_UP).where(_UP.user_id == user_id))
+        if pl is None:
+            pl = _UP(user_id=user_id, current_plan="free")
+            session.add(pl)
+            session.flush()
+        if type == "trial":
+            base = pl.trial_until if (pl.trial_until and pl.trial_until > now) else now
+            pl.trial_until = base + timedelta(days=days)
+        else:
+            base = pl.premium_until if (pl.premium_until and pl.premium_until > now) else now
+            pl.premium_until = base + timedelta(days=days)
+            pl.current_plan = "premium"
+        session.add(AdminAction(
+            admin_email=(admin_user or {}).get("email", ""),
+            action_type=f"grant_{type}",
+            target_user_id=user_id,
+            target_user_email=u.email,
+            days_granted=days,
+            reason=reason[:500] if reason else None,
+        ))
+    return RedirectResponse(url=f"/admin/users?q={u.email}", status_code=303)
+
+
+@router.post("/users/{user_id}/revoke")
+def admin_users_revoke(
+    request: Request,
+    user_id: int,
+    reason: str = Form(""),
+):
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
+    from app.database import session_scope
+    from app.models.user import User as _U
+    from app.models.billing import UserPlan as _UP, AdminAction
+
+    is_admin_, admin_user = _is_site_admin(request)
+    with session_scope() as session:
+        u = session.scalar(select(_U).where(_U.id == user_id))
+        if not u:
+            raise HTTPException(404)
+        pl = session.scalar(select(_UP).where(_UP.user_id == user_id))
+        if pl:
+            pl.trial_until = None
+            pl.premium_until = None
+            pl.current_plan = "free"
+        session.add(AdminAction(
+            admin_email=(admin_user or {}).get("email", ""),
+            action_type="revoke",
+            target_user_id=user_id,
+            target_user_email=u.email,
+            days_granted=None,
+            reason=reason[:500] if reason else None,
+        ))
+    return RedirectResponse(url="/admin/users", status_code=303)
+
+
+@router.get("/audit-log", response_class=HTMLResponse)
+def admin_audit_log(
+    request: Request,
+    admin: str = "",
+    action: str = "",
+    page: int = 1,
+):
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
+    from sqlalchemy import desc as sa_desc
+    from app.database import session_scope
+    from app.models.billing import AdminAction
+
+    page = max(1, page)
+    per_page = 100
+    with session_scope() as session:
+        stmt = select(AdminAction)
+        if admin:
+            stmt = stmt.where(AdminAction.admin_email.ilike(f"%{admin}%"))
+        if action:
+            stmt = stmt.where(AdminAction.action_type == action)
+        stmt = stmt.order_by(sa_desc(AdminAction.created_at))
+        total = session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+        rows = list(session.scalars(
+            stmt.offset((page-1)*per_page).limit(per_page)
+        ))
+        actions = [{
+            "id": r.id,
+            "admin_email": r.admin_email,
+            "action_type": r.action_type,
+            "target_user_id": r.target_user_id,
+            "target_user_email": r.target_user_email or "",
+            "days_granted": r.days_granted,
+            "reason": r.reason or "",
+            "created_at": r.created_at,
+        } for r in rows]
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    return templates.TemplateResponse(
+        request, "admin/audit_log.html",
+        {**_admin_ctx(request), "actions": actions, "admin_filter": admin,
+         "action_filter": action, "page": page, "total_pages": total_pages,
+         "total": total},
+    )
+
+
 @router.get("/market_temp/status")
 def market_temp_status(request: Request):
     """5 table row count + latest 10 day list + NULL detection + sync_status。"""
