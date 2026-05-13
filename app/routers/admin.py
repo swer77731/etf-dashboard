@@ -37,10 +37,23 @@ templates.env.filters["tw_time"] = tw_time
 # 沒有 settings.app_brand_full 等於 user 沒設定 → fallback;但 _common_ctx 在 pages.py
 # 不想 import 拉出來只給 admin 用,直接走最小 ctx
 def _admin_ctx(request: Request, **extra) -> dict:
+    # 統一 nav 用的信號 — 錯誤回報待處理數 / 備份是否異常
+    nav_pending = 0
+    nav_backup_stale = False
+    try:
+        nav_pending = _pending_error_reports_count()
+    except Exception:
+        pass
+    try:
+        nav_backup_stale = bool(_backup_status_summary().get("stale"))
+    except Exception:
+        pass
     return {
         "request": request,
         "brand_full": settings.app_brand_full,
         "brand_zh": settings.app_name,
+        "nav_pending_reports": nav_pending,
+        "nav_backup_stale": nav_backup_stale,
         **extra,
     }
 
@@ -1049,6 +1062,87 @@ def admin_audit_log(
         {**_admin_ctx(request), "actions": actions, "admin_filter": admin,
          "action_filter": action, "page": page, "total_pages": total_pages,
          "total": total},
+    )
+
+
+@router.get("/referrals", response_class=HTMLResponse)
+def admin_referrals(
+    request: Request,
+    referrer: str = "",
+    granted: str = "all",  # 'all' / 'yes' / 'no'
+    page: int = 1,
+):
+    """訪客點 ref 連結紀錄 — 看誰推薦給誰、轉換率、Top 推薦者。"""
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
+    from sqlalchemy import desc as sa_desc
+    from app.database import session_scope
+    from app.models.billing import Referral, UserPlan
+    from app.models.user import User as _U
+
+    page = max(1, page)
+    per_page = 100
+    with session_scope() as session:
+        # === 統計面板 ===
+        total_clicks = session.scalar(select(func.count(Referral.id))) or 0
+        total_granted = session.scalar(
+            select(func.count(Referral.id)).where(Referral.reward_granted == True)  # noqa: E712
+        ) or 0
+        total_failed = total_clicks - total_granted
+        conversion = (total_granted / total_clicks * 100.0) if total_clicks else 0.0
+
+        # Top 5 推薦者(by total_share_count from user_plans)
+        top_q = (
+            select(_U.id, _U.email, _U.display_name, UserPlan.total_share_count)
+            .join(UserPlan, _U.id == UserPlan.user_id)
+            .where(UserPlan.total_share_count > 0)
+            .order_by(sa_desc(UserPlan.total_share_count))
+            .limit(5)
+        )
+        top_referrers = [
+            {"id": r[0], "email": r[1], "display_name": r[2] or "", "count": r[3] or 0}
+            for r in session.execute(top_q)
+        ]
+
+        # === 列表 ===
+        stmt = (
+            select(Referral, _U.email.label("referrer_email"))
+            .join(_U, Referral.referrer_user_id == _U.id, isouter=True)
+        )
+        if referrer:
+            stmt = stmt.where(_U.email.ilike(f"%{referrer}%"))
+        if granted == "yes":
+            stmt = stmt.where(Referral.reward_granted == True)  # noqa: E712
+        elif granted == "no":
+            stmt = stmt.where(Referral.reward_granted == False)  # noqa: E712
+        stmt = stmt.order_by(sa_desc(Referral.clicked_at))
+
+        total = session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+        rows = list(session.execute(
+            stmt.offset((page - 1) * per_page).limit(per_page)
+        ))
+        referrals = []
+        for ref_obj, ref_email in rows:
+            referrals.append({
+                "id": ref_obj.id,
+                "referrer_user_id": ref_obj.referrer_user_id,
+                "referrer_email": ref_email or f"(deleted user #{ref_obj.referrer_user_id})",
+                "ref_token": ref_obj.ref_token,
+                "visitor_ip": ref_obj.visitor_ip or "",
+                "visitor_user_agent": (ref_obj.visitor_user_agent or "")[:80],
+                "clicked_at": ref_obj.clicked_at,
+                "reward_granted": ref_obj.reward_granted,
+                "granted_at": ref_obj.granted_at,
+            })
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    return templates.TemplateResponse(
+        request, "admin/referrals.html",
+        {**_admin_ctx(request), "referrals": referrals, "referrer_filter": referrer,
+         "granted_filter": granted, "page": page, "total_pages": total_pages,
+         "total": total, "total_clicks": total_clicks, "total_granted": total_granted,
+         "total_failed": total_failed, "conversion": conversion,
+         "top_referrers": top_referrers},
     )
 
 

@@ -81,13 +81,10 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
       <div class="flex items-center gap-3 flex-wrap">
         <a href="/" class="text-sm text-muted hover:text-fg transition">← 回前台</a>
-        {# 子頁面 override 此 block 顯示「← 回後台首頁」連到 /admin/analytics #}
-        {% block back_to_dashboard %}{% endblock %}
         <span class="text-muted">|</span>
         <h1 class="text-base sm:text-lg font-semibold">{{ brand_zh }} · 後台</h1>
       </div>
       <div class="flex items-center gap-3 text-sm">
-        {% block nav %}{% endblock %}
         {% block header_right %}
           {% if current_user %}
             <span class="text-fg/85 hidden sm:inline text-xs">{{ current_user.email }}</span>
@@ -98,6 +95,31 @@
         {% endblock %}
       </div>
     </div>
+
+    {# 統一導航列 — 任何 admin 頁都從這裡跳 #}
+    {% set p = request.url.path %}
+    <nav class="max-w-7xl mx-auto px-4 sm:px-6 pb-2 flex items-center gap-1 sm:gap-2 text-xs sm:text-sm overflow-x-auto whitespace-nowrap">
+      <a href="/admin/analytics"
+         class="px-2.5 py-1 rounded {% if p.startswith('/admin/analytics') %}bg-card-hi text-fg font-semibold{% else %}text-muted hover:text-fg{% endif %} transition">分析</a>
+      <a href="/admin/users"
+         class="px-2.5 py-1 rounded {% if p.startswith('/admin/users') %}bg-card-hi text-fg font-semibold{% else %}text-muted hover:text-fg{% endif %} transition">用戶</a>
+      <a href="/admin/referrals"
+         class="px-2.5 py-1 rounded {% if p.startswith('/admin/referrals') %}bg-card-hi text-fg font-semibold{% else %}text-muted hover:text-fg{% endif %} transition">推薦</a>
+      <a href="/admin/audit-log"
+         class="px-2.5 py-1 rounded {% if p.startswith('/admin/audit-log') %}bg-card-hi text-fg font-semibold{% else %}text-muted hover:text-fg{% endif %} transition">操作紀錄</a>
+      <a href="/admin/error-reports"
+         class="px-2.5 py-1 rounded {% if p.startswith('/admin/error-reports') %}bg-card-hi text-fg font-semibold{% else %}text-muted hover:text-fg{% endif %} transition">
+         錯誤回報{% if nav_pending_reports and nav_pending_reports > 0 %}
+           <span class="ml-1 num text-warning">({{ nav_pending_reports }})</span>
+         {% endif %}
+      </a>
+      <a href="/admin/backup/status"
+         class="px-2.5 py-1 rounded {% if p.startswith('/admin/backup') %}bg-card-hi text-fg font-semibold{% else %}text-muted hover:text-fg{% endif %} transition">
+         備份{% if nav_backup_stale %}<span class="ml-1 num text-up">⚠</span>{% endif %}
+      </a>
+      <span class="text-muted hidden sm:inline">|</span>
+      {% block nav_extra %}{% endblock %}
+    </nav>
   </header>
 
   <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">

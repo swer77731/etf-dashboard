@@ -2,30 +2,13 @@
 
 {% block title %}流量分析 — {{ brand_full }}{% endblock %}
 
-{% block nav %}
-  <span class="text-muted">|</span>
+{% block nav_extra %}
   <a href="/admin/analytics?range_days=7"
-     class="{% if range_days == 7 %}text-fg font-semibold{% else %}text-muted hover:text-fg{% endif %} transition">
-    近 7 天
-  </a>
+     class="px-2.5 py-1 rounded {% if range_days == 7 %}text-fg font-semibold{% else %}text-muted hover:text-fg{% endif %} transition">近 7 天</a>
   <a href="/admin/analytics?range_days=30"
-     class="{% if range_days == 30 %}text-fg font-semibold{% else %}text-muted hover:text-fg{% endif %} transition">
-    近 30 天
-  </a>
-  <span class="text-muted">|</span>
-  <a href="/admin/error-reports" class="text-muted hover:text-fg transition">
-    錯誤回報{% if pending_reports_count and pending_reports_count > 0 %}
-      <span class="ml-1 num text-warning">({{ pending_reports_count }} 待處理)</span>
-    {% endif %}
-  </a>
-  <span class="text-muted">|</span>
-  <a href="/admin/backup/status" class="text-muted hover:text-fg transition">
-    備份狀態{% if backup_summary and backup_summary.stale %}
-      <span class="ml-1 num text-up">⚠</span>
-    {% endif %}
-  </a>
-  <span class="text-muted">|</span>
-  <a href="/admin/send_daily_report" class="text-muted hover:text-fg transition" title="即時推一次今日 TG 日報">推送日報</a>
+     class="px-2.5 py-1 rounded {% if range_days == 30 %}text-fg font-semibold{% else %}text-muted hover:text-fg{% endif %} transition">近 30 天</a>
+  <a href="/admin/send_daily_report"
+     class="px-2.5 py-1 rounded text-muted hover:text-fg transition" title="即時推一次今日 TG 日報">推送日報</a>
 {% endblock %}
 
 {% block content %}
