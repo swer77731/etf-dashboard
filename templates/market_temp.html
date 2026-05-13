@@ -229,17 +229,19 @@
           <tr><th class="th-name"></th><th>今日</th><th>7 日均</th><th>30 日均</th></tr>
         </thead>
         <tbody>
+          {% macro b_up(v) %}{% if v is none %}—{% else %}+{{ fmt_int(v) }}{% endif %}{% endmacro %}
+          {% macro b_down(v) %}{% if v is none %}—{% else %}-{{ fmt_int(v) }}{% endif %}{% endmacro %}
           <tr>
             <td class="th-name">上漲</td>
-            <td class="v-up">+{{ fmt_int(breadth_summary['up_1d']) }}</td>
-            <td class="v-up">+{{ fmt_int(breadth_summary['up_7d_avg']) }}</td>
-            <td class="v-up">+{{ fmt_int(breadth_summary['up_30d_avg']) }}</td>
+            <td class="v-up">{{ b_up(breadth_summary['up_1d']) }}</td>
+            <td class="v-up">{{ b_up(breadth_summary['up_7d_avg']) }}</td>
+            <td class="v-up">{{ b_up(breadth_summary['up_30d_avg']) }}</td>
           </tr>
           <tr>
             <td class="th-name">下跌</td>
-            <td class="v-down">-{{ fmt_int(breadth_summary['down_1d']) }}</td>
-            <td class="v-down">-{{ fmt_int(breadth_summary['down_7d_avg']) }}</td>
-            <td class="v-down">-{{ fmt_int(breadth_summary['down_30d_avg']) }}</td>
+            <td class="v-down">{{ b_down(breadth_summary['down_1d']) }}</td>
+            <td class="v-down">{{ b_down(breadth_summary['down_7d_avg']) }}</td>
+            <td class="v-down">{{ b_down(breadth_summary['down_30d_avg']) }}</td>
           </tr>
           <tr>
             <td class="th-name">持平</td>
@@ -249,9 +251,9 @@
           </tr>
           <tr class="row-total">
             <td class="th-name">漲跌差</td>
-            {% set d1 = breadth_summary['up_1d'] - breadth_summary['down_1d'] %}
-            {% set d7 = breadth_summary['up_7d_avg'] - breadth_summary['down_7d_avg'] %}
-            {% set d30 = breadth_summary['up_30d_avg'] - breadth_summary['down_30d_avg'] %}
+            {% set d1 = (breadth_summary['up_1d'] - breadth_summary['down_1d']) if (breadth_summary['up_1d'] is not none and breadth_summary['down_1d'] is not none) else None %}
+            {% set d7 = (breadth_summary['up_7d_avg'] - breadth_summary['down_7d_avg']) if (breadth_summary['up_7d_avg'] is not none and breadth_summary['down_7d_avg'] is not none) else None %}
+            {% set d30 = (breadth_summary['up_30d_avg'] - breadth_summary['down_30d_avg']) if (breadth_summary['up_30d_avg'] is not none and breadth_summary['down_30d_avg'] is not none) else None %}
             <td class="{{ cls(d1) }}">{{ fmt_signed_int(d1) }}</td>
             <td class="{{ cls(d7) }}">{{ fmt_signed_int(d7) }}</td>
             <td class="{{ cls(d30) }}">{{ fmt_signed_int(d30) }}</td>
@@ -320,9 +322,9 @@
           </tr>
           <tr>
             <td class="th-name">平均費率</td>
-            <td class="v-neutral">{{ "%.2f"|format(sbl_summary['fee_1d']) }}%</td>
-            <td class="v-neutral">{{ "%.2f"|format(sbl_summary['fee_7d_avg']) }}%</td>
-            <td class="v-neutral">{{ "%.2f"|format(sbl_summary['fee_30d_avg']) }}%</td>
+            <td class="v-neutral">{% if sbl_summary['fee_1d'] is none %}—{% else %}{{ "%.2f"|format(sbl_summary['fee_1d']) }}%{% endif %}</td>
+            <td class="v-neutral">{% if sbl_summary['fee_7d_avg'] is none %}—{% else %}{{ "%.2f"|format(sbl_summary['fee_7d_avg']) }}%{% endif %}</td>
+            <td class="v-neutral">{% if sbl_summary['fee_30d_avg'] is none %}—{% else %}{{ "%.2f"|format(sbl_summary['fee_30d_avg']) }}%{% endif %}</td>
           </tr>
         </tbody>
       </table>

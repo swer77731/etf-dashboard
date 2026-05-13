@@ -899,23 +899,100 @@ def market_temp_status(request: Request):
     return out
 
 
+# ──────── 市場溫度計 backfill — daemon thread,避開 CF 502 ────────
+import threading as _th_mt
+from datetime import datetime as _dt_mt
+
+_MT_BACKFILL_STATE: dict = {
+    "running": False,
+    "started_at": None,
+    "current_date": None,
+    "completed": 0,
+    "total": 0,
+    "errors": [],
+    "range": None,
+}
+_MT_BACKFILL_LOCK = _th_mt.Lock()
+
+
 @router.get("/market_temp/backfill")
 def trigger_market_temp_backfill(request: Request, days: int = 30):
-    """手動 backfill 市場溫度計 5 sync 過去 N 天(default 30)。
+    """背景跑 backfill — 立即回 {"status":"started"},不會 CF 502。
 
-    用於:Zeabur 第一次部署、cron 漏跑、資料修正。
-    跑 ~3-5 分鐘(N=30 → ~120 req,quota 50% gate 內)。
+    poll /admin/market_temp/backfill/progress 看進度。
     """
     redirect = _require_admin(request)
     if redirect is not None:
         return redirect
     from datetime import date as date_type, timedelta
-    from app.services import market_temp_sync
     end = date_type.today()
     start = end - timedelta(days=max(1, min(days, 90)))
-    logger.info("[admin] market_temp backfill %s ~ %s", start, end)
-    result = market_temp_sync.backfill_range(start, end)
-    return {"range": [start.isoformat(), end.isoformat()], **result}
+    total = (end - start).days + 1
+
+    with _MT_BACKFILL_LOCK:
+        if _MT_BACKFILL_STATE["running"]:
+            return {"status": "already_running", **_MT_BACKFILL_STATE}
+        _MT_BACKFILL_STATE.update({
+            "running": True,
+            "started_at": _dt_mt.now().isoformat(timespec="seconds"),
+            "current_date": None,
+            "completed": 0,
+            "total": total,
+            "errors": [],
+            "range": [start.isoformat(), end.isoformat()],
+        })
+
+    def _run():
+        try:
+            from app.services import market_temp_sync
+            d = start
+            while d <= end:
+                _MT_BACKFILL_STATE["current_date"] = d.isoformat()
+                try:
+                    r1 = market_temp_sync.sync_breadth(d)
+                    r2 = market_temp_sync.sync_institutional(d)
+                    r3 = market_temp_sync.sync_lending(d)
+                    r4 = market_temp_sync.sync_margin_short_and_maintenance(d)
+                    # 鐵律 #1:抓不到不寫(sync 端 raise 已被內包,error 進 missing)
+                    for tag, r in [("breadth", r1), ("inst", r2), ("lend", r3), ("ms", r4)]:
+                        if r.get("error"):
+                            _MT_BACKFILL_STATE["errors"].append(
+                                f"{d}/{tag}: {r['error'][:120]}"
+                            )
+                except Exception as e:
+                    _MT_BACKFILL_STATE["errors"].append(f"{d}/raise: {str(e)[:120]}")
+                _MT_BACKFILL_STATE["completed"] += 1
+                d += timedelta(days=1)
+            logger.info(
+                "[mt-backfill] done — completed=%d errors=%d",
+                _MT_BACKFILL_STATE["completed"], len(_MT_BACKFILL_STATE["errors"]),
+            )
+        finally:
+            _MT_BACKFILL_STATE["running"] = False
+            _MT_BACKFILL_STATE["current_date"] = None
+
+    t = _th_mt.Thread(target=_run, daemon=True, name="mt-backfill")
+    t.start()
+    return {
+        "status": "started",
+        "range": [start.isoformat(), end.isoformat()],
+        "total_days": total,
+        "estimated_minutes": max(1, total // 4),  # ~4 day/min(各 sync 2-3s)
+        "progress_url": "/admin/market_temp/backfill/progress",
+    }
+
+
+@router.get("/market_temp/backfill/progress")
+def market_temp_backfill_progress(request: Request):
+    """poll backfill 進度。"""
+    redirect = _require_admin(request)
+    if redirect is not None:
+        return redirect
+    # 截 errors 防 response 太大
+    s = dict(_MT_BACKFILL_STATE)
+    if s.get("errors"):
+        s["errors"] = s["errors"][-20:]
+    return s
 
 
 # Bot 歷史紀錄清理 — 刪 analytics_log 中 UA 命中黑名單的 row
