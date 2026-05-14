@@ -2,7 +2,7 @@
 
 {% block title %}{{ brand_full }} — ETF 排行{% endblock %}
 
-{% from "_partials/ranking_card.html" import ranking_card %}
+{% from "_partials/ranking_card.html" import ranking_card with context %}
 {% from "_partials/dividend_board.html" import div_board %}
 
 {% set CATEGORY_DESC = {

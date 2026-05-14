@@ -508,6 +508,11 @@
     <div>本工具為歷史資料模擬,非投資建議,亦不構成投資招攬。實際投資結果可能與模擬結果有重大差異。</div>
   </div>
 
+  {% if not is_sponsor %}
+  <div class="paywall-overlay-container mb-7" style="min-height: 560px;">
+  <div class="paywall-blur">
+  {% endif %}
+
   {# 區塊 1:Hero #}
   <section class="dca-hero mb-4">
     <div class="text-xs text-muted tracking-widest mb-1">
@@ -755,6 +760,14 @@
       {{ login_wall_card() }}
     {% endif %}
   </div>
+
+  {% if not is_sponsor %}
+  </div>{# /.paywall-blur #}
+  {% with pw_title="定期定額試算工具", pw_desc="解鎖蒙地卡羅試算 + 完整圖表 + 演算法說明" %}
+    {% include "_partials/paywall_overlay.html" %}
+  {% endwith %}
+  </div>{# /.paywall-overlay-container #}
+  {% endif %}
 
   {# 區塊 7:免責 #}
   <section class="dca-disc">

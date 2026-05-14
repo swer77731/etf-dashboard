@@ -2,7 +2,7 @@
 
 {% block title %}{{ kind_label }} 排行 — {{ brand_full }}{% endblock %}
 
-{% from "_partials/ranking_table.html" import ranking_table %}
+{% from "_partials/ranking_table.html" import ranking_table with context %}
 
 {% block content %}
 

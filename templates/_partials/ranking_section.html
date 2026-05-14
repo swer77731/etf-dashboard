@@ -1,5 +1,5 @@
 {# 排行榜單一區塊 — 所有 6 個區塊都用同一份結構,改一處全部更新。 #}
-{% from "_partials/ranking_table.html" import ranking_table %}
+{% from "_partials/ranking_table.html" import ranking_table with context %}
 
 {% macro ranking_section(sec, descriptions) %}
 {% set is_leverage = (sec.kind in ("leverage_pos", "leverage_neg")) %}
