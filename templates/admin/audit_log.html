@@ -4,18 +4,18 @@
 
 {% block content %}
 <section class="mb-5">
-  <h2 class="text-xl font-semibold mb-1">Admin 操作紀錄</h2>
-  <p class="text-sm text-muted">手動開通 / 撤銷的稽核 log,共 {{ total }} 筆</p>
+  <h2 class="text-xl font-semibold mb-1">後台操作紀錄</h2>
+  <p class="text-sm text-muted">手動開通 / 撤銷權限的稽核紀錄,共 {{ total }} 筆</p>
 </section>
 
 <form method="get" action="/admin/audit-log" class="flex gap-2 mb-5 flex-wrap">
-  <input type="text" name="admin" value="{{ admin_filter }}" placeholder="admin email"
-         class="px-3 py-2 bg-card border border-border rounded-md text-sm text-fg">
+  <input type="text" name="admin" value="{{ admin_filter }}" placeholder="篩選操作者電子郵件"
+         class="px-3 py-2 bg-card border border-border rounded-md text-sm text-fg min-w-[220px]">
   <select name="action" class="px-3 py-2 bg-card border border-border rounded-md text-sm text-fg">
-    <option value="" {% if not action_filter %}selected{% endif %}>所有動作</option>
-    <option value="grant_trial" {% if action_filter=='grant_trial' %}selected{% endif %}>grant_trial</option>
-    <option value="grant_premium" {% if action_filter=='grant_premium' %}selected{% endif %}>grant_premium</option>
-    <option value="revoke" {% if action_filter=='revoke' %}selected{% endif %}>revoke</option>
+    <option value="" {% if not action_filter %}selected{% endif %}>全部動作</option>
+    <option value="grant_trial" {% if action_filter=='grant_trial' %}selected{% endif %}>加贈試用</option>
+    <option value="grant_premium" {% if action_filter=='grant_premium' %}selected{% endif %}>加贈進階版</option>
+    <option value="revoke" {% if action_filter=='revoke' %}selected{% endif %}>撤銷權限</option>
   </select>
   <button type="submit" class="px-4 py-2 bg-accent text-bg rounded-md text-sm font-medium">篩選</button>
 </form>
@@ -25,9 +25,9 @@
     <thead>
       <tr class="text-left text-muted border-b border-border">
         <th class="py-3 px-3 font-medium">時間</th>
-        <th class="py-3 px-3 font-medium">Admin</th>
+        <th class="py-3 px-3 font-medium">操作者</th>
         <th class="py-3 px-3 font-medium">動作</th>
-        <th class="py-3 px-3 font-medium">目標</th>
+        <th class="py-3 px-3 font-medium">目標用戶</th>
         <th class="py-3 px-3 font-medium">天數</th>
         <th class="py-3 px-3 font-medium">原因</th>
       </tr>
@@ -38,9 +38,9 @@
         <td class="py-3 px-3 text-xs text-muted">{{ a.created_at.strftime('%Y-%m-%d %H:%M') if a.created_at else '—' }}</td>
         <td class="py-3 px-3 font-mono text-xs">{{ a.admin_email }}</td>
         <td class="py-3 px-3">
-          {% if a.action_type == 'grant_trial' %}<span class="px-2 py-1 rounded bg-amber-500/20 text-amber-300 text-xs">grant_trial</span>
-          {% elif a.action_type == 'grant_premium' %}<span class="px-2 py-1 rounded bg-green-500/20 text-green-300 text-xs">grant_premium</span>
-          {% elif a.action_type == 'revoke' %}<span class="px-2 py-1 rounded bg-red-500/20 text-red-300 text-xs">revoke</span>
+          {% if a.action_type == 'grant_trial' %}<span class="px-2 py-1 rounded bg-amber-500/20 text-amber-300 text-xs whitespace-nowrap">加贈試用</span>
+          {% elif a.action_type == 'grant_premium' %}<span class="px-2 py-1 rounded bg-green-500/20 text-green-300 text-xs whitespace-nowrap">加贈進階版</span>
+          {% elif a.action_type == 'revoke' %}<span class="px-2 py-1 rounded bg-red-500/20 text-red-300 text-xs whitespace-nowrap">撤銷權限</span>
           {% else %}{{ a.action_type }}{% endif %}
         </td>
         <td class="py-3 px-3 text-xs"><span class="font-mono">{{ a.target_user_email }}</span><br><span class="text-muted">id={{ a.target_user_id }}</span></td>
@@ -48,7 +48,7 @@
         <td class="py-3 px-3 text-xs text-muted">{{ a.reason or '—' }}</td>
       </tr>
       {% else %}
-      <tr><td colspan="6" class="text-center py-10 text-muted">尚無 admin 操作紀錄</td></tr>
+      <tr><td colspan="6" class="text-center py-10 text-muted">尚無後台操作紀錄</td></tr>
       {% endfor %}
     </tbody>
   </table>

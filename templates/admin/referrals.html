@@ -5,33 +5,33 @@
 {% block content %}
 <section class="mb-5">
   <h2 class="text-xl font-semibold mb-1">推薦紀錄</h2>
-  <p class="text-sm text-muted">訪客點 ref 連結 → 給推薦人 +2 天試用(24h cooldown),共 {{ total }} 筆</p>
+  <p class="text-sm text-muted">訪客點推薦連結 → 給推薦人 +2 天試用(24 小時內只給獎一次),共 {{ total }} 筆</p>
 </section>
 
 {# === 統計卡片 === #}
 <section class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
   <div class="bg-card rounded-xl p-4 border border-border">
-    <div class="text-xs text-muted mb-1">總點擊</div>
+    <div class="text-xs text-muted mb-1">累計點擊次數</div>
     <div class="stat-num num text-fg">{{ total_clicks }}</div>
   </div>
   <div class="bg-card rounded-xl p-4 border border-border" style="border-left: 3px solid #10b981;">
-    <div class="text-xs text-muted mb-1">成功給獎(+2 天試用)</div>
+    <div class="text-xs text-muted mb-1">已給獎(+2 天試用)</div>
     <div class="stat-num num text-down">{{ total_granted }}</div>
   </div>
   <div class="bg-card rounded-xl p-4 border border-border" style="border-left: 3px solid #f59e0b;">
-    <div class="text-xs text-muted mb-1">重複點擊(24h 內已給過)</div>
+    <div class="text-xs text-muted mb-1">重複點擊(24 小時內已給過)</div>
     <div class="stat-num num" style="color: #fbbf24;">{{ total_failed }}</div>
   </div>
   <div class="bg-card rounded-xl p-4 border border-border" style="border-left: 3px solid #3b82f6;">
-    <div class="text-xs text-muted mb-1">轉換率</div>
+    <div class="text-xs text-muted mb-1">獲獎率</div>
     <div class="stat-num num text-accent">{{ '%.1f'|format(conversion) }}%</div>
   </div>
 </section>
 
-{# === Top 推薦者 === #}
+{# === 推薦排行 === #}
 {% if top_referrers %}
 <section class="bg-card rounded-xl border border-border p-4 mb-5">
-  <h3 class="text-sm font-semibold text-muted mb-3">Top 5 推薦者(總分享次數)</h3>
+  <h3 class="text-sm font-semibold text-muted mb-3">推薦排行前 5 名(累計分享次數)</h3>
   <ol class="space-y-2">
     {% for r in top_referrers %}
     <li class="flex items-center justify-between text-sm">
@@ -49,8 +49,8 @@
 
 {# === 篩選 === #}
 <form method="get" action="/admin/referrals" class="flex gap-2 mb-5 flex-wrap">
-  <input type="text" name="referrer" value="{{ referrer_filter }}" placeholder="篩選推薦人 email"
-         class="px-3 py-2 bg-card border border-border rounded-md text-sm text-fg min-w-[200px]">
+  <input type="text" name="referrer" value="{{ referrer_filter }}" placeholder="篩選推薦人電子郵件"
+         class="px-3 py-2 bg-card border border-border rounded-md text-sm text-fg min-w-[220px]">
   <select name="granted" class="px-3 py-2 bg-card border border-border rounded-md text-sm text-fg">
     <option value="yes" {% if granted_filter=='yes' %}selected{% endif %}>已給獎(預設)</option>
     <option value="all" {% if granted_filter=='all' %}selected{% endif %}>全部明細</option>
@@ -66,8 +66,8 @@
       <tr class="text-left text-muted border-b border-border">
         <th class="py-3 px-3 font-medium">點擊時間</th>
         <th class="py-3 px-3 font-medium">推薦人</th>
-        <th class="py-3 px-3 font-medium">Token</th>
-        <th class="py-3 px-3 font-medium">訪客 IP</th>
+        <th class="py-3 px-3 font-medium">推薦碼</th>
+        <th class="py-3 px-3 font-medium">訪客位址</th>
         <th class="py-3 px-3 font-medium">瀏覽器</th>
         <th class="py-3 px-3 font-medium">獎勵</th>
       </tr>
@@ -95,7 +95,7 @@
             <br><span class="text-muted">{{ r.granted_at | tw_time }}</span>
           {% else %}
             <span class="px-2 py-1 rounded bg-amber-500/15 text-amber-300 text-xs whitespace-nowrap">
-              cooldown
+              重複點擊
             </span>
           {% endif %}
         </td>
