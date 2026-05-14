@@ -118,6 +118,10 @@
 
 {% block content %}
 <div class="max-w-[1280px] mx-auto py-6 px-4">
+  {# === 分享 strip(統一元件)=== #}
+  {% from "_partials/share_buttons.html" import share_strip, share_strip_styles_and_script %}
+  {{ share_strip(default_path='/market-temp') }}
+
   <h1 class="text-center text-xl sm:text-2xl font-semibold mb-1">市場溫度計</h1>
   <div class="text-center mb-6">
     {% if data_age_days is not none and data_age_days > 5 %}
@@ -598,4 +602,6 @@ window.addEventListener('load', function() {
   });
 });
 </script>
+
+{{ share_strip_styles_and_script() }}
 {% endblock %}

@@ -1073,6 +1073,7 @@ def admin_referrals(
     from sqlalchemy import desc as sa_desc
     from app.database import session_scope
     from app.models.billing import Referral, UserPlan
+    from app.models.share import ShareButtonClick
     from app.models.user import User as _U
 
     page = max(1, page)
@@ -1085,6 +1086,17 @@ def admin_referrals(
         ) or 0
         total_failed = total_clicks - total_granted
         conversion = (total_granted / total_clicks * 100.0) if total_clicks else 0.0
+
+        # === 分享按鈕點擊拆分(累計,各平台)===
+        btn_rows = session.execute(
+            select(ShareButtonClick.platform, func.count())
+            .group_by(ShareButtonClick.platform)
+        ).all()
+        share_btn_by_platform = {"fb": 0, "line": 0, "threads": 0, "copy": 0, "native": 0}
+        for platform, n in btn_rows:
+            if platform in share_btn_by_platform:
+                share_btn_by_platform[platform] = int(n)
+        share_btn_total = sum(share_btn_by_platform.values())
 
         # Top 5 推薦者(by total_share_count from user_plans)
         top_q = (
@@ -1136,7 +1148,9 @@ def admin_referrals(
          "granted_filter": granted, "page": page, "total_pages": total_pages,
          "total": total, "total_clicks": total_clicks, "total_granted": total_granted,
          "total_failed": total_failed, "conversion": conversion,
-         "top_referrers": top_referrers},
+         "top_referrers": top_referrers,
+         "share_btn_by_platform": share_btn_by_platform,
+         "share_btn_total": share_btn_total},
     )
 
 

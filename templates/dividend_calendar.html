@@ -111,6 +111,10 @@
 
 {% block content %}
 
+{# === 分享 strip(統一元件)=== #}
+{% from "_partials/share_buttons.html" import share_strip, share_strip_styles_and_script %}
+{{ share_strip(default_path='/dividend-calendar') }}
+
 {# === Hero === #}
 <section class="mb-6 relative">
   <div class="text-xs text-muted tracking-widest mb-2">
@@ -294,4 +298,5 @@
 })();
 </script>
 
+{{ share_strip_styles_and_script() }}
 {% endblock %}

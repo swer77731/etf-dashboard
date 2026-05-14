@@ -6,6 +6,10 @@
 
 {% block content %}
 
+{# === 分享 strip(統一元件)=== #}
+{% from "_partials/share_buttons.html" import share_strip, share_strip_styles_and_script %}
+{{ share_strip(default_path='/ranking/' ~ kind) }}
+
 {# === Hero === #}
 <section class="mb-6 relative">
   <div class="text-xs text-muted tracking-widest mb-2">
@@ -86,4 +90,5 @@
   報酬以還原股價計算,如與您看到的略有差異請以您實際成交結果為準
 </section>
 
+{{ share_strip_styles_and_script() }}
 {% endblock %}

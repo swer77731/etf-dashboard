@@ -133,6 +133,10 @@
 
 {% block content %}
 <article class="max-w-[760px] mx-auto py-8 px-4">
+  {# === 分享 strip(統一元件)=== #}
+  {% from "_partials/share_buttons.html" import share_strip, share_strip_styles_and_script %}
+  {{ share_strip(default_path='/learn/' ~ article.slug) }}
+
   <nav class="breadcrumb mb-4">
     <a href="/">首頁</a> / <a href="/learn">學習</a> /
     <a href="/learn?category={{ article.category.slug }}">{{ article.category.name }}</a> /
@@ -204,4 +208,6 @@
   </form>
 </div>
 {% endif %}
+
+{{ share_strip_styles_and_script() }}
 {% endblock %}

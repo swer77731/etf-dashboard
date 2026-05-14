@@ -28,6 +28,30 @@
   </div>
 </section>
 
+{# === 分享按鈕點擊拆分(累計,各平台)=== #}
+<section class="bg-card rounded-xl border border-border p-4 mb-5">
+  <h3 class="text-sm font-semibold text-muted mb-1">分享按鈕點擊(累計,共 {{ share_btn_total }} 次)</h3>
+  <p class="text-xs text-muted mb-3">使用者按下分享 icon / 複製連結的次數(尚未保證有人點)。</p>
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div class="bg-bg/40 rounded-lg p-3 border border-border">
+      <div class="text-xs text-muted mb-1">Facebook</div>
+      <div class="stat-num num text-fg">{{ share_btn_by_platform.fb }}</div>
+    </div>
+    <div class="bg-bg/40 rounded-lg p-3 border border-border">
+      <div class="text-xs text-muted mb-1">LINE</div>
+      <div class="stat-num num text-fg">{{ share_btn_by_platform.line }}</div>
+    </div>
+    <div class="bg-bg/40 rounded-lg p-3 border border-border">
+      <div class="text-xs text-muted mb-1">Threads</div>
+      <div class="stat-num num text-fg">{{ share_btn_by_platform.threads }}</div>
+    </div>
+    <div class="bg-bg/40 rounded-lg p-3 border border-border">
+      <div class="text-xs text-muted mb-1">複製連結</div>
+      <div class="stat-num num text-fg">{{ share_btn_by_platform.copy }}</div>
+    </div>
+  </div>
+</section>
+
 {# === 推薦排行 === #}
 {% if top_referrers %}
 <section class="bg-card rounded-xl border border-border p-4 mb-5">
