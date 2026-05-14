@@ -76,6 +76,9 @@ PATH_LABELS: list[tuple[str, str]] = [
     ("/dividend-calendar", "配息日曆"),
     ("/monthly-income", "配息計算器"),
     ("/compare", "績效比較"),
+    ("/learn", "學習專區"),
+    ("/market-temp", "市場溫度計"),
+    ("/premium", "進階版"),
     ("/contact", "聯絡"),
     ("/changelog", "更新日誌"),
     ("/disclaimer", "免責聲明"),
@@ -86,9 +89,27 @@ PATH_LABELS: list[tuple[str, str]] = [
     ("/account-delete", "帳號刪除"),
     ("/auth/google/callback", "Google 登入完成"),
     ("/auth/google/login", "Google 登入"),
+    ("/auth/logout", "登出"),
     ("/admin/login", "後台登入"),
+    ("/admin/", "後台"),
+    ("/api/", "API 請求"),
     ("/", "首頁"),    # 必須最後 — 空 prefix 全匹配
 ]
+
+
+# 噪音路徑 — 瀏覽器自動 / 系統 / 爬蟲請求,不是 user 行為,
+# 不該出現在「最近訪問」表內(分析資料仍照常累計)
+NOISE_PATHS: set[str] = {
+    "/service-worker.js",
+    "/sw.js",
+    "/manifest.json",
+    "/favicon.ico",
+    "/sitemap.xml",
+    "/robots.txt",
+    "/ads.txt",
+    "/apple-touch-icon.png",
+    "/apple-touch-icon-precomposed.png",
+}
 
 
 def label_for_path(path: str) -> str:
@@ -427,11 +448,19 @@ def _parse_ua(ua: str | None) -> str:
 # ─────────────────────────────────────────────────────────────
 
 def recent_visits(limit: int = 100) -> list[dict]:
-    """最新 N 筆訪問(IP 已遮、UA 取 browser+OS)。"""
+    """最新 N 筆訪問(IP 已遮、UA 取 browser+OS)。
+    排除噪音路徑(service-worker / manifest / favicon / sitemap / robots / ads)
+    以及 /static/* 靜態資源 — 留下 user 真實點選的頁面。
+    """
     with session_scope() as s:
-        rows = s.scalars(
-            select(AnalyticsLog).order_by(AnalyticsLog.id.desc()).limit(limit)
-        ).all()
+        stmt = (
+            select(AnalyticsLog)
+            .where(~AnalyticsLog.path.in_(NOISE_PATHS))
+            .where(~AnalyticsLog.path.startswith("/static/"))
+            .order_by(AnalyticsLog.id.desc())
+            .limit(limit)
+        )
+        rows = s.scalars(stmt).all()
         return [
             {
                 "id": r.id,

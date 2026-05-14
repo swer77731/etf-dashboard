@@ -528,49 +528,6 @@
   </div>
 </section>
 
-{# === Top 搜尋 + Top 比較 === #}
-<section class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-  <div class="card p-4">
-    <h3 class="text-base font-semibold mb-3">熱門搜尋關鍵字 前 20 名 <span class="text-xs text-muted ml-2">近 {{ range_days }} 天</span></h3>
-    {% if searches %}
-      <table class="admin-table">
-        <thead><tr><th>#</th><th>關鍵字</th><th class="text-right">次數</th></tr></thead>
-        <tbody>
-          {% for s in searches %}
-            <tr>
-              <td class="num-col text-muted">{{ loop.index }}</td>
-              <td>{{ s.q }}</td>
-              <td class="num-col text-right">{{ s.count }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    {% else %}
-      <div class="text-sm text-muted py-6 text-center">暫無資料</div>
-    {% endif %}
-  </div>
-
-  <div class="card p-4">
-    <h3 class="text-base font-semibold mb-3">熱門比較組合 前 10 名 <span class="text-xs text-muted ml-2">近 {{ range_days }} 天</span></h3>
-    {% if compares %}
-      <table class="admin-table">
-        <thead><tr><th>#</th><th>組合</th><th class="text-right">次數</th></tr></thead>
-        <tbody>
-          {% for c in compares %}
-            <tr>
-              <td class="num-col text-muted">{{ loop.index }}</td>
-              <td class="num-col">{{ c.codes.replace(',', ' + ') }}</td>
-              <td class="num-col text-right">{{ c.count }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    {% else %}
-      <div class="text-sm text-muted py-6 text-center">暫無資料</div>
-    {% endif %}
-  </div>
-</section>
-
 {# === 流量來源圓餅圖 === #}
 <section class="card p-4 mb-6">
   <h3 class="text-base font-semibold mb-3">流量來源 <span class="text-xs text-muted ml-2">近 {{ range_days }} 天</span></h3>
@@ -614,7 +571,6 @@
             <th>訪問階段</th>
             <th>位址</th>
             <th>頁面</th>
-            <th>路徑</th>
             <th>瀏覽器 / 作業系統</th>
             <th class="text-right">耗時</th>
           </tr>
@@ -626,7 +582,6 @@
               <td class="num-col text-xs text-muted">{{ v.session_id_short }}</td>
               <td class="num-col text-xs">{{ v.ip_masked or '—' }}</td>
               <td class="text-fg/90">{{ v.label }}</td>
-              <td class="num-col text-xs text-muted truncate max-w-[200px]">{{ v.path }}</td>
               <td class="text-xs">{{ v.ua_short }}</td>
               <td class="num-col text-right text-xs">{% if v.duration_sec %}{{ '%.0f'|format(v.duration_sec * 1000) }} 毫秒{% else %}—{% endif %}</td>
             </tr>

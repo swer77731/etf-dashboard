@@ -299,8 +299,6 @@ async def analytics_page(
     capacity = admin_analytics.capacity_overview()
     etfs = admin_analytics.top_etfs(days=range_days, limit=10)
     feats = admin_analytics.top_features(days=range_days, limit=10)
-    searches = admin_analytics.top_searches(days=range_days, limit=20)
-    compares = admin_analytics.top_compares(days=range_days, limit=10)
     refs = admin_analytics.referer_breakdown(days=range_days)
     visits = admin_analytics.recent_visits(limit=100)
     member_stats = _member_stats()   # 會員註冊統計(2026-05-02 併入)
@@ -321,8 +319,6 @@ async def analytics_page(
             capacity=capacity,
             etfs=etfs,
             feats=feats,
-            searches=searches,
-            compares=compares,
             refs=refs,
             visits=visits,
             members=member_stats,
