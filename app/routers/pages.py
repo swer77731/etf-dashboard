@@ -281,7 +281,11 @@ async def index(request: Request) -> HTMLResponse:
             from app.services.paywall import find_referrer_by_token, grant_trial_check
             referrer_id = find_referrer_by_token(ref)
             if referrer_id:
-                visitor_ip = request.client.host if request.client else None
+                # 走 share_service.extract_visitor_ip — 支援 Cloudflare / Zeabur
+                # 的 x-forwarded-for + cf-connecting-ip header(原本 request.client.host
+                # 只會拿到 Zeabur reverse proxy 內部 IP 10.42.0.1)
+                from app.services.share_service import extract_visitor_ip
+                visitor_ip = extract_visitor_ip(request)
                 visitor_ua = request.headers.get("user-agent", "")
                 grant_trial_check(referrer_id, ref, visitor_ip, visitor_ua)
         except Exception:
