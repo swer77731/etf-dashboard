@@ -19,7 +19,7 @@
     <div class="stat-num num text-down">{{ total_granted }}</div>
   </div>
   <div class="bg-card rounded-xl p-4 border border-border" style="border-left: 3px solid #f59e0b;">
-    <div class="text-xs text-muted mb-1">未給獎(24h cooldown)</div>
+    <div class="text-xs text-muted mb-1">重複點擊(24h 內已給過)</div>
     <div class="stat-num num" style="color: #fbbf24;">{{ total_failed }}</div>
   </div>
   <div class="bg-card rounded-xl p-4 border border-border" style="border-left: 3px solid #3b82f6;">
@@ -52,9 +52,9 @@
   <input type="text" name="referrer" value="{{ referrer_filter }}" placeholder="篩選推薦人 email"
          class="px-3 py-2 bg-card border border-border rounded-md text-sm text-fg min-w-[200px]">
   <select name="granted" class="px-3 py-2 bg-card border border-border rounded-md text-sm text-fg">
-    <option value="all" {% if granted_filter=='all' %}selected{% endif %}>全部</option>
-    <option value="yes" {% if granted_filter=='yes' %}selected{% endif %}>已給獎</option>
-    <option value="no" {% if granted_filter=='no' %}selected{% endif %}>未給獎</option>
+    <option value="yes" {% if granted_filter=='yes' %}selected{% endif %}>已給獎(預設)</option>
+    <option value="all" {% if granted_filter=='all' %}selected{% endif %}>全部明細</option>
+    <option value="no" {% if granted_filter=='no' %}selected{% endif %}>重複點擊</option>
   </select>
   <button type="submit" class="px-4 py-2 bg-accent text-bg rounded-md text-sm font-medium">篩選</button>
 </form>

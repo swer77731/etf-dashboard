@@ -304,9 +304,8 @@ async def analytics_page(
     member_stats = _member_stats()   # 會員註冊統計(2026-05-02 併入)
     pending_reports = _pending_error_reports_count()  # nav 入口顯示待處理筆數
     backup_summary = _backup_status_summary()         # 備份狀態卡入口用
-    from app.services import data_audit, share_service
+    from app.services import data_audit
     audit_summary = data_audit.get_latest()           # 資料健康管家(2026-05-06)
-    share_stats = share_service.get_admin_share_stats(top_n=10)  # 分享統計(2026-05-08)
 
     return templates.TemplateResponse(
         request, "admin/analytics.html",
@@ -326,7 +325,6 @@ async def analytics_page(
             backup_summary=backup_summary,
             audit_summary=audit_summary,
             audit_triggered=audit_triggered_value,
-            share_stats=share_stats,
             maintenance_active=maintenance_active,
             maintenance_toggled=maintenance_value,
             current_user=user,
@@ -1065,7 +1063,7 @@ def admin_audit_log(
 def admin_referrals(
     request: Request,
     referrer: str = "",
-    granted: str = "all",  # 'all' / 'yes' / 'no'
+    granted: str = "yes",  # 'all' / 'yes' / 'no' — 預設只看已給獎,避免重複點擊洗版
     page: int = 1,
 ):
     """訪客點 ref 連結紀錄 — 看誰推薦給誰、轉換率、Top 推薦者。"""

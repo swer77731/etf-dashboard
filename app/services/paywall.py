@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
@@ -17,6 +18,29 @@ from app.database import session_scope
 from app.models.billing import UserPlan
 
 logger = logging.getLogger(__name__)
+
+
+# 社群預覽 / 搜尋引擎 / 程式化 UA — 不算「真人訪客」,不給獎也不寫 referrals
+# 起源:user 分享到 FB 後 facebookexternalhit 一次拉 3-12 次預覽,
+# 全部被當成「11 個訪客點擊」污染推薦統計
+_BOT_UA_RE = re.compile(
+    r"facebookexternalhit|FacebookBot|meta-externalagent"
+    r"|Twitterbot|LinkedInBot|Slackbot|TelegramBot|WhatsApp|Discordbot"
+    r"|line-poker|LineBotWebHook|Threads(External)?Fetcher"
+    r"|Googlebot|bingbot|Baiduspider|YandexBot|DuckDuckBot|Applebot"
+    r"|AhrefsBot|SemrushBot|MJ12bot|DotBot|PetalBot"
+    r"|HeadlessChrome|PhantomJS|Puppeteer|Playwright"
+    r"|python-requests|curl/|Wget/|Go-http-client|okhttp"
+    r"|bot|crawler|spider|fetcher",
+    re.IGNORECASE,
+)
+
+
+def _is_bot_ua(ua: str | None) -> bool:
+    """UA 是否屬於機器人 / 爬蟲 / 程式化請求。"""
+    if not ua:
+        return True  # 空 UA 多半是腳本/爬蟲
+    return bool(_BOT_UA_RE.search(ua))
 
 
 def _user_id_from(user: Any) -> Optional[int]:
@@ -123,6 +147,13 @@ def grant_trial_check(referrer_user_id: int, ref_token: str,
     Returns:
         {granted: bool, reason: str, trial_until: iso or None}
     """
+    # 機器人 / 預覽爬蟲 — 不寫 referrals 紀錄,不給獎(防 FB / Twitter 等
+    # 社群預覽爬蟲被誤計分;它們會在分享當下對 URL 拉 3-12 次)
+    if _is_bot_ua(visitor_ua):
+        logger.debug("[paywall.grant_trial] skipped bot UA: %s",
+                     (visitor_ua or "")[:120])
+        return {"granted": False, "reason": "bot", "trial_until": None}
+
     now = datetime.now()
     with session_scope() as session:
         plan = session.scalar(select(UserPlan).where(UserPlan.user_id == referrer_user_id))
