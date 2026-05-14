@@ -397,7 +397,12 @@ def mt_lending_job(_retry: bool = False) -> None:
 
 
 def mt_margin_short_job(_retry: bool = False) -> None:
-    """每天 18:05 — 融資融券 + 維持率(融資融券 ~18:00 釋出,最晚)。"""
+    """每天 19:30 — 融資融券 + 維持率(FinMind 19:00-19:30 才釋出完畢)。
+
+    2026-05-14 從 18:05 改 19:30 — 18:05 搶第一波 FinMind 經常回空 list,
+    retry 5min 後 18:10 也常失敗。改 19:30 後成功率大幅提高,即使再失敗
+    23:30 data_audit.market_temp_stale 會自動補洞。
+    """
     if not _try_lock("mt_margin_short"):
         return
     try:
@@ -620,8 +625,10 @@ def start_scheduler() -> AsyncIOScheduler:
          CronTrigger(hour=16, minute=5, timezone=tz)),
         ("mt_lending_daily", mt_lending_job,
          CronTrigger(hour=17, minute=35, timezone=tz)),
+        # 18:05 改 19:30 — FinMind TaiwanStockMarginPurchaseShortSale 通常
+        # 19:00-19:30 才釋出完畢,18:05 搶第一波容易碰空 list(2026-05-13 失敗事件)
         ("mt_margin_short_daily", mt_margin_short_job,
-         CronTrigger(hour=18, minute=5, timezone=tz)),
+         CronTrigger(hour=19, minute=30, timezone=tz)),
     ]
 
     for job_id, fn, trig in jobs:
