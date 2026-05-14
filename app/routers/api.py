@@ -520,3 +520,86 @@ async def share_visit_valid(request: Request) -> dict:
     ip = share_service.extract_visitor_ip(request)
     ok = share_service.mark_visit_valid(click_id, ip)
     return {"ok": ok}
+
+
+# ─────────────────────────────────────────────────────────────
+# 臨時診斷 endpoint(2026-05-14 — 修完 market_temp 沒更新 bug 後拿掉)
+# token 防爛 IP 亂打
+# ─────────────────────────────────────────────────────────────
+
+_DIAG_TOKEN = "diag-mt-2026-05-14"  # 一次性,fix 完拿掉
+
+
+@router.get("/_internal/mt_status")
+def _internal_mt_status(token: str = ""):
+    """市場溫度計 5 個 table 最新日期 + sync_status — 診斷用,no-auth。"""
+    if token != _DIAG_TOKEN:
+        raise HTTPException(403, "bad token")
+    from app.models.market_temperature import (
+        MarginMaintenance, MarketBreadth, MarginShortTotal,
+        SecuritiesLendingDaily, InstitutionalDaily,
+    )
+    from app.models.sync_status import SyncStatus
+    out = {}
+    with session_scope() as session:
+        for name, cls in [
+            ("margin_maintenance", MarginMaintenance),
+            ("market_breadth", MarketBreadth),
+            ("margin_short_total", MarginShortTotal),
+            ("securities_lending_daily", SecuritiesLendingDaily),
+            ("institutional_daily", InstitutionalDaily),
+        ]:
+            latest = session.scalar(select(func.max(cls.date)))
+            cnt = session.scalar(select(func.count()).select_from(cls)) or 0
+            recent = list(session.scalars(
+                select(cls.date).order_by(cls.date.desc()).limit(7)
+            ))
+            out[name] = {
+                "rows": cnt,
+                "latest": latest.isoformat() if latest else None,
+                "recent_7_days": [d.isoformat() for d in recent],
+            }
+        sources = ("mt_breadth", "mt_institutional", "mt_lending",
+                   "mt_margin_short", "mt_maintenance")
+        statuses = {}
+        for src in sources:
+            row = session.scalar(select(SyncStatus).where(SyncStatus.source == src))
+            if row:
+                statuses[src] = {
+                    "last_success_at": row.last_success_at.isoformat() if row.last_success_at else None,
+                    "last_attempt_at": row.last_attempt_at.isoformat() if row.last_attempt_at else None,
+                    "last_error": (row.last_error or "")[:300],
+                }
+            else:
+                statuses[src] = None
+        out["sync_status"] = statuses
+    return out
+
+
+@router.post("/_internal/mt_backfill")
+def _internal_mt_backfill(token: str = "", days: int = 3):
+    """同步呼叫 4 個 mt sync(用 today/yesterday/...),回傳結果。"""
+    if token != _DIAG_TOKEN:
+        raise HTTPException(403, "bad token")
+    if days < 1 or days > 14:
+        raise HTTPException(400, "days 1-14")
+    from datetime import date as date_type
+    from app.services import market_temp_sync
+    today = date_type.today()
+    results = []
+    for offset in range(days):
+        d = today - timedelta(days=offset)
+        if d.weekday() >= 5:
+            continue  # skip 週末
+        r_b = market_temp_sync.sync_breadth(d)
+        r_i = market_temp_sync.sync_institutional(d)
+        r_l = market_temp_sync.sync_lending(d)
+        r_m = market_temp_sync.sync_margin_short_and_maintenance(d)
+        results.append({
+            "date": d.isoformat(),
+            "breadth": r_b,
+            "institutional": r_i,
+            "lending": r_l,
+            "margin_short": r_m,
+        })
+    return {"ok": True, "results": results}
