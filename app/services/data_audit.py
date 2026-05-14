@@ -362,6 +362,106 @@ def _fix_dividend_pending_amount(finding: Finding) -> tuple[bool, str]:
 # ─────────────────────────────────────────────────────────────
 
 
+def _detect_market_temp_stale() -> list[Finding]:
+    """市場溫度計 5 個 table 任一卡在「2 個交易日以上」未更新 → flag。
+
+    起源:2026-05-13 18:05 cron sync_margin_short_and_maintenance 失敗
+    (FinMind 暫時不可用 / dataset lag),5 分鐘 retry 也失敗 → 5/13 資料缺漏,
+    隔天 user 才反映。本 check 在 23:30 cron 補洞。
+    """
+    from app.models.market_temperature import (
+        MarginMaintenance, MarketBreadth, MarginShortTotal,
+        SecuritiesLendingDaily, InstitutionalDaily,
+    )
+
+    today = date.today()
+    # 上個交易日(skip 週末):週一往前看上週五,其他往前看一天
+    if today.weekday() == 0:        # Monday → Friday
+        prev_trading_day = today - timedelta(days=3)
+    elif today.weekday() == 6:      # Sunday → Friday
+        prev_trading_day = today - timedelta(days=2)
+    elif today.weekday() == 5:      # Saturday → Friday
+        prev_trading_day = today - timedelta(days=1)
+    else:
+        prev_trading_day = today - timedelta(days=1)
+
+    out: list[Finding] = []
+    now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    table_specs = [
+        ("breadth", MarketBreadth),
+        ("institutional", InstitutionalDaily),
+        ("lending", SecuritiesLendingDaily),
+        ("margin_short", MarginShortTotal),
+        ("maintenance", MarginMaintenance),
+    ]
+    with session_scope() as s:
+        for src_short, cls in table_specs:
+            latest = s.scalar(select(func.max(cls.date)))
+            if latest is None or latest < prev_trading_day:
+                days_ago = (today - latest).days if latest else 999
+                out.append(Finding(
+                    id=f"market_temp_stale:{src_short}",
+                    kind="market_temp_stale",
+                    label=f"市場溫度計 {src_short} 資料卡住",
+                    severity="warn",
+                    code=None,
+                    detail=(
+                        f"{cls.__tablename__} 最新日期 {latest} "
+                        f"(預期 ≥ {prev_trading_day},差 {days_ago} 天)"
+                    ),
+                    auto_fixable=True,
+                    created_at=now_iso,
+                    metadata={
+                        "table": cls.__tablename__,
+                        "source": src_short,
+                        "latest": latest.isoformat() if latest else None,
+                        "expected_min": prev_trading_day.isoformat(),
+                        "days_ago": days_ago,
+                    },
+                ))
+    return out
+
+
+def _fix_market_temp_stale(finding: "Finding") -> tuple[bool, str]:
+    """補抓缺漏日的 mt sync(往回掃 5 個交易日)。"""
+    from datetime import date as date_type
+    src = (finding.metadata or {}).get("source", "")
+    from app.services import market_temp_sync
+
+    sync_map = {
+        "breadth": market_temp_sync.sync_breadth,
+        "institutional": market_temp_sync.sync_institutional,
+        "lending": market_temp_sync.sync_lending,
+        "margin_short": market_temp_sync.sync_margin_short_and_maintenance,
+        "maintenance": market_temp_sync.sync_margin_short_and_maintenance,
+    }
+    fn = sync_map.get(src)
+    if fn is None:
+        return False, f"unknown source {src}"
+
+    # 從昨天往回掃 5 個交易日,缺什麼補什麼
+    today = date_type.today()
+    results = []
+    success = 0
+    for offset in range(1, 8):
+        d = today - timedelta(days=offset)
+        if d.weekday() >= 5:
+            continue
+        if len([x for x in results if x.get("rows", 0) > 0]) >= 5:
+            break
+        try:
+            r = fn(d)
+            results.append({"date": d.isoformat(), "rows": r.get("rows", 0),
+                            "error": r.get("error")})
+            if r.get("error") is None and r.get("rows", 0) > 0:
+                success += 1
+        except Exception as e:
+            results.append({"date": d.isoformat(), "error": str(e)[:80]})
+    if success > 0:
+        return True, f"backfilled {success} day(s)"
+    return False, f"all attempts failed: {results[-3:] if results else 'no attempts'}"
+
+
 CHECKS: list[dict] = [
     {
         "id": "kbar_adj_null",
@@ -369,6 +469,13 @@ CHECKS: list[dict] = [
         "auto_fixable": True,
         "detect_fn": _detect_kbar_adj_null,
         "fix_fn": _fix_kbar_adj_null,
+    },
+    {
+        "id": "market_temp_stale",
+        "label": "市場溫度計資料卡住",
+        "auto_fixable": True,
+        "detect_fn": _detect_market_temp_stale,
+        "fix_fn": _fix_market_temp_stale,
     },
     {
         "id": "kbar_stale",
