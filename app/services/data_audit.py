@@ -362,6 +362,60 @@ def _fix_dividend_pending_amount(finding: Finding) -> tuple[bool, str]:
 # ─────────────────────────────────────────────────────────────
 
 
+def _detect_sync_freshness() -> list[Finding]:
+    """元審查 — sync source 整批沒跑 / 卡住的兜底偵測。
+
+    起源:2026-05-16 user 要求加「元審查」機制。
+    已有專屬 check 的 source(kbar / mt_*)跳過避免重複;
+    退役的(holdings_* / dividend_sync)跳過;
+    startup-only(etf_universe / finmind_quota_check)跳過。
+    本 check 是兜底層,catch 「整個 sync 系列被遺忘」。
+
+    auto_fixable=False:升 todo 進後台紅卡,user 點按鈕手動觸發
+    (從 data_audit 內部反向 import scheduler job 太繞且容易循環依賴)。
+    """
+    EXPECTED_HOURS = {
+        "news_sync": 30,                # daily 14:30,留 6h 寬限
+        "twse_dividend_announce": 30,   # daily 14:30
+        "yearly_returns_sync": 30,      # daily 04:00
+        "sitca_aum_monthly": 35 * 24,   # monthly 5 號 03:00
+        "finmind_beneficial": 8 * 24,   # weekly 週一 03:00,7+1 寬限
+    }
+    from app.models.sync_status import SyncStatus
+    out: list[Finding] = []
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    with session_scope() as s:
+        for source, expected_h in EXPECTED_HOURS.items():
+            row = s.scalar(select(SyncStatus).where(SyncStatus.source == source))
+            if row is None or row.last_success_at is None:
+                continue  # 從沒成功過,不算 stale(可能 sync 還沒到第一次)
+            elapsed_h = (now - row.last_success_at).total_seconds() / 3600
+            if elapsed_h > expected_h:
+                days_ago = round(elapsed_h / 24, 1)
+                out.append(Finding(
+                    id=f"sync_freshness:{source}",
+                    kind="sync_freshness",
+                    label="Sync source 長期沒跑",
+                    severity="warn",
+                    code=None,
+                    detail=(
+                        f"{source} 最後成功 {row.last_success_at} "
+                        f"({days_ago} 天前,預期 ≤ {round(expected_h/24,1)} 天)"
+                    ),
+                    auto_fixable=False,
+                    created_at=now_iso,
+                    metadata={
+                        "source": source,
+                        "last_success_at": row.last_success_at.isoformat(),
+                        "elapsed_hours": round(elapsed_h, 1),
+                        "expected_hours": expected_h,
+                        "days_ago": days_ago,
+                    },
+                ))
+    return out
+
+
 def _detect_market_temp_stale() -> list[Finding]:
     """市場溫度計 5 個 table 任一卡在「2 個交易日以上」未更新 → flag。
 
@@ -464,7 +518,16 @@ def _fix_market_temp_stale(finding: "Finding") -> tuple[bool, str]:
 
 CHECKS: list[dict] = [
     {
-        # 排第一:findings 最多 5 個(5 個表),絕不會餓死其他 check;
+        # 元審查 — 兜底層,catch 整個 sync 系列被遺忘。
+        # auto_fixable=False(進 todo)避免跟專屬 check 重複自動修
+        "id": "sync_freshness",
+        "label": "Sync source 長期沒跑",
+        "auto_fixable": False,
+        "detect_fn": _detect_sync_freshness,
+        "fix_fn": None,
+    },
+    {
+        # 排第二:findings 最多 5 個(5 個表),絕不會餓死其他 check;
         # 排後面會被 kbar_adj_null 200+ findings 吃光預算 → 永遠輪不到。
         # 2026-05-16 之前排第 2,實際 5-14/5-15 兩天都被 skip,user 看到 market-temp 卡 3 天。
         "id": "market_temp_stale",
