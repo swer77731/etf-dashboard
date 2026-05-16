@@ -375,7 +375,6 @@ def _detect_sync_freshness() -> list[Finding]:
     (從 data_audit 內部反向 import scheduler job 太繞且容易循環依賴)。
     """
     EXPECTED_HOURS = {
-        "news_sync": 30,                # daily 14:30,留 6h 寬限
         "twse_dividend_announce": 30,   # daily 14:30
         "yearly_returns_sync": 30,      # daily 04:00
         "sitca_aum_monthly": 35 * 24,   # monthly 5 號 03:00

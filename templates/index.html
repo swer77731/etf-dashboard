@@ -140,8 +140,6 @@
   TAIEX 為加權股價指數 · 報酬以還原股價計算,如與您看到的略有差異請以您實際成交結果為準
 </section>
 
-{# 相對時間 / fresh 標記由 Jinja filter humanize_relative + is_fresh_news 在 server 端 render(Asia/Taipei),JS 不再重算 #}
-
 {# 分享 strip styles + JS — 一頁一次 #}
 {{ share_strip_styles_and_script() }}
 {% endblock %}
