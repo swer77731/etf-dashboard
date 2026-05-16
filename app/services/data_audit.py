@@ -666,9 +666,10 @@ def run_all_checks(auto_fix: bool = True) -> dict:
     all_findings = _apply_ignored(all_findings)
 
     # 自動修(只對 status='pending' 的,單輪上限 MAX_FIXES_PER_RUN 避免撞 quota)
-    # 設計:fix_fn 回 ok=True 就信任,不立刻 re-detect 驗證(省 quota)
-    # 真的有沒修好下次 cron 自然會再 detect 抓到。failed 一次就 +1 attempt;
-    # 累積 attempts >= MAX_FIX_ATTEMPTS → status 自動變 'todo'(可看 finding.status)
+    # 紀律 #22「跑了 ≠ 跑對了」:fix_fn 回 ok 不代表真的修好,
+    # 必須 post-fix re-detect 驗證 finding 真的消失才算 fixed。
+    # 驗證失敗 → 立刻升 todo(不等 MAX_FIX_ATTEMPTS),user 可在後台看到。
+    # 成本:多 1 次 detect 查詢 / 修(輕,值得)。
     if auto_fix:
         fixed_count = 0
         for finding in all_findings:
@@ -689,8 +690,26 @@ def run_all_checks(auto_fix: bool = True) -> dict:
                 ok, msg = False, f"{type(e).__name__}: {str(e)[:120]}"
             finding.fix_log.append(f"attempt {finding.fix_attempts}: {'OK' if ok else 'FAIL'} - {msg}")
             if ok:
-                finding.auto_fixed = True
-                fixed_count += 1
+                # 紀律 #22 post-fix verify:re-detect 確認 finding 真的消失。
+                # 每次 fix 後立刻 re-detect(不快取,因 DB 狀態每修一個就變)。
+                # 10 修 × 1 detect = 10 次 query,可接受。
+                try:
+                    new_results = chk["detect_fn"]()
+                    still_present = any(f.id == finding.id for f in new_results)
+                except Exception as e:
+                    still_present = True  # 保守:detect 失敗當成驗證不通過
+                    finding.fix_log.append(f"verify: detect failed {type(e).__name__}")
+                if still_present:
+                    # fix_fn 回 OK 但 finding 還在 → 假修。
+                    # 直接把 fix_attempts 拉到 MAX_FIX_ATTEMPTS 觸發 @property status → "todo"
+                    # (Finding.status 是 derived property,不能 setattr)
+                    finding.fix_log.append(
+                        f"VERIFY FAILED: finding 仍存在,升級 todo"
+                    )
+                    finding.fix_attempts = MAX_FIX_ATTEMPTS
+                else:
+                    finding.auto_fixed = True
+                    fixed_count += 1
 
     _persist_to_sync_status(all_findings)
     _append_history(all_findings)

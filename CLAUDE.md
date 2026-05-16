@@ -102,6 +102,47 @@ session 死掉、context 滿、對話被壓縮都不要緊,
 進度區塊裡的失敗也要明確標示 ❌,不要用模糊用詞掩蓋。
 **失敗策略也是教材**,留著供下次參考。
 
+---
+
+### 23. 改完先制定驗收計畫(2026-05-16 鎖定 by user — 鐵律)
+
+> 「每次改完東西 請自己制定 驗收計畫 寫進紀律裡面」— user 原話
+
+#### 規則
+任何 code 改動完成、commit 之前,**必須先寫下「驗收計畫」**:列出「我怎麼知道這次改的真的有用?」的具體 step,然後**執行那些 step**才算完工。
+
+#### 為什麼
+- 紀律 #22 鎖了「跑了 ≠ 跑對了」,但實務上我常 ship 完 code、curl 一下 200 就算過,**沒驗證行為層面**真的修對
+- 2026-05-16 事故:data_audit 把 mt_stale 排第 2,我從沒驗「連續 3 天會不會被 kbar_adj_null 餓死」 — 結果剛好就餓死 3 天,user 自己看到才發現
+- 2026-05-16 verify cache bug:加 post-fix re-detect 時用 dict cache,第 1 次 smoke test 一打就爆 — 202/204 假驗證失敗。**如果先制定驗收計畫(「跑一次 audit,VERIFY FAILED 比例應 < 10%」),立刻會看到 99% 失敗 = cache 邏輯壞**
+
+#### 驗收計畫模板(每次改動都要填)
+1. **預期行為**:這次改動會讓系統做什麼?(1 句)
+2. **可觀測的訊號**:從外部怎麼看出有沒有做對?(具體 metric / log line / DB 欄位 / HTTP response)
+3. **驗收 step**:做什麼動作觀察那個訊號?(curl / Python script / 後台頁面 / SQL 查詢)
+4. **fail 條件**:訊號變什麼就代表 ship 失敗,要 rollback?
+
+#### 例子
+- 改動:「market_temp_stale 排 CHECKS 第 1 個」
+- 預期行為:每次 audit 跑時,mt_stale 比 kbar_adj_null 先處理
+- 可觀測訊號:`data/audit_history/{today}.log` 裡,mt_stale finding 的 fix_log **不再出現** "skipped: 本輪已修 10 個"
+- 驗收 step:`run_all_checks()` → 讀今日 log → grep `"skipped"` in mt findings 應為 0
+- fail 條件:仍有 mt finding 出現 "skipped"
+
+#### 落地檢查清單(每次 commit 前自問)
+- [ ] 我寫下驗收計畫了嗎?(4 點都有)
+- [ ] 跑了那個計畫嗎?(實際看訊號)
+- [ ] 訊號通過嗎?(不通過 = 不 commit)
+- [ ] 跑完留紀錄(audit_history / git log / 對話紀錄)讓 next session 看得到?
+
+#### 例外
+- 純改文案 / 改 typo / 改 CSS 顯示位置 → 跳過(影響範圍小,目視即可)
+- WIP commit(`wip:` prefix)→ 允許跳過,但 Phase ✅ 仍需執行
+
+跟紀律 #14「不准用行動代替思考」、#16「Phase 完工 = 後端+前端+用戶實際操作」、#22「跑了 ≠ 跑對了」一起鎖,**違反 = 自己制造下一個 user 自己看到的 bug**。
+
+---
+
 ### 22. 「跑了」≠「跑對了」(2026-05-06 鎖定 by user — 鐵律)
 
 > 「能自動修的自動修,修不了的顯示在後台」 — user 原話,設計哲學。
