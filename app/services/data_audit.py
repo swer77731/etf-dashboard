@@ -464,18 +464,21 @@ def _fix_market_temp_stale(finding: "Finding") -> tuple[bool, str]:
 
 CHECKS: list[dict] = [
     {
-        "id": "kbar_adj_null",
-        "label": "K 棒 adj_close 缺漏",
-        "auto_fixable": True,
-        "detect_fn": _detect_kbar_adj_null,
-        "fix_fn": _fix_kbar_adj_null,
-    },
-    {
+        # 排第一:findings 最多 5 個(5 個表),絕不會餓死其他 check;
+        # 排後面會被 kbar_adj_null 200+ findings 吃光預算 → 永遠輪不到。
+        # 2026-05-16 之前排第 2,實際 5-14/5-15 兩天都被 skip,user 看到 market-temp 卡 3 天。
         "id": "market_temp_stale",
         "label": "市場溫度計資料卡住",
         "auto_fixable": True,
         "detect_fn": _detect_market_temp_stale,
         "fix_fn": _fix_market_temp_stale,
+    },
+    {
+        "id": "kbar_adj_null",
+        "label": "K 棒 adj_close 缺漏",
+        "auto_fixable": True,
+        "detect_fn": _detect_kbar_adj_null,
+        "fix_fn": _fix_kbar_adj_null,
     },
     {
         "id": "kbar_stale",
