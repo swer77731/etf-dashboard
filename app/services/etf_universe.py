@@ -41,7 +41,9 @@ def _upsert_etf(
         existing.category = category
         if listed_date:
             existing.listed_date = listed_date
-        existing.is_active = is_active
+        # is_active 不覆寫:由 data_audit / migration / admin 手動操作控制,
+        # FinMind TaiwanStockInfo 對下市 ETF 延遲多年才剃除(00866 已 1957 天無 K 棒
+        # 仍在 list)→ sync 不可信任 FinMind list 狀態反推 active
         return existing, False
     obj = ETF(
         code=code,
