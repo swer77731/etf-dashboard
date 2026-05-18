@@ -735,15 +735,15 @@ def run_all_checks(auto_fix: bool = True) -> dict:
     if auto_fix:
         fixed_count = 0
         for finding in all_findings:
-            if fixed_count >= MAX_FIXES_PER_RUN:
-                finding.fix_log.append(
-                    f"skipped: 本輪已修 {MAX_FIXES_PER_RUN} 個,留待下次"
-                )
-                continue
             if finding.status != "pending":
                 continue
             chk = next((c for c in CHECKS if c["id"] == finding.kind), None)
             if not chk or not chk["fix_fn"]:
+                continue
+            if fixed_count >= MAX_FIXES_PER_RUN:
+                finding.fix_log.append(
+                    f"skipped: 本輪已修 {MAX_FIXES_PER_RUN} 個,留待下次"
+                )
                 continue
             finding.fix_attempts += 1
             try:
