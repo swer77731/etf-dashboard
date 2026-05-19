@@ -428,15 +428,17 @@ def _detect_market_temp_stale() -> list[Finding]:
     )
 
     today = date.today()
-    # 上個交易日(skip 週末):週一往前看上週五,其他往前看一天
-    if today.weekday() == 0:        # Monday → Friday
-        prev_trading_day = today - timedelta(days=3)
-    elif today.weekday() == 6:      # Sunday → Friday
+    # 「最後一個應該有資料的交易日」— audit 23:30 跑時 19:30 cron 應已完成
+    # 今天是交易日 → 期待 today 已入 DB(否則卡 1 天 = flag)
+    # 週末 → 期待上週五
+    # 原本「週一比對上週五」會錯放週一 cron 失敗事件(latest=Fri 一致 → 不 flag),
+    # 結果週一資料卡到週二 audit 才被抓 → user 週二早上看到還停在週五。
+    if today.weekday() < 5:                       # Mon-Fri = today is trading day
+        prev_trading_day = today
+    elif today.weekday() == 5:                    # Saturday → Friday
+        prev_trading_day = today - timedelta(days=1)
+    else:                                          # Sunday → Friday
         prev_trading_day = today - timedelta(days=2)
-    elif today.weekday() == 5:      # Saturday → Friday
-        prev_trading_day = today - timedelta(days=1)
-    else:
-        prev_trading_day = today - timedelta(days=1)
 
     out: list[Finding] = []
     now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
