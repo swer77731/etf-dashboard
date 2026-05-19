@@ -1319,66 +1319,6 @@ def market_temp_backfill_progress(request: Request):
     return s
 
 
-# 臨時 no-auth backfill — 2026-05-19 cron 連續失敗需 Claude 從 local 觸發。
-# 用完移除(同 2026-05-06 adj_close backfill 模式)。
-@router.get("/api/_internal/mt_backfill")
-def _internal_mt_backfill(days: int = 7, token: str = ""):
-    if token != "ck_mt_backfill_2026_05_19":
-        return {"error": "forbidden"}
-    from datetime import date as date_type, timedelta as td_int
-    end = date_type.today()
-    start = end - td_int(days=max(1, min(days, 14)))
-    total = (end - start).days + 1
-    with _MT_BACKFILL_LOCK:
-        if _MT_BACKFILL_STATE["running"]:
-            return {"status": "already_running", **_MT_BACKFILL_STATE}
-        _MT_BACKFILL_STATE.update({
-            "running": True,
-            "started_at": _dt_mt.now().isoformat(timespec="seconds"),
-            "current_date": None,
-            "completed": 0,
-            "total": total,
-            "errors": [],
-            "range": [start.isoformat(), end.isoformat()],
-        })
-
-    def _run():
-        try:
-            from app.services import market_temp_sync
-            d = start
-            while d <= end:
-                _MT_BACKFILL_STATE["current_date"] = d.isoformat()
-                try:
-                    r1 = market_temp_sync.sync_breadth(d)
-                    r2 = market_temp_sync.sync_institutional(d)
-                    r3 = market_temp_sync.sync_lending(d)
-                    r4 = market_temp_sync.sync_margin_short_and_maintenance(d)
-                    for tag, r in [("breadth", r1), ("inst", r2), ("lend", r3), ("ms", r4)]:
-                        if r.get("error"):
-                            _MT_BACKFILL_STATE["errors"].append(f"{d}/{tag}: {r['error'][:120]}")
-                except Exception as e:
-                    _MT_BACKFILL_STATE["errors"].append(f"{d}/raise: {str(e)[:120]}")
-                _MT_BACKFILL_STATE["completed"] += 1
-                d += td_int(days=1)
-        finally:
-            _MT_BACKFILL_STATE["running"] = False
-            _MT_BACKFILL_STATE["current_date"] = None
-
-    t = _th_mt.Thread(target=_run, daemon=True, name="mt-backfill-internal")
-    t.start()
-    return {"status": "started", "range": [start.isoformat(), end.isoformat()], "total": total}
-
-
-@router.get("/api/_internal/mt_backfill/progress")
-def _internal_mt_backfill_progress(token: str = ""):
-    if token != "ck_mt_backfill_2026_05_19":
-        return {"error": "forbidden"}
-    s = dict(_MT_BACKFILL_STATE)
-    if s.get("errors"):
-        s["errors"] = s["errors"][-10:]
-    return s
-
-
 # Bot 歷史紀錄清理 — 刪 analytics_log 中 UA 命中黑名單的 row
 @router.get("/bot-cleanup", response_class=HTMLResponse)
 async def bot_cleanup(request: Request):
